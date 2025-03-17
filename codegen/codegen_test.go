@@ -22,16 +22,45 @@ func TestGenerate(t *testing.T) {
 		*/
 		{
 			Input: ast.Program{
-				MainFunction: ast.Fn{
+				MainFunction: ast.Func{
 					Identifier: "main",
-					Body: []any{
-						ast.Return{V: 42},
+					Body: []ast.Stmt{
+						ast.Return{
+							Expr: ast.Int{V0: 42},
+						},
 					},
 				},
 			},
 			Output: teal.Program{
-				Instructions: []any{
+				Instructions: []teal.Instruction{
 					teal.Int{V0: 42},
+					teal.Return{},
+				},
+			},
+		},
+		/*
+			func main():
+				return 1 + 2
+		*/
+		{
+			Input: ast.Program{
+				MainFunction: ast.Func{
+					Identifier: "main",
+					Body: []ast.Stmt{
+						ast.Return{
+							Expr: ast.Add{
+								L: ast.Int{V0: 1},
+								R: ast.Int{V0: 2},
+							},
+						},
+					},
+				},
+			},
+			Output: teal.Program{
+				Instructions: []teal.Instruction{
+					teal.Int{V0: 1},
+					teal.Int{V0: 2},
+					teal.Add{},
 					teal.Return{},
 				},
 			},
@@ -41,7 +70,7 @@ func TestGenerate(t *testing.T) {
 	for _, tc := range tcs {
 		output := Generate(&tc.Input)
 		if !slices.Equal(output.Instructions, tc.Output.Instructions) {
-			t.Errorf("expected %v, got %v", tc.Output, output)
+			t.Errorf("expected %+v, got %+v", tc.Output, output)
 		}
 	}
 
