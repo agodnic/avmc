@@ -43,6 +43,11 @@ func generateExpr(expr ast.Expr) (instructions []teal.Instruction) {
 		instructions = append(instructions, generateExpr(i.R)...)
 		instructions = append(instructions, teal.Add{})
 		return instructions
+	case ast.Sub:
+		instructions = append(instructions, generateExpr(i.L)...)
+		instructions = append(instructions, generateExpr(i.R)...)
+		instructions = append(instructions, teal.Sub{})
+		return instructions
 	default:
 		//TODO msg := fmt(...)
 		panic("not iplemented")

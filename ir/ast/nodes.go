@@ -40,6 +40,11 @@ type Add struct {
 	R Expr
 }
 
+type Sub struct {
+	L Expr
+	R Expr
+}
+
 // -----------------------------------------------------------------------------
 // Interface tags
 
@@ -49,3 +54,4 @@ func (s Return) stmtTag() {}
 // Expr interface tags
 func (e Add) exprTag() {}
 func (e Int) exprTag() {}
+func (e Sub) exprTag() {}

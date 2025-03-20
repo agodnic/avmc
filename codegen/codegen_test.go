@@ -69,6 +69,20 @@ func TestGenerateExpr(t *testing.T) {
 				teal.Add{},
 			},
 		},
+		/*
+			2 - 1
+		*/
+		{
+			Input: ast.Sub{
+				L: ast.Int{V0: 2},
+				R: ast.Int{V0: 1},
+			},
+			Output: []teal.Instruction{
+				teal.Int{V0: 2},
+				teal.Int{V0: 1},
+				teal.Sub{},
+			},
+		},
 	}
 
 	for _, tc := range tcs {
