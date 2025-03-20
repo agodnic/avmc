@@ -13,6 +13,8 @@ type Instruction interface {
 // Instructions
 type Add struct{}
 type Sub struct{}
+type Mul struct{}
+type Div struct{}
 type Int struct {
 	V0 uint64
 }
@@ -20,6 +22,8 @@ type Return struct{}
 
 // Instruction interface tags
 func (i Add) instructionTag()    {}
+func (i Div) instructionTag()    {}
 func (i Int) instructionTag()    {}
+func (i Mul) instructionTag()    {}
 func (i Return) instructionTag() {}
 func (i Sub) instructionTag()    {}

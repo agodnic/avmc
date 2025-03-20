@@ -85,6 +85,36 @@ func TestGenerateExpr(t *testing.T) {
 				teal.Sub{},
 			},
 		},
+		/*
+			2 * 3
+		*/
+		{
+			Input: ast.BinaryExpr{
+				Op: teal.Mul{},
+				L:  ast.IntLit{V0: 2},
+				R:  ast.IntLit{V0: 3},
+			},
+			Output: []teal.Instruction{
+				teal.Int{V0: 2},
+				teal.Int{V0: 3},
+				teal.Mul{},
+			},
+		},
+		/*
+			4 / 2
+		*/
+		{
+			Input: ast.BinaryExpr{
+				Op: teal.Div{},
+				L:  ast.IntLit{V0: 4},
+				R:  ast.IntLit{V0: 2},
+			},
+			Output: []teal.Instruction{
+				teal.Int{V0: 4},
+				teal.Int{V0: 2},
+				teal.Div{},
+			},
+		},
 	}
 
 	for _, tc := range tcs {
