@@ -8,6 +8,12 @@ import (
 	"github.com/agodnic/avmc/ir/teal"
 )
 
+func assertInstructionsEqual(t *testing.T, actual []teal.Instruction, expected []teal.Instruction) {
+	if !slices.Equal(actual, expected) {
+		t.Errorf("expected %+v, got %+v", expected, actual)
+	}
+}
+
 func TestGenerateFn(t *testing.T) {
 
 	type TestCase struct {
@@ -37,11 +43,7 @@ func TestGenerateFn(t *testing.T) {
 	}
 
 	for _, tc := range tcs {
-		output := generateFn(tc.Input)
-
-		if !slices.Equal(output, tc.Output) {
-			t.Errorf("expected %+v, got %+v", tc.Output, output)
-		}
+		assertInstructionsEqual(t, generateFn(tc.Input), tc.Output)
 	}
 }
 
@@ -70,10 +72,6 @@ func TestGenerateExpr(t *testing.T) {
 	}
 
 	for _, tc := range tcs {
-		output := generateExpr(tc.Input)
-
-		if !slices.Equal(output, tc.Output) {
-			t.Errorf("expected %+v, got %+v", tc.Output, output)
-		}
+		assertInstructionsEqual(t, generateExpr(tc.Input), tc.Output)
 	}
 }
