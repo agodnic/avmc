@@ -38,15 +38,10 @@ func generateExpr(expr ast.Expr) (instructions []teal.Instruction) {
 			teal.Int{V0: i.V0},
 		}
 		return instructions
-	case ast.Add:
+	case ast.BinaryExpr:
 		instructions = append(instructions, generateExpr(i.L)...)
 		instructions = append(instructions, generateExpr(i.R)...)
-		instructions = append(instructions, teal.Add{})
-		return instructions
-	case ast.Sub:
-		instructions = append(instructions, generateExpr(i.L)...)
-		instructions = append(instructions, generateExpr(i.R)...)
-		instructions = append(instructions, teal.Sub{})
+		instructions = append(instructions, i.Op)
 		return instructions
 	default:
 		//TODO msg := fmt(...)

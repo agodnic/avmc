@@ -59,9 +59,10 @@ func TestGenerateExpr(t *testing.T) {
 			1 + 2
 		*/
 		{
-			Input: ast.Add{
-				L: ast.Int{V0: 1},
-				R: ast.Int{V0: 2},
+			Input: ast.BinaryExpr{
+				Op: teal.Add{},
+				L:  ast.Int{V0: 1},
+				R:  ast.Int{V0: 2},
 			},
 			Output: []teal.Instruction{
 				teal.Int{V0: 1},
@@ -73,9 +74,10 @@ func TestGenerateExpr(t *testing.T) {
 			2 - 1
 		*/
 		{
-			Input: ast.Sub{
-				L: ast.Int{V0: 2},
-				R: ast.Int{V0: 1},
+			Input: ast.BinaryExpr{
+				Op: teal.Sub{},
+				L:  ast.Int{V0: 2},
+				R:  ast.Int{V0: 1},
 			},
 			Output: []teal.Instruction{
 				teal.Int{V0: 2},

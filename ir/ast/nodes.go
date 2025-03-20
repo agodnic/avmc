@@ -1,5 +1,7 @@
 package ast
 
+import "github.com/agodnic/avmc/ir/teal"
+
 // https://go.dev/src/go/ast/ast.go?s=1405:1446#L29
 
 // -----------------------------------------------------------------------------
@@ -10,7 +12,7 @@ type Stmt interface {
 	stmtTag()
 }
 
-// All expression nodes implement the Stmt interface
+// All expression nodes implement the Expr interface
 type Expr interface {
 	exprTag()
 }
@@ -35,14 +37,10 @@ type Int struct {
 	V0 uint64
 }
 
-type Add struct {
-	L Expr
-	R Expr
-}
-
-type Sub struct {
-	L Expr
-	R Expr
+type BinaryExpr struct {
+	Op teal.Instruction
+	L  Expr
+	R  Expr
 }
 
 // -----------------------------------------------------------------------------
@@ -52,6 +50,5 @@ type Sub struct {
 func (s Return) stmtTag() {}
 
 // Expr interface tags
-func (e Add) exprTag() {}
-func (e Int) exprTag() {}
-func (e Sub) exprTag() {}
+func (e BinaryExpr) exprTag() {}
+func (e Int) exprTag()        {}
