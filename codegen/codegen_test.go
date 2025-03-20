@@ -17,7 +17,7 @@ func assertInstructionsEqual(t *testing.T, actual []teal.Instruction, expected [
 func TestGenerateFn(t *testing.T) {
 
 	type TestCase struct {
-		Input  ast.Func
+		Input  ast.FuncDecl
 		Output []teal.Instruction
 	}
 
@@ -27,11 +27,11 @@ func TestGenerateFn(t *testing.T) {
 				return 42
 		*/
 		{
-			Input: ast.Func{
+			Input: ast.FuncDecl{
 				Identifier: "main",
 				Body: []ast.Stmt{
 					ast.Return{
-						Expr: ast.Int{V0: 42},
+						Expr: ast.IntLit{V0: 42},
 					},
 				},
 			},
@@ -61,8 +61,8 @@ func TestGenerateExpr(t *testing.T) {
 		{
 			Input: ast.BinaryExpr{
 				Op: teal.Add{},
-				L:  ast.Int{V0: 1},
-				R:  ast.Int{V0: 2},
+				L:  ast.IntLit{V0: 1},
+				R:  ast.IntLit{V0: 2},
 			},
 			Output: []teal.Instruction{
 				teal.Int{V0: 1},
@@ -76,8 +76,8 @@ func TestGenerateExpr(t *testing.T) {
 		{
 			Input: ast.BinaryExpr{
 				Op: teal.Sub{},
-				L:  ast.Int{V0: 2},
-				R:  ast.Int{V0: 1},
+				L:  ast.IntLit{V0: 2},
+				R:  ast.IntLit{V0: 1},
 			},
 			Output: []teal.Instruction{
 				teal.Int{V0: 2},

@@ -21,10 +21,10 @@ type Expr interface {
 // Structs that represent non-terminal nodes in the AST
 
 type Program struct {
-	MainFunction Func
+	MainFunction FuncDecl
 }
 
-type Func struct {
+type FuncDecl struct {
 	Identifier string
 	Body       []Stmt
 }
@@ -33,7 +33,7 @@ type Return struct {
 	Expr Expr
 }
 
-type Int struct {
+type IntLit struct {
 	V0 uint64
 }
 
@@ -51,4 +51,4 @@ func (s Return) stmtTag() {}
 
 // Expr interface tags
 func (e BinaryExpr) exprTag() {}
-func (e Int) exprTag()        {}
+func (e IntLit) exprTag()     {}

@@ -12,7 +12,7 @@ func Generate(program *ast.Program) teal.Program {
 	}
 }
 
-func generateFn(fn ast.Func) []teal.Instruction {
+func generateFn(fn ast.FuncDecl) []teal.Instruction {
 
 	var instructions []teal.Instruction
 
@@ -33,7 +33,7 @@ func generateFn(fn ast.Func) []teal.Instruction {
 func generateExpr(expr ast.Expr) (instructions []teal.Instruction) {
 
 	switch i := expr.(type) {
-	case ast.Int:
+	case ast.IntLit:
 		instructions = []teal.Instruction{
 			teal.Int{V0: i.V0},
 		}
