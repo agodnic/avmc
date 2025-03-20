@@ -8,11 +8,11 @@ import (
 	"github.com/agodnic/avmc/ir/teal"
 )
 
-func TestGenerate(t *testing.T) {
+func TestGenerateFn(t *testing.T) {
 
 	type TestCase struct {
-		Input  ast.Program
-		Output teal.Program
+		Input  ast.Func
+		Output []teal.Instruction
 	}
 
 	tcs := []TestCase{
@@ -21,57 +21,59 @@ func TestGenerate(t *testing.T) {
 				return 42
 		*/
 		{
-			Input: ast.Program{
-				MainFunction: ast.Func{
-					Identifier: "main",
-					Body: []ast.Stmt{
-						ast.Return{
-							Expr: ast.Int{V0: 42},
-						},
+			Input: ast.Func{
+				Identifier: "main",
+				Body: []ast.Stmt{
+					ast.Return{
+						Expr: ast.Int{V0: 42},
 					},
 				},
 			},
-			Output: teal.Program{
-				Instructions: []teal.Instruction{
-					teal.Int{V0: 42},
-					teal.Return{},
-				},
-			},
-		},
-		/*
-			func main():
-				return 1 + 2
-		*/
-		{
-			Input: ast.Program{
-				MainFunction: ast.Func{
-					Identifier: "main",
-					Body: []ast.Stmt{
-						ast.Return{
-							Expr: ast.Add{
-								L: ast.Int{V0: 1},
-								R: ast.Int{V0: 2},
-							},
-						},
-					},
-				},
-			},
-			Output: teal.Program{
-				Instructions: []teal.Instruction{
-					teal.Int{V0: 1},
-					teal.Int{V0: 2},
-					teal.Add{},
-					teal.Return{},
-				},
+			Output: []teal.Instruction{
+				teal.Int{V0: 42},
+				teal.Return{},
 			},
 		},
 	}
 
 	for _, tc := range tcs {
-		output := Generate(&tc.Input)
-		if !slices.Equal(output.Instructions, tc.Output.Instructions) {
+		output := generateFn(tc.Input)
+
+		if !slices.Equal(output, tc.Output) {
 			t.Errorf("expected %+v, got %+v", tc.Output, output)
 		}
 	}
+}
 
+func TestGenerateExpr(t *testing.T) {
+
+	type TestCase struct {
+		Input  ast.Expr
+		Output []teal.Instruction
+	}
+
+	tcs := []TestCase{
+		/*
+			1 + 2
+		*/
+		{
+			Input: ast.Add{
+				L: ast.Int{V0: 1},
+				R: ast.Int{V0: 2},
+			},
+			Output: []teal.Instruction{
+				teal.Int{V0: 1},
+				teal.Int{V0: 2},
+				teal.Add{},
+			},
+		},
+	}
+
+	for _, tc := range tcs {
+		output := generateExpr(tc.Input)
+
+		if !slices.Equal(output, tc.Output) {
+			t.Errorf("expected %+v, got %+v", tc.Output, output)
+		}
+	}
 }

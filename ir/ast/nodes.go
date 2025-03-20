@@ -1,13 +1,9 @@
 package ast
 
-type Program struct {
-	MainFunction Func
-}
+// https://go.dev/src/go/ast/ast.go?s=1405:1446#L29
 
-type Func struct {
-	Identifier string
-	Body       []Stmt
-}
+// -----------------------------------------------------------------------------
+// Interfaces that represent non-terminal nodes in the AST
 
 // All statement nodes implement the Stmt interface
 type Stmt interface {
@@ -17,6 +13,18 @@ type Stmt interface {
 // All expression nodes implement the Stmt interface
 type Expr interface {
 	exprTag()
+}
+
+// -----------------------------------------------------------------------------
+// Structs that represent non-terminal nodes in the AST
+
+type Program struct {
+	MainFunction Func
+}
+
+type Func struct {
+	Identifier string
+	Body       []Stmt
 }
 
 type Return struct {
@@ -31,6 +39,9 @@ type Add struct {
 	L Expr
 	R Expr
 }
+
+// -----------------------------------------------------------------------------
+// Interface tags
 
 // Stmt interface tags
 func (s Return) stmtTag() {}
