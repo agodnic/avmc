@@ -18,16 +18,34 @@ type (
 	// /
 	Div struct{}
 
+	// ==
+	Eq struct{}
+
+	// >
+	Gt struct{}
+
+	// >=
+	Gte struct{}
+
 	// int <i>
 	Int struct {
 		V0 uint64
 	}
+
+	// <
+	Lt struct{}
+
+	// <=
+	Lte struct{}
 
 	// !
 	LogicalNot struct{}
 
 	// *
 	Mul struct{}
+
+	// !=
+	Ne struct{}
 
 	// return
 	Return struct{}
@@ -39,8 +57,14 @@ type (
 // Mnemonic interface tags
 func (i Add) mnemonicTag()        {}
 func (i Div) mnemonicTag()        {}
+func (i Eq) mnemonicTag()         {}
+func (i Gt) mnemonicTag()         {}
+func (i Gte) mnemonicTag()        {}
 func (i Int) mnemonicTag()        {}
+func (i Lt) mnemonicTag()         {}
+func (i Lte) mnemonicTag()        {}
 func (i LogicalNot) mnemonicTag() {}
 func (i Mul) mnemonicTag()        {}
+func (i Ne) mnemonicTag()         {}
 func (i Return) mnemonicTag()     {}
 func (i Sub) mnemonicTag()        {}

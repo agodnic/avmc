@@ -128,6 +128,96 @@ func TestGenerateExpr(t *testing.T) {
 				teal.LogicalNot{},
 			},
 		},
+		/*
+			==
+		*/
+		{
+			Input: ast.BinaryExpr{
+				Op: teal.Eq{},
+				L:  ast.IntLit{V0: 1},
+				R:  ast.IntLit{V0: 2},
+			},
+			Output: []teal.Mnemonic{
+				teal.Int{V0: 1},
+				teal.Int{V0: 2},
+				teal.Eq{},
+			},
+		},
+		/*
+			!=
+		*/
+		{
+			Input: ast.BinaryExpr{
+				Op: teal.Ne{},
+				L:  ast.IntLit{V0: 1},
+				R:  ast.IntLit{V0: 2},
+			},
+			Output: []teal.Mnemonic{
+				teal.Int{V0: 1},
+				teal.Int{V0: 2},
+				teal.Ne{},
+			},
+		},
+		/*
+			>
+		*/
+		{
+			Input: ast.BinaryExpr{
+				Op: teal.Gt{},
+				L:  ast.IntLit{V0: 1},
+				R:  ast.IntLit{V0: 2},
+			},
+			Output: []teal.Mnemonic{
+				teal.Int{V0: 1},
+				teal.Int{V0: 2},
+				teal.Gt{},
+			},
+		},
+		/*
+			>=
+		*/
+		{
+			Input: ast.BinaryExpr{
+				Op: teal.Gte{},
+				L:  ast.IntLit{V0: 1},
+				R:  ast.IntLit{V0: 2},
+			},
+			Output: []teal.Mnemonic{
+				teal.Int{V0: 1},
+				teal.Int{V0: 2},
+				teal.Gte{},
+			},
+		},
+		/*
+			<
+		*/
+		{
+			Input: ast.BinaryExpr{
+				Op: teal.Lt{},
+				L:  ast.IntLit{V0: 1},
+				R:  ast.IntLit{V0: 2},
+			},
+			Output: []teal.Mnemonic{
+				teal.Int{V0: 1},
+				teal.Int{V0: 2},
+				teal.Lt{},
+			},
+		},
+		/*
+			<=
+		*/
+		{
+			Input: ast.BinaryExpr{
+				Op: teal.Lte{},
+				L:  ast.IntLit{V0: 1},
+				R:  ast.IntLit{V0: 2},
+			},
+			Output: []teal.Mnemonic{
+				teal.Int{V0: 1},
+				teal.Int{V0: 2},
+				teal.Lte{},
+			},
+		},
 	}
 
 	for _, tc := range tcs {
