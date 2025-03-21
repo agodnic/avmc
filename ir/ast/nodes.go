@@ -6,6 +6,8 @@ import "github.com/agodnic/avmc/ir/teal"
 
 // -----------------------------------------------------------------------------
 // Interfaces that represent non-terminal nodes in the AST
+//
+// These interfaces are used to emulate some sort of pattern-matching.
 
 // All statement nodes implement the Stmt interface
 type Stmt interface {
@@ -24,29 +26,41 @@ type Program struct {
 	MainFunction FuncDecl
 }
 
-type FuncDecl struct {
-	Identifier string
-	Body       []Stmt
-}
+// Declaration nodes
+type (
+	FuncDecl struct {
+		Identifier string
+		Body       []Stmt
+	}
+)
 
-type Return struct {
-	Expr Expr
-}
+// Expression nodes
+type (
+	// BinaryExpr represents a binary expression
+	BinaryExpr struct {
+		Op teal.Instruction
+		L  Expr
+		R  Expr
+	}
 
-type IntLit struct {
-	V0 uint64
-}
+	// IntLit represents a literal integer expression
+	IntLit struct {
+		V0 uint64
+	}
 
-type BinaryExpr struct {
-	Op teal.Instruction
-	L  Expr
-	R  Expr
-}
+	// UnaryExpr represents a unary expression
+	UnaryExpr struct {
+		Op   teal.Instruction
+		Expr Expr
+	}
+)
 
-type UnaryExpr struct {
-	Op   teal.Instruction
-	Expr Expr
-}
+// Statement nodes
+type (
+	Return struct {
+		Expr Expr
+	}
+)
 
 // -----------------------------------------------------------------------------
 // Interface tags
