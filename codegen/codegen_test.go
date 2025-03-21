@@ -218,6 +218,36 @@ func TestGenerateExpr(t *testing.T) {
 				teal.Lte{},
 			},
 		},
+		/*
+			&&
+		*/
+		{
+			Input: ast.BinaryExpr{
+				Op: teal.LogicalAnd{},
+				L:  ast.IntLit{V0: 1},
+				R:  ast.IntLit{V0: 2},
+			},
+			Output: []teal.Mnemonic{
+				teal.Int{V0: 1},
+				teal.Int{V0: 2},
+				teal.LogicalAnd{},
+			},
+		},
+		/*
+			||
+		*/
+		{
+			Input: ast.BinaryExpr{
+				Op: teal.LogicalOr{},
+				L:  ast.IntLit{V0: 1},
+				R:  ast.IntLit{V0: 2},
+			},
+			Output: []teal.Mnemonic{
+				teal.Int{V0: 1},
+				teal.Int{V0: 2},
+				teal.LogicalOr{},
+			},
+		},
 	}
 
 	for _, tc := range tcs {

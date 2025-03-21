@@ -38,8 +38,14 @@ type (
 	// <=
 	Lte struct{}
 
+	// &&
+	LogicalAnd struct{}
+
 	// !
 	LogicalNot struct{}
+
+	// ||
+	LogicalOr struct{}
 
 	// *
 	Mul struct{}
@@ -63,7 +69,9 @@ func (i Gte) mnemonicTag()        {}
 func (i Int) mnemonicTag()        {}
 func (i Lt) mnemonicTag()         {}
 func (i Lte) mnemonicTag()        {}
+func (i LogicalAnd) mnemonicTag() {}
 func (i LogicalNot) mnemonicTag() {}
+func (i LogicalOr) mnemonicTag()  {}
 func (i Mul) mnemonicTag()        {}
 func (i Ne) mnemonicTag()         {}
 func (i Return) mnemonicTag()     {}
