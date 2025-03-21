@@ -2,30 +2,45 @@ package teal
 
 // Program is a high-level representation of a TEAL program
 type Program struct {
-	Instructions []Instruction
+	Mnemonics []Mnemonic
 }
 
-// All instructions implement the Instruction interface
-type Instruction interface {
-	instructionTag()
+// All mnemonics implement the Mnemonic interface
+type Mnemonic interface {
+	mnemonicTag()
 }
 
-// Instructions
-type Add struct{}
-type Sub struct{}
-type Mul struct{}
-type Div struct{}
-type LogicalNot struct{}
-type Int struct {
-	V0 uint64
-}
-type Return struct{}
+// Mnemonics
+type (
+	// +
+	Add struct{}
 
-// Instruction interface tags
-func (i Add) instructionTag()        {}
-func (i Div) instructionTag()        {}
-func (i Int) instructionTag()        {}
-func (i LogicalNot) instructionTag() {}
-func (i Mul) instructionTag()        {}
-func (i Return) instructionTag()     {}
-func (i Sub) instructionTag()        {}
+	// /
+	Div struct{}
+
+	// int <i>
+	Int struct {
+		V0 uint64
+	}
+
+	// !
+	LogicalNot struct{}
+
+	// *
+	Mul struct{}
+
+	// return
+	Return struct{}
+
+	// -
+	Sub struct{}
+)
+
+// Mnemonic interface tags
+func (i Add) mnemonicTag()        {}
+func (i Div) mnemonicTag()        {}
+func (i Int) mnemonicTag()        {}
+func (i LogicalNot) mnemonicTag() {}
+func (i Mul) mnemonicTag()        {}
+func (i Return) mnemonicTag()     {}
+func (i Sub) mnemonicTag()        {}

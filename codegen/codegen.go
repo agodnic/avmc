@@ -6,47 +6,47 @@ import (
 )
 
 func Generate(program *ast.Program) teal.Program {
-	instructions := generateFn(program.MainFunction)
+	mnemonics := generateFn(program.MainFunction)
 	return teal.Program{
-		Instructions: instructions,
+		Mnemonics: mnemonics,
 	}
 }
 
-func generateFn(fn ast.FuncDecl) []teal.Instruction {
+func generateFn(fn ast.FuncDecl) []teal.Mnemonic {
 
-	var instructions []teal.Instruction
+	var mnemonics []teal.Mnemonic
 
 	for _, stmt := range fn.Body {
 		switch i := stmt.(type) {
 		case (ast.Return):
-			instructions = append(instructions, generateExpr(i.Expr)...)
-			instructions = append(instructions, teal.Return{})
+			mnemonics = append(mnemonics, generateExpr(i.Expr)...)
+			mnemonics = append(mnemonics, teal.Return{})
 		default:
 			//TODO msg := fmt(...)
 			panic("not iplemented")
 		}
 	}
 
-	return instructions
+	return mnemonics
 }
 
-func generateExpr(expr ast.Expr) (instructions []teal.Instruction) {
+func generateExpr(expr ast.Expr) (mnemonics []teal.Mnemonic) {
 
 	switch i := expr.(type) {
 	case ast.IntLit:
-		instructions = []teal.Instruction{
+		mnemonics = []teal.Mnemonic{
 			teal.Int{V0: i.V0},
 		}
-		return instructions
+		return mnemonics
 	case ast.BinaryExpr:
-		instructions = append(instructions, generateExpr(i.L)...)
-		instructions = append(instructions, generateExpr(i.R)...)
-		instructions = append(instructions, i.Op)
-		return instructions
+		mnemonics = append(mnemonics, generateExpr(i.L)...)
+		mnemonics = append(mnemonics, generateExpr(i.R)...)
+		mnemonics = append(mnemonics, i.Op)
+		return mnemonics
 	case ast.UnaryExpr:
-		instructions = append(instructions, generateExpr(i.Expr)...)
-		instructions = append(instructions, i.Op)
-		return instructions
+		mnemonics = append(mnemonics, generateExpr(i.Expr)...)
+		mnemonics = append(mnemonics, i.Op)
+		return mnemonics
 	default:
 		//TODO msg := fmt(...)
 		panic("not iplemented")

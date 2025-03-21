@@ -38,7 +38,7 @@ type (
 type (
 	// BinaryExpr represents a binary expression
 	BinaryExpr struct {
-		Op teal.Instruction
+		Op teal.Mnemonic
 		L  Expr
 		R  Expr
 	}
@@ -50,7 +50,7 @@ type (
 
 	// UnaryExpr represents a unary expression
 	UnaryExpr struct {
-		Op   teal.Instruction
+		Op   teal.Mnemonic
 		Expr Expr
 	}
 )

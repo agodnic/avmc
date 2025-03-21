@@ -8,7 +8,7 @@ import (
 	"github.com/agodnic/avmc/ir/teal"
 )
 
-func assertInstructionsEqual(t *testing.T, actual []teal.Instruction, expected []teal.Instruction) {
+func assertMnemonicsEqual(t *testing.T, actual []teal.Mnemonic, expected []teal.Mnemonic) {
 	if !slices.Equal(actual, expected) {
 		t.Errorf("expected %+v, got %+v", expected, actual)
 	}
@@ -18,7 +18,7 @@ func TestGenerateFn(t *testing.T) {
 
 	type TestCase struct {
 		Input  ast.FuncDecl
-		Output []teal.Instruction
+		Output []teal.Mnemonic
 	}
 
 	tcs := []TestCase{
@@ -35,7 +35,7 @@ func TestGenerateFn(t *testing.T) {
 					},
 				},
 			},
-			Output: []teal.Instruction{
+			Output: []teal.Mnemonic{
 				teal.Int{V0: 42},
 				teal.Return{},
 			},
@@ -43,7 +43,7 @@ func TestGenerateFn(t *testing.T) {
 	}
 
 	for _, tc := range tcs {
-		assertInstructionsEqual(t, generateFn(tc.Input), tc.Output)
+		assertMnemonicsEqual(t, generateFn(tc.Input), tc.Output)
 	}
 }
 
@@ -51,7 +51,7 @@ func TestGenerateExpr(t *testing.T) {
 
 	type TestCase struct {
 		Input  ast.Expr
-		Output []teal.Instruction
+		Output []teal.Mnemonic
 	}
 
 	tcs := []TestCase{
@@ -64,7 +64,7 @@ func TestGenerateExpr(t *testing.T) {
 				L:  ast.IntLit{V0: 1},
 				R:  ast.IntLit{V0: 2},
 			},
-			Output: []teal.Instruction{
+			Output: []teal.Mnemonic{
 				teal.Int{V0: 1},
 				teal.Int{V0: 2},
 				teal.Add{},
@@ -79,7 +79,7 @@ func TestGenerateExpr(t *testing.T) {
 				L:  ast.IntLit{V0: 2},
 				R:  ast.IntLit{V0: 1},
 			},
-			Output: []teal.Instruction{
+			Output: []teal.Mnemonic{
 				teal.Int{V0: 2},
 				teal.Int{V0: 1},
 				teal.Sub{},
@@ -94,7 +94,7 @@ func TestGenerateExpr(t *testing.T) {
 				L:  ast.IntLit{V0: 2},
 				R:  ast.IntLit{V0: 3},
 			},
-			Output: []teal.Instruction{
+			Output: []teal.Mnemonic{
 				teal.Int{V0: 2},
 				teal.Int{V0: 3},
 				teal.Mul{},
@@ -109,7 +109,7 @@ func TestGenerateExpr(t *testing.T) {
 				L:  ast.IntLit{V0: 4},
 				R:  ast.IntLit{V0: 2},
 			},
-			Output: []teal.Instruction{
+			Output: []teal.Mnemonic{
 				teal.Int{V0: 4},
 				teal.Int{V0: 2},
 				teal.Div{},
@@ -123,7 +123,7 @@ func TestGenerateExpr(t *testing.T) {
 				Op:   teal.LogicalNot{},
 				Expr: ast.IntLit{V0: 1},
 			},
-			Output: []teal.Instruction{
+			Output: []teal.Mnemonic{
 				teal.Int{V0: 1},
 				teal.LogicalNot{},
 			},
@@ -131,6 +131,6 @@ func TestGenerateExpr(t *testing.T) {
 	}
 
 	for _, tc := range tcs {
-		assertInstructionsEqual(t, generateExpr(tc.Input), tc.Output)
+		assertMnemonicsEqual(t, generateExpr(tc.Input), tc.Output)
 	}
 }
