@@ -43,6 +43,11 @@ type BinaryExpr struct {
 	R  Expr
 }
 
+type UnaryExpr struct {
+	Op   teal.Instruction
+	Expr Expr
+}
+
 // -----------------------------------------------------------------------------
 // Interface tags
 
@@ -52,3 +57,4 @@ func (s Return) stmtTag() {}
 // Expr interface tags
 func (e BinaryExpr) exprTag() {}
 func (e IntLit) exprTag()     {}
+func (e UnaryExpr) exprTag()  {}

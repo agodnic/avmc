@@ -115,6 +115,19 @@ func TestGenerateExpr(t *testing.T) {
 				teal.Div{},
 			},
 		},
+		/*
+			!true
+		*/
+		{
+			Input: ast.UnaryExpr{
+				Op:   teal.LogicalNot{},
+				Expr: ast.IntLit{V0: 1},
+			},
+			Output: []teal.Instruction{
+				teal.Int{V0: 1},
+				teal.LogicalNot{},
+			},
+		},
 	}
 
 	for _, tc := range tcs {
