@@ -40,30 +40,51 @@ func TestGenerateFn(t *testing.T) {
 				teal.Return{},
 			},
 		},
+	}
+
+	for _, tc := range tcs {
+		assertMnemonicsEqual(t, generateFn(tc.Input), tc.Output)
+	}
+}
+
+func TestGenerateStmt(t *testing.T) {
+
+	type TestCase struct {
+		Input  ast.Stmt
+		Output []teal.Mnemonic
+	}
+
+	tcs := []TestCase{
 		/*
-			func main():
-				if true:
-					return 1
-				else:
-					return 0
+			return 42
 		*/
 		{
-			Input: ast.FuncDecl{
-				Identifier: "main",
-				Body: []ast.Stmt{
-					ast.If{
-						BaseLabelsName: "L0",
-						Cond:           ast.IntLit{V0: 1},
-						Then: []ast.Stmt{
-							ast.Return{
-								Expr: ast.IntLit{V0: 1},
-							},
-						},
-						Else: []ast.Stmt{
-							ast.Return{
-								Expr: ast.IntLit{V0: 0},
-							},
-						},
+			Input: ast.Return{
+				Expr: ast.IntLit{V0: 42},
+			},
+			Output: []teal.Mnemonic{
+				teal.Int{V0: 42},
+				teal.Return{},
+			},
+		},
+		/*
+			if true:
+				return 1
+			else:
+				return 0
+		*/
+		{
+			Input: ast.If{
+				BaseLabelsName: "L0",
+				Cond:           ast.IntLit{V0: 1},
+				Then: []ast.Stmt{
+					ast.Return{
+						Expr: ast.IntLit{V0: 1},
+					},
+				},
+				Else: []ast.Stmt{
+					ast.Return{
+						Expr: ast.IntLit{V0: 0},
 					},
 				},
 			},
@@ -89,7 +110,7 @@ func TestGenerateFn(t *testing.T) {
 	}
 
 	for _, tc := range tcs {
-		assertMnemonicsEqual(t, generateFn(tc.Input), tc.Output)
+		assertMnemonicsEqual(t, generateStmt(tc.Input), tc.Output)
 	}
 }
 
