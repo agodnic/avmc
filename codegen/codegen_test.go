@@ -1,7 +1,7 @@
 package codegen
 
 import (
-	"slices"
+	"reflect"
 	"testing"
 
 	"github.com/agodnic/avmc/ir/ast"
@@ -9,7 +9,7 @@ import (
 )
 
 func assertMnemonicsEqual(t *testing.T, actual []teal.Mnemonic, expected []teal.Mnemonic) {
-	if !slices.Equal(actual, expected) {
+	if !reflect.DeepEqual(actual, expected) {
 		t.Errorf("expected %+v, got %+v", expected, actual)
 	}
 }
@@ -134,12 +134,12 @@ func TestGenerateExpr(t *testing.T) {
 		{
 			Input: ast.BinaryExpr{
 				Op: teal.Eq{},
-				L:  ast.IntLit{V0: 1},
-				R:  ast.IntLit{V0: 2},
+				L:  ast.BytesLit{V0: []byte{1, 1}},
+				R:  ast.BytesLit{V0: []byte{2, 2}},
 			},
 			Output: []teal.Mnemonic{
-				teal.Int{V0: 1},
-				teal.Int{V0: 2},
+				teal.Bytes{V0: []byte{1, 1}},
+				teal.Bytes{V0: []byte{2, 2}},
 				teal.Eq{},
 			},
 		},

@@ -15,6 +15,11 @@ type (
 	// +
 	Add struct{}
 
+	// byte <b>
+	Bytes struct {
+		V0 []byte
+	}
+
 	// /
 	Div struct{}
 
@@ -62,6 +67,7 @@ type (
 
 // Mnemonic interface tags
 func (i Add) mnemonicTag()        {}
+func (i Bytes) mnemonicTag()      {}
 func (i Div) mnemonicTag()        {}
 func (i Eq) mnemonicTag()         {}
 func (i Gt) mnemonicTag()         {}

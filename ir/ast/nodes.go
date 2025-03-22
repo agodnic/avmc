@@ -43,6 +43,11 @@ type (
 		R  Expr
 	}
 
+	// BytesLit represents a literal byte array expression
+	BytesLit struct {
+		V0 []byte
+	}
+
 	// IntLit represents a literal integer expression
 	IntLit struct {
 		V0 uint64
@@ -70,5 +75,6 @@ func (s Return) stmtTag() {}
 
 // Expr interface tags
 func (e BinaryExpr) exprTag() {}
+func (e BytesLit) exprTag()   {}
 func (e IntLit) exprTag()     {}
 func (e UnaryExpr) exprTag()  {}
