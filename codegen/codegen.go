@@ -40,7 +40,7 @@ func generateExpr(expr ast.Expr) (mnemonics []teal.Mnemonic) {
 		return mnemonics
 	case ast.BytesLit:
 		mnemonics = []teal.Mnemonic{
-			teal.Bytes{V0: i.V0},
+			teal.Byte{V0: i.V0},
 		}
 		return mnemonics
 	case ast.BinaryExpr:

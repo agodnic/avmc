@@ -15,8 +15,23 @@ type (
 	// +
 	Add struct{}
 
+	// b <label>
+	B struct {
+		Label *Mnemonic
+	}
+
+	// bnz <label>
+	Bnz struct {
+		Label *Mnemonic
+	}
+
+	// bz <label>
+	Bz struct {
+		Label *Mnemonic
+	}
+
 	// byte <b>
-	Bytes struct {
+	Byte struct {
 		V0 []byte
 	}
 
@@ -67,7 +82,10 @@ type (
 
 // Mnemonic interface tags
 func (i Add) mnemonicTag()        {}
-func (i Bytes) mnemonicTag()      {}
+func (i B) mnemonicTag()          {}
+func (i Bnz) mnemonicTag()        {}
+func (i Bz) mnemonicTag()         {}
+func (i Byte) mnemonicTag()       {}
 func (i Div) mnemonicTag()        {}
 func (i Eq) mnemonicTag()         {}
 func (i Gt) mnemonicTag()         {}

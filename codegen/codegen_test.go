@@ -138,8 +138,8 @@ func TestGenerateExpr(t *testing.T) {
 				R:  ast.BytesLit{V0: []byte{2, 2}},
 			},
 			Output: []teal.Mnemonic{
-				teal.Bytes{V0: []byte{1, 1}},
-				teal.Bytes{V0: []byte{2, 2}},
+				teal.Byte{V0: []byte{1, 1}},
+				teal.Byte{V0: []byte{2, 2}},
 				teal.Eq{},
 			},
 		},
