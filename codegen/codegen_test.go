@@ -40,6 +40,52 @@ func TestGenerateFn(t *testing.T) {
 				teal.Return{},
 			},
 		},
+		/*
+			func main():
+				if true:
+					return 1
+				else:
+					return 0
+		*/
+		{
+			Input: ast.FuncDecl{
+				Identifier: "main",
+				Body: []ast.Stmt{
+					ast.If{
+						BaseLabelsName: "L0",
+						Cond:           ast.IntLit{V0: 1},
+						Then: []ast.Stmt{
+							ast.Return{
+								Expr: ast.IntLit{V0: 1},
+							},
+						},
+						Else: []ast.Stmt{
+							ast.Return{
+								Expr: ast.IntLit{V0: 0},
+							},
+						},
+					},
+				},
+			},
+			Output: []teal.Mnemonic{
+				// test block
+				teal.Int{V0: 1},
+				teal.Bnz{Label: "L0_else"},
+
+				// then block
+				teal.Int{V0: 1},
+				teal.Return{},
+				teal.B{Label: "L0_end"},
+
+				// else block
+				teal.Label{Name: "L0_else"},
+				teal.Int{V0: 0},
+				teal.Return{},
+
+				// end block
+				teal.Label{Name: "L0_end"},
+			},
+		},
 	}
 
 	for _, tc := range tcs {

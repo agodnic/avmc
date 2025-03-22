@@ -17,17 +17,17 @@ type (
 
 	// b <label>
 	B struct {
-		Label *Mnemonic
+		Label string
 	}
 
 	// bnz <label>
 	Bnz struct {
-		Label *Mnemonic
+		Label string
 	}
 
 	// bz <label>
 	Bz struct {
-		Label *Mnemonic
+		Label string
 	}
 
 	// byte <b>
@@ -50,6 +50,11 @@ type (
 	// int <i>
 	Int struct {
 		V0 uint64
+	}
+
+	// <label_name>:
+	Label struct {
+		Name string
 	}
 
 	// <
@@ -91,6 +96,7 @@ func (i Eq) mnemonicTag()         {}
 func (i Gt) mnemonicTag()         {}
 func (i Gte) mnemonicTag()        {}
 func (i Int) mnemonicTag()        {}
+func (i Label) mnemonicTag()      {}
 func (i Lt) mnemonicTag()         {}
 func (i Lte) mnemonicTag()        {}
 func (i LogicalAnd) mnemonicTag() {}

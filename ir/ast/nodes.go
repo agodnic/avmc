@@ -62,6 +62,13 @@ type (
 
 // Statement nodes
 type (
+	If struct {
+		BaseLabelsName string
+		Cond           Expr
+		Then           []Stmt
+		Else           []Stmt
+	}
+
 	Return struct {
 		Expr Expr
 	}
@@ -71,6 +78,7 @@ type (
 // Interface tags
 
 // Stmt interface tags
+func (s If) stmtTag()     {}
 func (s Return) stmtTag() {}
 
 // Expr interface tags

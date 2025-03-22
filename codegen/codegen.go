@@ -17,14 +17,43 @@ func generateFn(fn ast.FuncDecl) []teal.Mnemonic {
 	var mnemonics []teal.Mnemonic
 
 	for _, stmt := range fn.Body {
-		switch i := stmt.(type) {
-		case (ast.Return):
-			mnemonics = append(mnemonics, generateExpr(i.Expr)...)
-			mnemonics = append(mnemonics, teal.Return{})
-		default:
-			//TODO msg := fmt(...)
-			panic("not iplemented")
+		mnemonics = append(mnemonics, generateStmt(stmt)...)
+	}
+
+	return mnemonics
+}
+
+func generateStmt(stmt ast.Stmt) (mnemonics []teal.Mnemonic) {
+
+	switch i := stmt.(type) {
+	case ast.Return:
+		mnemonics = append(mnemonics, generateExpr(i.Expr)...)
+		mnemonics = append(mnemonics, teal.Return{})
+	case ast.If:
+		elseLabel := i.BaseLabelsName + "_else"
+		endLabel := i.BaseLabelsName + "_end"
+
+		// test block
+		mnemonics = append(mnemonics, teal.Int{V0: 1})
+		mnemonics = append(mnemonics, teal.Bnz{Label: elseLabel})
+
+		// then block
+		for j := range i.Then {
+			mnemonics = append(mnemonics, generateStmt(i.Then[j])...)
 		}
+		mnemonics = append(mnemonics, teal.B{Label: endLabel})
+
+		// else block
+		mnemonics = append(mnemonics, teal.Label{Name: elseLabel})
+		for j := range i.Else {
+			mnemonics = append(mnemonics, generateStmt(i.Else[j])...)
+		}
+
+		// end block
+		mnemonics = append(mnemonics, teal.Label{Name: endLabel})
+	default:
+		//TODO msg := fmt(...)
+		panic("not iplemented")
 	}
 
 	return mnemonics
