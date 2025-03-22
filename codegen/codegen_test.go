@@ -14,7 +14,7 @@ func assertMnemonicsEqual(t *testing.T, actual []teal.Mnemonic, expected []teal.
 	}
 }
 
-func TestGenerateFn(t *testing.T) {
+func TestGenerateFuncDecl(t *testing.T) {
 
 	type TestCase struct {
 		Input  ast.FuncDecl
@@ -43,7 +43,7 @@ func TestGenerateFn(t *testing.T) {
 	}
 
 	for _, tc := range tcs {
-		assertMnemonicsEqual(t, generateFn(tc.Input), tc.Output)
+		assertMnemonicsEqual(t, generateFuncDecl(tc.Input), tc.Output)
 	}
 }
 

@@ -6,13 +6,13 @@ import (
 )
 
 func Generate(program *ast.Program) teal.Program {
-	mnemonics := generateFn(program.MainFunction)
+	mnemonics := generateFuncDecl(program.MainFunction)
 	return teal.Program{
 		Mnemonics: mnemonics,
 	}
 }
 
-func generateFn(fn ast.FuncDecl) []teal.Mnemonic {
+func generateFuncDecl(fn ast.FuncDecl) []teal.Mnemonic {
 
 	var mnemonics []teal.Mnemonic
 
