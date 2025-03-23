@@ -137,6 +137,21 @@ func TestGenerateFunctionCall(t *testing.T) {
 				teal.Len{},
 			},
 		},
+		/*
+			sha256("\x00")
+		*/
+		{
+			Input: ast.FunctionCall{
+				FuncName: "sha256",
+				Args: []ast.Expr{
+					ast.BytesLit{V0: []byte{0}},
+				},
+			},
+			Output: []teal.Mnemonic{
+				teal.Byte{V0: []byte{0}},
+				teal.Sha256{},
+			},
+		},
 	}
 
 	for _, tc := range tcs {

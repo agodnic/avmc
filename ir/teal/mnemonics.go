@@ -84,6 +84,9 @@ type (
 	// return
 	Return struct{}
 
+	// sha256
+	Sha256 struct{}
+
 	// -
 	Sub struct{}
 )
@@ -109,4 +112,5 @@ func (i LogicalOr) mnemonicTag()  {}
 func (i Mul) mnemonicTag()        {}
 func (i Ne) mnemonicTag()         {}
 func (i Return) mnemonicTag()     {}
+func (i Sha256) mnemonicTag()     {}
 func (i Sub) mnemonicTag()        {}

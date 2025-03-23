@@ -103,5 +103,6 @@ func generateExpr(expr ast.Expr) (mnemonics []teal.Mnemonic) {
 }
 
 var builtinFunctionToMnemonic = map[string]teal.Mnemonic{
-	"len": teal.Len{},
+	"len":    teal.Len{},
+	"sha256": teal.Sha256{},
 }
