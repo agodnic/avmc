@@ -166,6 +166,30 @@ func TestGenerateFunctionCall(t *testing.T) {
 				teal.Arg{N: 0},
 			},
 		},
+		/*
+			txn.Sender()
+		*/
+		{
+			Input: ast.FunctionCall{
+				FuncName: "txn.Sender",
+				Args:     []ast.Expr{},
+			},
+			Output: []teal.Mnemonic{
+				teal.Txn{Field: "Sender"},
+			},
+		},
+		/*
+			txn.CloseRemainderTo()
+		*/
+		{
+			Input: ast.FunctionCall{
+				FuncName: "txn.CloseRemainderTo",
+				Args:     []ast.Expr{},
+			},
+			Output: []teal.Mnemonic{
+				teal.Txn{Field: "CloseRemainderTo"},
+			},
+		},
 	}
 
 	for _, tc := range tcs {

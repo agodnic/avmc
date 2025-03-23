@@ -121,6 +121,8 @@ func generateExpr(expr ast.Expr) (mnemonics []teal.Mnemonic) {
 }
 
 var builtinFunctionToMnemonic = map[string]teal.Mnemonic{
-	"len":    teal.Len{},
-	"sha256": teal.Sha256{},
+	"len":                  teal.Len{},
+	"sha256":               teal.Sha256{},
+	"txn.Sender":           teal.Txn{Field: "Sender"},
+	"txn.CloseRemainderTo": teal.Txn{Field: "CloseRemainderTo"},
 }

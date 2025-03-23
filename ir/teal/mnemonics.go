@@ -94,6 +94,11 @@ type (
 
 	// -
 	Sub struct{}
+
+	// txn <field>
+	Txn struct {
+		Field string
+	}
 )
 
 // Mnemonic interface tags
@@ -120,3 +125,4 @@ func (i Ne) mnemonicTag()         {}
 func (i Return) mnemonicTag()     {}
 func (i Sha256) mnemonicTag()     {}
 func (i Sub) mnemonicTag()        {}
+func (i Txn) mnemonicTag()        {}
