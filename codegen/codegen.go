@@ -5,13 +5,6 @@ import (
 	"github.com/agodnic/avmc/ir/teal"
 )
 
-func Generate(program *ast.Program) teal.Program {
-	mnemonics := generateFuncDecl(program.MainFunction)
-	return teal.Program{
-		Mnemonics: mnemonics,
-	}
-}
-
 func generateFuncDecl(fn ast.FuncDecl) []teal.Mnemonic {
 
 	var mnemonics []teal.Mnemonic

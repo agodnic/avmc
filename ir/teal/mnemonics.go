@@ -1,10 +1,5 @@
 package teal
 
-// Program is a high-level representation of a TEAL program
-type Program struct {
-	Mnemonics []Mnemonic
-}
-
 // All mnemonics implement the Mnemonic interface
 type Mnemonic interface {
 	mnemonicTag()
