@@ -5,10 +5,10 @@ import (
 	"testing"
 
 	"github.com/agodnic/avmc/ir/ast"
-	"github.com/agodnic/avmc/ir/teal"
+	"github.com/agodnic/avmc/ir/mnemonic"
 )
 
-func assertMnemonicsEqual(t *testing.T, actual []teal.Mnemonic, expected []teal.Mnemonic) {
+func assertMnemonicsEqual(t *testing.T, actual []mnemonic.Mnemonic, expected []mnemonic.Mnemonic) {
 	if !reflect.DeepEqual(actual, expected) {
 		t.Errorf("expected %+v, got %+v", expected, actual)
 	}
@@ -18,7 +18,7 @@ func TestGenerateFuncDecl(t *testing.T) {
 
 	type TestCase struct {
 		Input  ast.FuncDecl
-		Output []teal.Mnemonic
+		Output []mnemonic.Mnemonic
 	}
 
 	tcs := []TestCase{
@@ -35,9 +35,9 @@ func TestGenerateFuncDecl(t *testing.T) {
 					},
 				},
 			},
-			Output: []teal.Mnemonic{
-				teal.Int{V0: 42},
-				teal.Return{},
+			Output: []mnemonic.Mnemonic{
+				mnemonic.Int{V0: 42},
+				mnemonic.Return{},
 			},
 		},
 	}
@@ -51,7 +51,7 @@ func TestGenerateStmt(t *testing.T) {
 
 	type TestCase struct {
 		Input  ast.Stmt
-		Output []teal.Mnemonic
+		Output []mnemonic.Mnemonic
 	}
 
 	tcs := []TestCase{
@@ -62,9 +62,9 @@ func TestGenerateStmt(t *testing.T) {
 			Input: ast.Return{
 				Expr: ast.IntLit{V0: 42},
 			},
-			Output: []teal.Mnemonic{
-				teal.Int{V0: 42},
-				teal.Return{},
+			Output: []mnemonic.Mnemonic{
+				mnemonic.Int{V0: 42},
+				mnemonic.Return{},
 			},
 		},
 		/*
@@ -88,23 +88,23 @@ func TestGenerateStmt(t *testing.T) {
 					},
 				},
 			},
-			Output: []teal.Mnemonic{
+			Output: []mnemonic.Mnemonic{
 				// test block
-				teal.Int{V0: 1},
-				teal.Bnz{Label: "L0_else"},
+				mnemonic.Int{V0: 1},
+				mnemonic.Bnz{Label: "L0_else"},
 
 				// then block
-				teal.Int{V0: 1},
-				teal.Return{},
-				teal.B{Label: "L0_end"},
+				mnemonic.Int{V0: 1},
+				mnemonic.Return{},
+				mnemonic.B{Label: "L0_end"},
 
 				// else block
-				teal.Label{Name: "L0_else"},
-				teal.Int{V0: 0},
-				teal.Return{},
+				mnemonic.Label{Name: "L0_else"},
+				mnemonic.Int{V0: 0},
+				mnemonic.Return{},
 
 				// end block
-				teal.Label{Name: "L0_end"},
+				mnemonic.Label{Name: "L0_end"},
 			},
 		},
 	}
@@ -118,7 +118,7 @@ func TestGenerateFunctionCall(t *testing.T) {
 
 	type TestCase struct {
 		Input  ast.FunctionCall
-		Output []teal.Mnemonic
+		Output []mnemonic.Mnemonic
 	}
 
 	tcs := []TestCase{
@@ -132,9 +132,9 @@ func TestGenerateFunctionCall(t *testing.T) {
 					ast.BytesLit{V0: []byte{1, 2, 3}},
 				},
 			},
-			Output: []teal.Mnemonic{
-				teal.Byte{V0: []byte{1, 2, 3}},
-				teal.Len{},
+			Output: []mnemonic.Mnemonic{
+				mnemonic.Byte{V0: []byte{1, 2, 3}},
+				mnemonic.Len{},
 			},
 		},
 		/*
@@ -147,9 +147,9 @@ func TestGenerateFunctionCall(t *testing.T) {
 					ast.BytesLit{V0: []byte{0}},
 				},
 			},
-			Output: []teal.Mnemonic{
-				teal.Byte{V0: []byte{0}},
-				teal.Sha256{},
+			Output: []mnemonic.Mnemonic{
+				mnemonic.Byte{V0: []byte{0}},
+				mnemonic.Sha256{},
 			},
 		},
 		/*
@@ -162,8 +162,8 @@ func TestGenerateFunctionCall(t *testing.T) {
 					ast.IntLit{V0: 0},
 				},
 			},
-			Output: []teal.Mnemonic{
-				teal.Arg{N: 0},
+			Output: []mnemonic.Mnemonic{
+				mnemonic.Arg{N: 0},
 			},
 		},
 		/*
@@ -174,8 +174,8 @@ func TestGenerateFunctionCall(t *testing.T) {
 				FuncName: "txn.Sender",
 				Args:     []ast.Expr{},
 			},
-			Output: []teal.Mnemonic{
-				teal.Txn{Field: "Sender"},
+			Output: []mnemonic.Mnemonic{
+				mnemonic.Txn{Field: "Sender"},
 			},
 		},
 		/*
@@ -186,8 +186,8 @@ func TestGenerateFunctionCall(t *testing.T) {
 				FuncName: "txn.CloseRemainderTo",
 				Args:     []ast.Expr{},
 			},
-			Output: []teal.Mnemonic{
-				teal.Txn{Field: "CloseRemainderTo"},
+			Output: []mnemonic.Mnemonic{
+				mnemonic.Txn{Field: "CloseRemainderTo"},
 			},
 		},
 	}
@@ -201,7 +201,7 @@ func TestGenerateExpr(t *testing.T) {
 
 	type TestCase struct {
 		Input  ast.Expr
-		Output []teal.Mnemonic
+		Output []mnemonic.Mnemonic
 	}
 
 	tcs := []TestCase{
@@ -210,14 +210,14 @@ func TestGenerateExpr(t *testing.T) {
 		*/
 		{
 			Input: ast.BinaryExpr{
-				Op: teal.Add{},
+				Op: mnemonic.Add{},
 				L:  ast.IntLit{V0: 1},
 				R:  ast.IntLit{V0: 2},
 			},
-			Output: []teal.Mnemonic{
-				teal.Int{V0: 1},
-				teal.Int{V0: 2},
-				teal.Add{},
+			Output: []mnemonic.Mnemonic{
+				mnemonic.Int{V0: 1},
+				mnemonic.Int{V0: 2},
+				mnemonic.Add{},
 			},
 		},
 		/*
@@ -225,14 +225,14 @@ func TestGenerateExpr(t *testing.T) {
 		*/
 		{
 			Input: ast.BinaryExpr{
-				Op: teal.Sub{},
+				Op: mnemonic.Sub{},
 				L:  ast.IntLit{V0: 2},
 				R:  ast.IntLit{V0: 1},
 			},
-			Output: []teal.Mnemonic{
-				teal.Int{V0: 2},
-				teal.Int{V0: 1},
-				teal.Sub{},
+			Output: []mnemonic.Mnemonic{
+				mnemonic.Int{V0: 2},
+				mnemonic.Int{V0: 1},
+				mnemonic.Sub{},
 			},
 		},
 		/*
@@ -240,14 +240,14 @@ func TestGenerateExpr(t *testing.T) {
 		*/
 		{
 			Input: ast.BinaryExpr{
-				Op: teal.Mul{},
+				Op: mnemonic.Mul{},
 				L:  ast.IntLit{V0: 2},
 				R:  ast.IntLit{V0: 3},
 			},
-			Output: []teal.Mnemonic{
-				teal.Int{V0: 2},
-				teal.Int{V0: 3},
-				teal.Mul{},
+			Output: []mnemonic.Mnemonic{
+				mnemonic.Int{V0: 2},
+				mnemonic.Int{V0: 3},
+				mnemonic.Mul{},
 			},
 		},
 		/*
@@ -255,14 +255,14 @@ func TestGenerateExpr(t *testing.T) {
 		*/
 		{
 			Input: ast.BinaryExpr{
-				Op: teal.Div{},
+				Op: mnemonic.Div{},
 				L:  ast.IntLit{V0: 4},
 				R:  ast.IntLit{V0: 2},
 			},
-			Output: []teal.Mnemonic{
-				teal.Int{V0: 4},
-				teal.Int{V0: 2},
-				teal.Div{},
+			Output: []mnemonic.Mnemonic{
+				mnemonic.Int{V0: 4},
+				mnemonic.Int{V0: 2},
+				mnemonic.Div{},
 			},
 		},
 		/*
@@ -270,12 +270,12 @@ func TestGenerateExpr(t *testing.T) {
 		*/
 		{
 			Input: ast.UnaryExpr{
-				Op:   teal.LogicalNot{},
+				Op:   mnemonic.LogicalNot{},
 				Expr: ast.IntLit{V0: 1},
 			},
-			Output: []teal.Mnemonic{
-				teal.Int{V0: 1},
-				teal.LogicalNot{},
+			Output: []mnemonic.Mnemonic{
+				mnemonic.Int{V0: 1},
+				mnemonic.LogicalNot{},
 			},
 		},
 		/*
@@ -283,14 +283,14 @@ func TestGenerateExpr(t *testing.T) {
 		*/
 		{
 			Input: ast.BinaryExpr{
-				Op: teal.Eq{},
+				Op: mnemonic.Eq{},
 				L:  ast.BytesLit{V0: []byte{1, 1}},
 				R:  ast.BytesLit{V0: []byte{2, 2}},
 			},
-			Output: []teal.Mnemonic{
-				teal.Byte{V0: []byte{1, 1}},
-				teal.Byte{V0: []byte{2, 2}},
-				teal.Eq{},
+			Output: []mnemonic.Mnemonic{
+				mnemonic.Byte{V0: []byte{1, 1}},
+				mnemonic.Byte{V0: []byte{2, 2}},
+				mnemonic.Eq{},
 			},
 		},
 		/*
@@ -298,14 +298,14 @@ func TestGenerateExpr(t *testing.T) {
 		*/
 		{
 			Input: ast.BinaryExpr{
-				Op: teal.Ne{},
+				Op: mnemonic.Ne{},
 				L:  ast.IntLit{V0: 1},
 				R:  ast.IntLit{V0: 2},
 			},
-			Output: []teal.Mnemonic{
-				teal.Int{V0: 1},
-				teal.Int{V0: 2},
-				teal.Ne{},
+			Output: []mnemonic.Mnemonic{
+				mnemonic.Int{V0: 1},
+				mnemonic.Int{V0: 2},
+				mnemonic.Ne{},
 			},
 		},
 		/*
@@ -313,14 +313,14 @@ func TestGenerateExpr(t *testing.T) {
 		*/
 		{
 			Input: ast.BinaryExpr{
-				Op: teal.Gt{},
+				Op: mnemonic.Gt{},
 				L:  ast.IntLit{V0: 1},
 				R:  ast.IntLit{V0: 2},
 			},
-			Output: []teal.Mnemonic{
-				teal.Int{V0: 1},
-				teal.Int{V0: 2},
-				teal.Gt{},
+			Output: []mnemonic.Mnemonic{
+				mnemonic.Int{V0: 1},
+				mnemonic.Int{V0: 2},
+				mnemonic.Gt{},
 			},
 		},
 		/*
@@ -328,14 +328,14 @@ func TestGenerateExpr(t *testing.T) {
 		*/
 		{
 			Input: ast.BinaryExpr{
-				Op: teal.Gte{},
+				Op: mnemonic.Gte{},
 				L:  ast.IntLit{V0: 1},
 				R:  ast.IntLit{V0: 2},
 			},
-			Output: []teal.Mnemonic{
-				teal.Int{V0: 1},
-				teal.Int{V0: 2},
-				teal.Gte{},
+			Output: []mnemonic.Mnemonic{
+				mnemonic.Int{V0: 1},
+				mnemonic.Int{V0: 2},
+				mnemonic.Gte{},
 			},
 		},
 		/*
@@ -343,14 +343,14 @@ func TestGenerateExpr(t *testing.T) {
 		*/
 		{
 			Input: ast.BinaryExpr{
-				Op: teal.Lt{},
+				Op: mnemonic.Lt{},
 				L:  ast.IntLit{V0: 1},
 				R:  ast.IntLit{V0: 2},
 			},
-			Output: []teal.Mnemonic{
-				teal.Int{V0: 1},
-				teal.Int{V0: 2},
-				teal.Lt{},
+			Output: []mnemonic.Mnemonic{
+				mnemonic.Int{V0: 1},
+				mnemonic.Int{V0: 2},
+				mnemonic.Lt{},
 			},
 		},
 		/*
@@ -358,14 +358,14 @@ func TestGenerateExpr(t *testing.T) {
 		*/
 		{
 			Input: ast.BinaryExpr{
-				Op: teal.Lte{},
+				Op: mnemonic.Lte{},
 				L:  ast.IntLit{V0: 1},
 				R:  ast.IntLit{V0: 2},
 			},
-			Output: []teal.Mnemonic{
-				teal.Int{V0: 1},
-				teal.Int{V0: 2},
-				teal.Lte{},
+			Output: []mnemonic.Mnemonic{
+				mnemonic.Int{V0: 1},
+				mnemonic.Int{V0: 2},
+				mnemonic.Lte{},
 			},
 		},
 		/*
@@ -373,14 +373,14 @@ func TestGenerateExpr(t *testing.T) {
 		*/
 		{
 			Input: ast.BinaryExpr{
-				Op: teal.LogicalAnd{},
+				Op: mnemonic.LogicalAnd{},
 				L:  ast.IntLit{V0: 1},
 				R:  ast.IntLit{V0: 2},
 			},
-			Output: []teal.Mnemonic{
-				teal.Int{V0: 1},
-				teal.Int{V0: 2},
-				teal.LogicalAnd{},
+			Output: []mnemonic.Mnemonic{
+				mnemonic.Int{V0: 1},
+				mnemonic.Int{V0: 2},
+				mnemonic.LogicalAnd{},
 			},
 		},
 		/*
@@ -388,14 +388,14 @@ func TestGenerateExpr(t *testing.T) {
 		*/
 		{
 			Input: ast.BinaryExpr{
-				Op: teal.LogicalOr{},
+				Op: mnemonic.LogicalOr{},
 				L:  ast.IntLit{V0: 1},
 				R:  ast.IntLit{V0: 2},
 			},
-			Output: []teal.Mnemonic{
-				teal.Int{V0: 1},
-				teal.Int{V0: 2},
-				teal.LogicalOr{},
+			Output: []mnemonic.Mnemonic{
+				mnemonic.Int{V0: 1},
+				mnemonic.Int{V0: 2},
+				mnemonic.LogicalOr{},
 			},
 		},
 	}

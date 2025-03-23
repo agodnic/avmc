@@ -1,4 +1,4 @@
-package teal
+package mnemonic
 
 // All mnemonics implement the Mnemonic interface
 type Mnemonic interface {

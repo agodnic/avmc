@@ -2,12 +2,12 @@ package codegen
 
 import (
 	"github.com/agodnic/avmc/ir/ast"
-	"github.com/agodnic/avmc/ir/teal"
+	"github.com/agodnic/avmc/ir/mnemonic"
 )
 
-func generateFuncDecl(fn ast.FuncDecl) []teal.Mnemonic {
+func generateFuncDecl(fn ast.FuncDecl) []mnemonic.Mnemonic {
 
-	var mnemonics []teal.Mnemonic
+	var mnemonics []mnemonic.Mnemonic
 
 	for _, stmt := range fn.Body {
 		mnemonics = append(mnemonics, generateStmt(stmt)...)
@@ -16,34 +16,34 @@ func generateFuncDecl(fn ast.FuncDecl) []teal.Mnemonic {
 	return mnemonics
 }
 
-func generateStmt(stmt ast.Stmt) (mnemonics []teal.Mnemonic) {
+func generateStmt(stmt ast.Stmt) (mnemonics []mnemonic.Mnemonic) {
 
 	switch i := stmt.(type) {
 	case ast.Return:
 		mnemonics = append(mnemonics, generateExpr(i.Expr)...)
-		mnemonics = append(mnemonics, teal.Return{})
+		mnemonics = append(mnemonics, mnemonic.Return{})
 	case ast.If:
 		elseLabel := i.BaseLabelsName + "_else"
 		endLabel := i.BaseLabelsName + "_end"
 
 		// test block
-		mnemonics = append(mnemonics, teal.Int{V0: 1})
-		mnemonics = append(mnemonics, teal.Bnz{Label: elseLabel})
+		mnemonics = append(mnemonics, mnemonic.Int{V0: 1})
+		mnemonics = append(mnemonics, mnemonic.Bnz{Label: elseLabel})
 
 		// then block
 		for j := range i.Then {
 			mnemonics = append(mnemonics, generateStmt(i.Then[j])...)
 		}
-		mnemonics = append(mnemonics, teal.B{Label: endLabel})
+		mnemonics = append(mnemonics, mnemonic.B{Label: endLabel})
 
 		// else block
-		mnemonics = append(mnemonics, teal.Label{Name: elseLabel})
+		mnemonics = append(mnemonics, mnemonic.Label{Name: elseLabel})
 		for j := range i.Else {
 			mnemonics = append(mnemonics, generateStmt(i.Else[j])...)
 		}
 
 		// end block
-		mnemonics = append(mnemonics, teal.Label{Name: endLabel})
+		mnemonics = append(mnemonics, mnemonic.Label{Name: endLabel})
 	default:
 		//TODO msg := fmt(...)
 		panic("not iplemented")
@@ -52,17 +52,17 @@ func generateStmt(stmt ast.Stmt) (mnemonics []teal.Mnemonic) {
 	return mnemonics
 }
 
-func generateExpr(expr ast.Expr) (mnemonics []teal.Mnemonic) {
+func generateExpr(expr ast.Expr) (mnemonics []mnemonic.Mnemonic) {
 
 	switch i := expr.(type) {
 	case ast.IntLit:
-		mnemonics = []teal.Mnemonic{
-			teal.Int{V0: i.V0},
+		mnemonics = []mnemonic.Mnemonic{
+			mnemonic.Int{V0: i.V0},
 		}
 		return mnemonics
 	case ast.BytesLit:
-		mnemonics = []teal.Mnemonic{
-			teal.Byte{V0: i.V0},
+		mnemonics = []mnemonic.Mnemonic{
+			mnemonic.Byte{V0: i.V0},
 		}
 		return mnemonics
 	case ast.BinaryExpr:
@@ -88,7 +88,7 @@ func generateExpr(expr ast.Expr) (mnemonics []teal.Mnemonic) {
 				panic("invalid argument type for arg")
 			}
 
-			mnemonics = append(mnemonics, teal.Arg{N: n.V0})
+			mnemonics = append(mnemonics, mnemonic.Arg{N: n.V0})
 
 			return mnemonics
 		}
@@ -113,13 +113,13 @@ func generateExpr(expr ast.Expr) (mnemonics []teal.Mnemonic) {
 
 }
 
-var builtinFunctionToMnemonic = map[string]teal.Mnemonic{
-	"len":    teal.Len{},
-	"sha256": teal.Sha256{},
+var builtinFunctionToMnemonic = map[string]mnemonic.Mnemonic{
+	"len":    mnemonic.Len{},
+	"sha256": mnemonic.Sha256{},
 	//TODO add the rest of https://developer.algorand.org/docs/get-details/dapps/avm/teal/opcodes/v11/#txn_1
-	"txn.Sender":           teal.Txn{Field: "Sender"},
-	"txn.CloseRemainderTo": teal.Txn{Field: "CloseRemainderTo"},
-	"txn.FirstValid":       teal.Txn{Field: "FirstValid"},
-	"txn.Fee":              teal.Txn{Field: "Fee"},
-	"txn.RekeyTo":          teal.Txn{Field: "RekeyTo"},
+	"txn.Sender":           mnemonic.Txn{Field: "Sender"},
+	"txn.CloseRemainderTo": mnemonic.Txn{Field: "CloseRemainderTo"},
+	"txn.FirstValid":       mnemonic.Txn{Field: "FirstValid"},
+	"txn.Fee":              mnemonic.Txn{Field: "Fee"},
+	"txn.RekeyTo":          mnemonic.Txn{Field: "RekeyTo"},
 }

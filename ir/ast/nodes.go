@@ -1,6 +1,6 @@
 package ast
 
-import "github.com/agodnic/avmc/ir/teal"
+import "github.com/agodnic/avmc/ir/mnemonic"
 
 // https://go.dev/src/go/ast/ast.go?s=1405:1446#L29
 
@@ -38,7 +38,7 @@ type (
 type (
 	// BinaryExpr represents a binary expression
 	BinaryExpr struct {
-		Op teal.Mnemonic
+		Op mnemonic.Mnemonic
 		L  Expr
 		R  Expr
 	}
@@ -61,7 +61,7 @@ type (
 
 	// UnaryExpr represents a unary expression
 	UnaryExpr struct {
-		Op   teal.Mnemonic
+		Op   mnemonic.Mnemonic
 		Expr Expr
 	}
 )
