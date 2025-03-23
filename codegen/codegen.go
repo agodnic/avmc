@@ -82,20 +82,26 @@ func generateExpr(expr ast.Expr) (mnemonics []teal.Mnemonic) {
 		mnemonics = append(mnemonics, i.Op)
 		return mnemonics
 	case ast.FunctionCall:
-		switch i.FuncName {
-		case "len":
-			for j := range i.Args {
-				mnemonics = append(mnemonics, generateExpr(i.Args[j])...)
-			}
-			mnemonics = append(mnemonics, teal.Len{})
-		default:
+
+		opcode, ok := builtinFunctionToMnemonic[i.FuncName]
+		if !ok {
 			//TODO msg := fmt(...)
 			panic("unknown function")
 		}
+
+		for j := range i.Args {
+			mnemonics = append(mnemonics, generateExpr(i.Args[j])...)
+		}
+
+		mnemonics = append(mnemonics, opcode)
 	default:
 		//TODO msg := fmt(...)
 		panic("not iplemented")
 	}
 
 	return mnemonics
+}
+
+var builtinFunctionToMnemonic = map[string]teal.Mnemonic{
+	"len": teal.Len{},
 }
