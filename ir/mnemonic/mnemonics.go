@@ -1,10 +1,5 @@
 package mnemonic
 
-// All mnemonics implement the Mnemonic interface
-type Mnemonic interface {
-	mnemonicTag()
-}
-
 // Mnemonics
 type (
 	// +
@@ -96,7 +91,11 @@ type (
 	}
 )
 
-// Mnemonic interface tags
+// All mnemonics implement the Mnemonic interface
+type Mnemonic interface {
+	mnemonicTag()
+}
+
 func (i Add) mnemonicTag()        {}
 func (i Arg) mnemonicTag()        {}
 func (i B) mnemonicTag()          {}
