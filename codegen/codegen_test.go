@@ -114,6 +114,36 @@ func TestGenerateStmt(t *testing.T) {
 	}
 }
 
+func TestGenerateFunctionCall(t *testing.T) {
+
+	type TestCase struct {
+		Input  ast.FunctionCall
+		Output []teal.Mnemonic
+	}
+
+	tcs := []TestCase{
+		/*
+			len("\x01\x02\x03")
+		*/
+		{
+			Input: ast.FunctionCall{
+				FuncName: "len",
+				Args: []ast.Expr{
+					ast.BytesLit{V0: []byte{1, 2, 3}},
+				},
+			},
+			Output: []teal.Mnemonic{
+				teal.Byte{V0: []byte{1, 2, 3}},
+				teal.Len{},
+			},
+		},
+	}
+
+	for _, tc := range tcs {
+		assertMnemonicsEqual(t, generateExpr(tc.Input), tc.Output)
+	}
+}
+
 func TestGenerateExpr(t *testing.T) {
 
 	type TestCase struct {

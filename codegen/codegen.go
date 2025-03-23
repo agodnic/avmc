@@ -81,8 +81,21 @@ func generateExpr(expr ast.Expr) (mnemonics []teal.Mnemonic) {
 		mnemonics = append(mnemonics, generateExpr(i.Expr)...)
 		mnemonics = append(mnemonics, i.Op)
 		return mnemonics
+	case ast.FunctionCall:
+		switch i.FuncName {
+		case "len":
+			for j := range i.Args {
+				mnemonics = append(mnemonics, generateExpr(i.Args[j])...)
+			}
+			mnemonics = append(mnemonics, teal.Len{})
+		default:
+			//TODO msg := fmt(...)
+			panic("unknown function")
+		}
 	default:
 		//TODO msg := fmt(...)
 		panic("not iplemented")
 	}
+
+	return mnemonics
 }

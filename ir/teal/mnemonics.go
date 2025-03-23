@@ -57,6 +57,9 @@ type (
 		Name string
 	}
 
+	// len
+	Len struct{}
+
 	// <
 	Lt struct{}
 
@@ -97,6 +100,7 @@ func (i Gt) mnemonicTag()         {}
 func (i Gte) mnemonicTag()        {}
 func (i Int) mnemonicTag()        {}
 func (i Label) mnemonicTag()      {}
+func (i Len) mnemonicTag()        {}
 func (i Lt) mnemonicTag()         {}
 func (i Lte) mnemonicTag()        {}
 func (i LogicalAnd) mnemonicTag() {}

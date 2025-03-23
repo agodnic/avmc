@@ -48,6 +48,12 @@ type (
 		V0 []byte
 	}
 
+	// FunctionCall represents a function call expression
+	FunctionCall struct {
+		FuncName string
+		Args     []Expr
+	}
+
 	// IntLit represents a literal integer expression
 	IntLit struct {
 		V0 uint64
@@ -82,7 +88,8 @@ func (s If) stmtTag()     {}
 func (s Return) stmtTag() {}
 
 // Expr interface tags
-func (e BinaryExpr) exprTag() {}
-func (e BytesLit) exprTag()   {}
-func (e IntLit) exprTag()     {}
-func (e UnaryExpr) exprTag()  {}
+func (e BinaryExpr) exprTag()   {}
+func (e BytesLit) exprTag()     {}
+func (e FunctionCall) exprTag() {}
+func (e IntLit) exprTag()       {}
+func (e UnaryExpr) exprTag()    {}
