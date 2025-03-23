@@ -83,6 +83,24 @@ func generateExpr(expr ast.Expr) (mnemonics []teal.Mnemonic) {
 		return mnemonics
 	case ast.FunctionCall:
 
+		// Mnemonics with embedded arguments
+		if i.FuncName == "arg" {
+			if len(i.Args) != 1 {
+				//TODO msg := fmt(...)
+				panic("invalid number of arguments for arg")
+			}
+			n, ok := i.Args[0].(ast.IntLit)
+			if !ok {
+				//TODO msg := fmt(...)
+				panic("invalid argument type for arg")
+			}
+
+			mnemonics = append(mnemonics, teal.Arg{N: n.V0})
+
+			return mnemonics
+		}
+
+		// Mnemonics without embedded arguments
 		opcode, ok := builtinFunctionToMnemonic[i.FuncName]
 		if !ok {
 			//TODO msg := fmt(...)
@@ -94,12 +112,12 @@ func generateExpr(expr ast.Expr) (mnemonics []teal.Mnemonic) {
 		}
 
 		mnemonics = append(mnemonics, opcode)
+		return mnemonics
 	default:
 		//TODO msg := fmt(...)
 		panic("not iplemented")
 	}
 
-	return mnemonics
 }
 
 var builtinFunctionToMnemonic = map[string]teal.Mnemonic{

@@ -15,6 +15,11 @@ type (
 	// +
 	Add struct{}
 
+	// arg <n>
+	Arg struct {
+		N uint64
+	}
+
 	// b <label>
 	B struct {
 		Label string
@@ -93,6 +98,7 @@ type (
 
 // Mnemonic interface tags
 func (i Add) mnemonicTag()        {}
+func (i Arg) mnemonicTag()        {}
 func (i B) mnemonicTag()          {}
 func (i Bnz) mnemonicTag()        {}
 func (i Bz) mnemonicTag()         {}
