@@ -121,8 +121,12 @@ func generateExpr(expr ast.Expr) (mnemonics []teal.Mnemonic) {
 }
 
 var builtinFunctionToMnemonic = map[string]teal.Mnemonic{
-	"len":                  teal.Len{},
-	"sha256":               teal.Sha256{},
+	"len":    teal.Len{},
+	"sha256": teal.Sha256{},
+	//TODO add the rest of https://developer.algorand.org/docs/get-details/dapps/avm/teal/opcodes/v11/#txn_1
 	"txn.Sender":           teal.Txn{Field: "Sender"},
 	"txn.CloseRemainderTo": teal.Txn{Field: "CloseRemainderTo"},
+	"txn.FirstValid":       teal.Txn{Field: "FirstValid"},
+	"txn.Fee":              teal.Txn{Field: "Fee"},
+	"txn.RekeyTo":          teal.Txn{Field: "RekeyTo"},
 }
