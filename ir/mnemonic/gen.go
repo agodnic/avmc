@@ -61,7 +61,7 @@ func main() {
 	spec.Ops = append(spec.Ops, fakeOpcodes...)
 
 	// Open the output file
-	file, err := os.OpenFile("generated_mnemonics.go", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
+	file, err := os.OpenFile("generated_mnemonics.go", os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0644)
 	if err != nil {
 		msg := fmt.Sprintf("failed to open file: %v", err)
 		panic(msg)
