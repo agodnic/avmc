@@ -77,7 +77,15 @@ func main() {
 			continue
 		}
 
+		// Print a comment above the struct definition
 		fmt.Fprintf(file, "\n")
+		fmt.Fprintf(file, "\t// %s", op.Name)
+		for _, imm := range op.ImmediateNote {
+			fmt.Fprintf(file, " %s", imm.Name)
+		}
+		fmt.Fprintf(file, "\n")
+
+		// Print the struct definition
 		fmt.Fprintf(file, "\t%s struct{\n", mapOpcodeName(op.Name))
 		for _, imm := range op.ImmediateNote {
 			fmt.Fprintf(file, "\t\t%s %s\n",
