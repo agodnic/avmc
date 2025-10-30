@@ -188,5 +188,4 @@ var allowList = map[string]bool{
 	"return": true,
 	"sha256": true,
 	"-":      true,
-	"txn":    true,
 }

@@ -114,85 +114,6 @@ func TestGenerateStmt(t *testing.T) {
 	}
 }
 
-//func TestGenerateTxnField(t *testing.T) {
-//
-//	type TestCase struct {
-//		FieldName string
-//	}
-//
-//	tcs := []TestCase{
-//		{FieldName: "Sender"},
-//		{FieldName: "Fee"},
-//		{FieldName: "FirstValid"},
-//		{FieldName: "FirstValidTime"},
-//		{FieldName: "LastValid"},
-//		{FieldName: "Note"},
-//		{FieldName: "Lease"},
-//		{FieldName: "Receiver"},
-//		{FieldName: "Amount"},
-//		{FieldName: "CloseRemainderTo"},
-//		{FieldName: "VotePK"},
-//		{FieldName: "SelectionPK"},
-//		{FieldName: "VoteFirst"},
-//		{FieldName: "VoteLast"},
-//		{FieldName: "VoteKeyDilution"},
-//		{FieldName: "Type"},
-//		{FieldName: "TypeEnum"},
-//		{FieldName: "XferAsset"},
-//		{FieldName: "AssetAmount"},
-//		{FieldName: "AssetSender"},
-//		{FieldName: "AssetReceiver"},
-//		{FieldName: "AssetCloseTo"},
-//		{FieldName: "GroupIndex"},
-//		{FieldName: "TxID"},
-//		{FieldName: "ApplicationID"},
-//		{FieldName: "OnCompletion"},
-//		{FieldName: "NumAppArgs"},
-//		{FieldName: "NumAccounts"},
-//		{FieldName: "ApprovalProgram"},
-//		{FieldName: "ClearStateProgram"},
-//		{FieldName: "RekeyTo"},
-//		{FieldName: "ConfigAsset"},
-//		{FieldName: "ConfigAssetTotal"},
-//		{FieldName: "ConfigAssetDecimals"},
-//		{FieldName: "ConfigAssetDefaultFrozen"},
-//		{FieldName: "ConfigAssetUnitName"},
-//		{FieldName: "ConfigAssetName"},
-//		{FieldName: "ConfigAssetURL"},
-//		{FieldName: "ConfigAssetMetadataHash"},
-//		{FieldName: "ConfigAssetManager"},
-//		{FieldName: "ConfigAssetReserve"},
-//		{FieldName: "ConfigAssetFreeze"},
-//		{FieldName: "ConfigAssetClawback"},
-//		{FieldName: "FreezeAsset"},
-//		{FieldName: "FreezeAssetAccount"},
-//		{FieldName: "FreezeAssetFrozen"},
-//		{FieldName: "NumAssets"},
-//		{FieldName: "NumApplications"},
-//		{FieldName: "GlobalNumUint"},
-//		{FieldName: "GlobalNumByteSlice"},
-//		{FieldName: "LocalNumUint"},
-//		{FieldName: "LocalNumByteSlice"},
-//		{FieldName: "ExtraProgramPages"},
-//		{FieldName: "Nonparticipation"},
-//		{FieldName: "NumLogs"},
-//		{FieldName: "CreatedAssetID"},
-//		{FieldName: "CreatedApplicationID"},
-//		{FieldName: "LastLog"},
-//		{FieldName: "StateProofPK"},
-//		{FieldName: "NumApprovalProgramPages"},
-//		{FieldName: "NumClearStateProgramPages"},
-//	}
-//
-//	for i := range tcs {
-//		assertMnemonicsEqual(
-//			t,
-//			generateExpr(ast.FunctionCall{FuncName: "txn." + tcs[i].FieldName, Args: nil}),
-//			[]mnemonic.Mnemonic{mnemonic.Txn{Field: tcs[i].FieldName}},
-//		)
-//	}
-//}
-
 func TestGenerateFunctionCall(t *testing.T) {
 
 	type TestCase struct {
@@ -245,18 +166,6 @@ func TestGenerateFunctionCall(t *testing.T) {
 				mnemonic.Arg{N: 0},
 			},
 		},
-		///*
-		//	txn.Sender()
-		//*/
-		//{
-		//	Input: ast.FunctionCall{
-		//		FuncName: "txn.Sender",
-		//		Args:     []ast.Expr{},
-		//	},
-		//	Output: []mnemonic.Mnemonic{
-		//		mnemonic.Txn{F: "Sender"},
-		//	},
-		//},
 	}
 
 	for _, tc := range tcs {
