@@ -22,7 +22,7 @@ type Op struct {
 	Size              uint8       `json:"Size"`
 	ArgEnum           []string    `json:"ArgEnum"`
 	ArgEnumTypes      []string    `json:"ArgEnumTypes"`
-	DocCost           uint        `json:"DocCost,string"`
+	DocCost           string      `json:"DocCost"`
 	Doc               string      `json:"Doc"`
 	DocExtra          string      `json:"DocExtra"`
 	ImmediateNote     []Immediate `json:"ImmediateNote"`
