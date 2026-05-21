@@ -61,6 +61,16 @@ type TestCase[T any] struct {
 	Expected   T
 }
 
+func testAll[T any](t *testing.T, testCases []TestCase[T]) {
+
+	for _, testCase := range testCases {
+		t.Run(testCase.Name, func(t *testing.T) {
+			returnStmt := mustParse[T](t, testCase.SourceCode)
+			assert.Equal(t, testCase.Expected, *returnStmt)
+		})
+	}
+}
+
 // TestReturnStmt exercises the parsing of the ReturnStmt grammar element
 func TestReturnStmt(t *testing.T) {
 
@@ -77,13 +87,23 @@ func TestReturnStmt(t *testing.T) {
 		},
 	}
 
-	for _, testCase := range testCases {
-		t.Run(testCase.Name, func(t *testing.T) {
-			returnStmt := mustParse[ReturnStmt](t, testCase.SourceCode)
-			assert.Equal(t, testCase.Expected, *returnStmt)
-		})
+	testAll(t, testCases)
+}
+
+func TestFunctionParameters(t *testing.T) {
+
+	testCases := []TestCase[FunctionParameter]{
+		{
+			Name:       "Naive case",
+			SourceCode: "j int",
+			Expected: FunctionParameter{
+				Ident: "j",
+				Type:  "int",
+			},
+		},
 	}
 
+	testAll(t, testCases)
 }
 
 // TODO write table-driven tests for each node
