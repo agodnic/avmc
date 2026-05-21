@@ -13,8 +13,25 @@ import (
 
 func main() {
 
+	// Read the TEAL opcodes specification.
+	//
+	// Add a few synthetic opcodes to it for convenience.
 	spec := tealspec.MustParse()
 	spec.Ops = append(spec.Ops, fakeOpcodes...)
+
+	// Generate file contents
+	content := buildFileContents(&spec)
+
+	// Write contents to the file
+	const filename = "generated_mnemonics.go"
+	err := os.WriteFile(filename, content, 0644)
+	if err != nil {
+		msg := fmt.Sprintf("failed to write generated mnemonics to file %s: %v", filename, err)
+		panic(msg)
+	}
+}
+
+func buildFileContents(spec *tealspec.LangSpec) []byte {
 
 	var buf bytes.Buffer
 
@@ -23,6 +40,7 @@ func main() {
 	fmt.Fprintf(&buf, "type (\n")
 	for _, op := range spec.Ops {
 
+		// Skip opcodes that are now supported yet
 		if _, ok := opcodeAllowed[op.Name]; !ok {
 			continue
 		}
@@ -47,7 +65,7 @@ func main() {
 	}
 	fmt.Fprintf(&buf, ")\n")
 
-	// Generate interface implementations for a little bit of extra type safety
+	// Generate interface implementations for a little bit of static type checkin
 	fmt.Fprintf(&buf, "\n")
 	for _, op := range spec.Ops {
 
@@ -58,12 +76,7 @@ func main() {
 		fmt.Fprintf(&buf, "func (m %s) mnemonicTag() {}\n", opcodeNameToIdentifierName(op.Name))
 	}
 
-	const filename = "generated_mnemonics.go"
-	err := os.WriteFile(filename, buf.Bytes(), 0644)
-	if err != nil {
-		msg := fmt.Sprintf("failed to write generated mnemonics to file %s: %v", filename, err)
-		panic(msg)
-	}
+	return buf.Bytes()
 }
 
 // uppercaseFirstCharacter sets the first character of the input string to uppercase.
