@@ -13,7 +13,7 @@ type FuncDeclaration struct {
 	RParen             string              `")"`
 	ReturnType         string              `@Ident`
 	LBrace             string              `"{"`
-	Stmts              []ReturnStmt        `@@+` // TODO use an union to have different types of statements
+	Stmts              []Stmt              `@@+`
 	RBrace             string              `"}"`
 }
 
@@ -22,8 +22,12 @@ type FunctionParameter struct {
 	Type  string `@Ident`
 }
 
-// TODO add different types of statements
 type ReturnStmt struct {
 	Return string `"return"`
 	UInt   uint64 `@Int` //TODO this should be an expr node
 }
+
+func (rs ReturnStmt) stmtTag() {}
+
+// TODO add different types of statements
+type Stmt interface{ stmtTag() }

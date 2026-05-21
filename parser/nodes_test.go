@@ -33,6 +33,7 @@ func mustParse[T any](t *testing.T, sourceCode string) *T {
 
 	parser, err := participle.Build[T](
 		participle.Unquote("String"),
+		participle.Union[Stmt](ReturnStmt{}),
 	)
 	assert.NoError(t, err)
 
@@ -98,8 +99,8 @@ func TestFuncDeclaration(t *testing.T) {
 					},
 				},
 				ReturnType: "int",
-				Stmts: []ReturnStmt{
-					{
+				Stmts: []Stmt{
+					ReturnStmt{
 						UInt: 0,
 					},
 				},
@@ -108,5 +109,4 @@ func TestFuncDeclaration(t *testing.T) {
 	}
 
 	testAll(t, testCases)
-
 }
