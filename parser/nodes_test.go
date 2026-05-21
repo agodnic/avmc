@@ -7,40 +7,6 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-const code = `
-func main (i int, j int) int {
-	return 0
-}
-`
-
-type CompilationUnit struct {
-	// FIXME use an union to have different types of declarations
-	FuncDeclarations []FuncDeclaration `@@*`
-}
-
-type FuncDeclaration struct {
-	Func               string              `"func"`
-	Name               string              `@Ident`
-	LParen             string              `"("`
-	FunctionParameters []FunctionParameter `@@! ("," @@)*`
-	RParen             string              `")"`
-	ReturnType         string              `@Ident`
-	LBrace             string              `"{"`
-	Stmts              []*ReturnStmt       `@@+` // TODO use an union to have different types of statements
-	RBrace             string              `"}"`
-}
-
-type FunctionParameter struct {
-	Ident string `@Ident`
-	Type  string `@Ident`
-}
-
-// TODO add different types of statements
-type ReturnStmt struct {
-	Return string `"return"`
-	UInt   uint64 `@Int` //TODO this should be an expr node
-}
-
 func mustParse[T any](t *testing.T, sourceCode string) *T {
 
 	parser, err := participle.Build[T](
@@ -90,7 +56,8 @@ func TestReturnStmt(t *testing.T) {
 	testAll(t, testCases)
 }
 
-func TestFunctionParameters(t *testing.T) {
+// TestFunctionParameter exercises the parsing of the FunctionParameter grammar element
+func TestFunctionParameter(t *testing.T) {
 
 	testCases := []TestCase[FunctionParameter]{
 		{
@@ -108,6 +75,12 @@ func TestFunctionParameters(t *testing.T) {
 
 // TODO write table-driven tests for each node
 func TestExperiment(t *testing.T) {
+
+	const code = `
+func main (i int, j int) int {
+	return 0
+}
+`
 
 	compilationUnit := mustParse[CompilationUnit](t, code)
 
