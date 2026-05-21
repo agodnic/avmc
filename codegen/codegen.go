@@ -99,8 +99,8 @@ func generateExpr(expr ast.Expr) (mnemonics []mnemonic.Mnemonic) {
 		// Mnemonics without embedded arguments
 		opcode, ok := builtinFunctionToMnemonic[i.FuncName]
 		if !ok {
-			//TODO msg := fmt(...)
-			panic("unknown function")
+			msg := fmt.Sprintf("unknown function name: %s", i.FuncName)
+			panic(msg)
 		}
 
 		for j := range i.Args {
