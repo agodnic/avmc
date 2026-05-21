@@ -96,8 +96,10 @@ func generateExpr(expr ast.Expr) (mnemonics []mnemonic.Mnemonic) {
 			}
 
 			// FIXME hard cast to int8.
-			// Probably the input structure should have the right type
-			// And it should validate that the initial number fits in the u8 range.
+			// Maybe the input structure should have the int8 type?
+			// The problem is that the parser has no way to know that at parse-time.
+			// Hence the argument can only be an integer literal without detailed type information,
+			// and the type-checking should be done at this later stage.
 			mnemonics = append(mnemonics, mnemonic.Arg{N: uint8(n.V0)})
 
 			return mnemonics
