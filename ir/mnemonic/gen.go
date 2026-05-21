@@ -16,6 +16,10 @@ func main() {
 	spec.Ops = append(spec.Ops, fakeOpcodes...)
 
 	// Open the output file
+	//
+	// TODO decouple the file writing logic from the string building logic
+	// I think we can use a bytes.Buffer for this.
+	// We can also split the logic into functions
 	file, err := os.OpenFile("generated_mnemonics.go", os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0644)
 	if err != nil {
 		msg := fmt.Sprintf("failed to open file: %v", err)
