@@ -13,37 +13,6 @@ import (
 func main() {
 
 	spec := tealspec.MustParse()
-
-	// Add missing mnemonics that do not translate 1:1 to opcodes
-	fakeOpcodes := []tealspec.Op{
-		{
-			Name: "byte",
-			ImmediateNote: []tealspec.Immediate{
-				{
-					Name:     "I",
-					Encoding: "[]byte",
-				},
-			},
-		},
-		{
-			Name: "int",
-			ImmediateNote: []tealspec.Immediate{
-				{
-					Name:     "I",
-					Encoding: "uint64",
-				},
-			},
-		},
-		{
-			Name: "label",
-			ImmediateNote: []tealspec.Immediate{
-				{
-					Name:     "I",
-					Encoding: "string",
-				},
-			},
-		},
-	}
 	spec.Ops = append(spec.Ops, fakeOpcodes...)
 
 	// Open the output file
@@ -193,4 +162,35 @@ var opcodeAllowed = map[string]bool{
 	"return": true,
 	"sha256": true,
 	"-":      true,
+}
+
+// fakeOpcodes contains synthetic opcodes that we add to the original spec.
+var fakeOpcodes = []tealspec.Op{
+	{
+		Name: "byte",
+		ImmediateNote: []tealspec.Immediate{
+			{
+				Name:     "I",
+				Encoding: "[]byte",
+			},
+		},
+	},
+	{
+		Name: "int",
+		ImmediateNote: []tealspec.Immediate{
+			{
+				Name:     "I",
+				Encoding: "uint64",
+			},
+		},
+	},
+	{
+		Name: "label",
+		ImmediateNote: []tealspec.Immediate{
+			{
+				Name:     "I",
+				Encoding: "string",
+			},
+		},
+	},
 }
