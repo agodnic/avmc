@@ -54,17 +54,17 @@ func mustParse[T any](t *testing.T, sourceCode string) *T {
 	return result
 }
 
+type TestCase[T any] struct {
+	Name       string
+	SourceCode string
+	Error      bool
+	Expected   T
+}
+
 // TestReturnStmt exercises the parsing of the ReturnStmt grammar element
 func TestReturnStmt(t *testing.T) {
 
-	type TestCase struct {
-		Name       string
-		SourceCode string
-		Error      bool
-		Expected   ReturnStmt
-	}
-
-	tcs := []TestCase{
+	testCases := []TestCase[ReturnStmt]{
 		{
 			Name:       `just return 0`,
 			SourceCode: `return 0`,
@@ -77,10 +77,10 @@ func TestReturnStmt(t *testing.T) {
 		},
 	}
 
-	for _, tc := range tcs {
-		t.Run(tc.Name, func(t *testing.T) {
-			returnStmt := mustParse[ReturnStmt](t, tc.SourceCode)
-			assert.Equal(t, tc.Expected, *returnStmt)
+	for _, testCase := range testCases {
+		t.Run(testCase.Name, func(t *testing.T) {
+			returnStmt := mustParse[ReturnStmt](t, testCase.SourceCode)
+			assert.Equal(t, testCase.Expected, *returnStmt)
 		})
 	}
 
