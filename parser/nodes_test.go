@@ -41,6 +41,46 @@ type ReturnStmt struct {
 	UInt   uint64 `@Int` //TODO this should be an expr node
 }
 
+// TestReturnStmt exercises the parsing of the ReturnStmt grammar element
+func TestReturnStmt(t *testing.T) {
+
+	type TestCase struct {
+		Name       string
+		SourceCode string
+		Error      bool
+		Expected   ReturnStmt
+	}
+
+	tcs := []TestCase{
+		{
+			Name:       `just return 0`,
+			SourceCode: `return 0`,
+			Expected:   ReturnStmt{UInt: 0},
+		},
+		{
+			Name:       `just return 1`,
+			SourceCode: `return 1`,
+			Expected:   ReturnStmt{UInt: 1},
+		},
+	}
+
+	for _, tc := range tcs {
+		t.Run(tc.Name, func(t *testing.T) {
+			//FIXME deduplicate
+			parser, err := participle.Build[ReturnStmt](
+				participle.Unquote("String"),
+			)
+			assert.NoError(t, err)
+
+			returnStmt, err := parser.ParseString("", tc.SourceCode)
+			assert.NoError(t, err)
+
+			assert.Equal(t, tc.Expected, *returnStmt)
+		})
+	}
+
+}
+
 // TODO write table-driven tests for each node
 func TestExperiment(t *testing.T) {
 
