@@ -6,7 +6,7 @@ import (
 	"fmt"
 )
 
-//go:embed langspec_v12.json
+//go:embed langspec_v13.json
 var langspecFileContents string
 
 func MustParse() LangSpec {
