@@ -1,5 +1,6 @@
 package tealspec
 
+// LangSpec defines all details about a specific AVM version
 type LangSpec struct {
 	Version         uint8       `json:"Version"`
 	LogicSigVersion uint8       `json:"LogicSigVersion"`
