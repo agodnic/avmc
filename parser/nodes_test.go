@@ -41,6 +41,19 @@ type ReturnStmt struct {
 	UInt   uint64 `@Int` //TODO this should be an expr node
 }
 
+func mustParse[T any](t *testing.T, sourceCode string) *T {
+
+	parser, err := participle.Build[T](
+		participle.Unquote("String"),
+	)
+	assert.NoError(t, err)
+
+	result, err := parser.ParseString("", sourceCode)
+	assert.NoError(t, err)
+
+	return result
+}
+
 // TestReturnStmt exercises the parsing of the ReturnStmt grammar element
 func TestReturnStmt(t *testing.T) {
 
@@ -66,15 +79,7 @@ func TestReturnStmt(t *testing.T) {
 
 	for _, tc := range tcs {
 		t.Run(tc.Name, func(t *testing.T) {
-			//FIXME deduplicate
-			parser, err := participle.Build[ReturnStmt](
-				participle.Unquote("String"),
-			)
-			assert.NoError(t, err)
-
-			returnStmt, err := parser.ParseString("", tc.SourceCode)
-			assert.NoError(t, err)
-
+			returnStmt := mustParse[ReturnStmt](t, tc.SourceCode)
 			assert.Equal(t, tc.Expected, *returnStmt)
 		})
 	}
@@ -84,14 +89,7 @@ func TestReturnStmt(t *testing.T) {
 // TODO write table-driven tests for each node
 func TestExperiment(t *testing.T) {
 
-	parser, err := participle.Build[CompilationUnit](
-		participle.Unquote("String"),
-		//participle.Union[Value](String{}, Number{}),
-	)
-	assert.NoError(t, err)
-
-	compilationUnit, err := parser.ParseString("", code)
-	assert.NoError(t, err)
+	compilationUnit := mustParse[CompilationUnit](t, code)
 
 	assert.Len(t, compilationUnit.FuncDeclarations, 1)
 
@@ -102,5 +100,4 @@ func TestExperiment(t *testing.T) {
 
 	stmt := decl.Stmts[0]
 	assert.Equal(t, uint64(0), stmt.UInt)
-
 }
