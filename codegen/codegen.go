@@ -79,18 +79,25 @@ func generateExpr(expr ast.Expr) (mnemonics []mnemonic.Mnemonic) {
 	case ast.FunctionCall:
 
 		// Mnemonics with embedded arguments
+		//
+		// FIXME obviously we should not code this manually for every function.
+		// We should define, for each function, number and types of parameters.
+		// Then use a function to perform the type checking.
+		// This is would be easy to unit test.
 		if i.FuncName == "arg" {
 			if len(i.Args) != 1 {
-				//TODO msg := fmt(...)
-				panic("invalid number of arguments for arg")
+				msg := fmt.Sprintf("expected exactly 1 arguments on `arg` function call, but got %d", len(i.Args))
+				panic(msg)
 			}
 			n, ok := i.Args[0].(ast.IntLit)
 			if !ok {
-				//TODO msg := fmt(...)
-				panic("invalid argument type for arg")
+				msg := fmt.Sprintf("unexpected argument type for `arg` function call: %#v", i.Args[0])
+				panic(msg)
 			}
 
-			// FIXME hard cast. Probably the input structure should have the right type
+			// FIXME hard cast to int8.
+			// Probably the input structure should have the right type
+			// And it should validate that the initial number fits in the u8 range.
 			mnemonics = append(mnemonics, mnemonic.Arg{N: uint8(n.V0)})
 
 			return mnemonics
@@ -116,6 +123,11 @@ func generateExpr(expr ast.Expr) (mnemonics []mnemonic.Mnemonic) {
 
 }
 
+// Some builtin functions translate directly to TEAL opcodes
+//
+// e.g. the builtin function `len()` translates into the `len` opcode.
+//
+// This map defines a table to perform those translations
 var builtinFunctionToMnemonic = map[string]mnemonic.Mnemonic{
 	"len":    mnemonic.Len{},
 	"sha256": mnemonic.Sha256{},
