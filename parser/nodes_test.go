@@ -8,7 +8,7 @@ import (
 )
 
 const code = `
-func main () {
+func main () int {
 	return 0
 }
 `
@@ -19,18 +19,15 @@ type CompilationUnit struct {
 }
 
 // TODO add function parameters
-// TODO add function return value
 type FuncDeclaration struct {
-	Func   string `"func"`
-	Name   string `@Ident`
-	LParen string `"("`
-	RParen string `")"`
-	LBrace string `"{"`
-
-	// TODO use an union to have different types of statements
-	Stmts []*Stmt `@@*`
-
-	RBrace string `"}"`
+	Func       string  `"func"`
+	Name       string  `@Ident`
+	LParen     string  `"("`
+	RParen     string  `")"`
+	ReturnType string  `@Ident`
+	LBrace     string  `"{"`
+	Stmts      []*Stmt `@@*` // TODO use an union to have different types of statements
+	RBrace     string  `"}"`
 }
 
 // TODO add different types of statements
@@ -55,6 +52,7 @@ func TestExperiment(t *testing.T) {
 
 	decl := compilationUnit.FuncDeclarations[0]
 	assert.Equal(t, "main", decl.Name)
+	assert.Equal(t, "int", decl.ReturnType)
 	assert.Len(t, decl.Stmts, 1)
 
 	stmt := decl.Stmts[0]
