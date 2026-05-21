@@ -78,24 +78,35 @@ func TestFunctionParameter(t *testing.T) {
 	testAll(t, testCases)
 }
 
-// TODO write table-driven tests for each node
-func TestExperiment(t *testing.T) {
+// TestFuncDeclaration exercises the parsing of the FuncDeclaration grammar element
+func TestFuncDeclaration(t *testing.T) {
 
-	const code = `
-func main (i int, j int) int {
-	return 0
-}
-`
+	testCases := []TestCase[FuncDeclaration]{
+		{
+			Name: "Naive case",
+			SourceCode: `
+				func main(i int) int {
+					return 0
+				}
+			`,
+			Expected: FuncDeclaration{
+				Name: "main",
+				FunctionParameters: []FunctionParameter{
+					{
+						Ident: "i",
+						Type:  "int",
+					},
+				},
+				ReturnType: "int",
+				Stmts: []ReturnStmt{
+					{
+						UInt: 0,
+					},
+				},
+			},
+		},
+	}
 
-	compilationUnit := mustParse[CompilationUnit](t, code)
+	testAll(t, testCases)
 
-	assert.Len(t, compilationUnit.FuncDeclarations, 1)
-
-	decl := compilationUnit.FuncDeclarations[0]
-	assert.Equal(t, "main", decl.Name)
-	assert.Equal(t, "int", decl.ReturnType)
-	assert.Len(t, decl.Stmts, 1)
-
-	stmt := decl.Stmts[0]
-	assert.Equal(t, uint64(0), stmt.UInt)
 }
