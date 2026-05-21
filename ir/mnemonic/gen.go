@@ -14,6 +14,12 @@ import (
 func main() {
 
 	// Read file contents
+	//
+	// TODO this block and the next one should just be in the tealspec package.
+	// Use go:embed for the JSON file.
+	// Encapsulate everything into a funcion.
+	// The rationale of doing this is encapsulation (hiding boilerplate) and code reuse
+	// (we'll probably parse the langspec many times through the codebase).
 	bs, err := os.ReadFile("../../tealspec/langspec_v12.json")
 	if err != nil {
 		msg := fmt.Sprintf("failed to read file: %v", err)
@@ -73,7 +79,7 @@ func main() {
 	fmt.Fprintf(file, "type (\n")
 	for _, op := range spec.Ops {
 
-		if _, ok := allowList[op.Name]; !ok {
+		if _, ok := opcodeAllowed[op.Name]; !ok {
 			continue
 		}
 
@@ -86,10 +92,10 @@ func main() {
 		fmt.Fprintf(file, "\n")
 
 		// Print the struct definition
-		fmt.Fprintf(file, "\t%s struct{\n", mapOpcodeName(op.Name))
+		fmt.Fprintf(file, "\t%s struct{\n", opcodeNameToIdentifierName(op.Name))
 		for _, imm := range op.ImmediateNote {
 			fmt.Fprintf(file, "\t\t%s %s\n",
-				mapCase(imm.Name),
+				uppercaseFirstCharacter(imm.Name),
 				mapImmEncoding(op.Name, imm.Encoding),
 			)
 		}
@@ -101,20 +107,26 @@ func main() {
 	fmt.Fprintf(file, "\n")
 	for _, op := range spec.Ops {
 
-		if _, ok := allowList[op.Name]; !ok {
+		if _, ok := opcodeAllowed[op.Name]; !ok {
 			continue
 		}
 
-		fmt.Fprintf(file, "func (m %s) mnemonicTag() {}\n", mapOpcodeName(op.Name))
+		fmt.Fprintf(file, "func (m %s) mnemonicTag() {}\n", opcodeNameToIdentifierName(op.Name))
 	}
 
 }
 
-func mapCase(s string) string {
+// uppercaseFirstCharacter sets the first character of the input string to uppercase.
+func uppercaseFirstCharacter(s string) string {
 	return strings.ToUpper(s[:1]) + strings.ToLower(s[1:])
 }
 
-func mapOpcodeName(name string) string {
+// opcodeNameToIdentifierName creates an alphanumeric identifier name for a given opcode mnemonic
+//
+// For instance, the + opcode is mapped to Add, and the == opcode is mapped to Eq.
+//
+// TODO for the sake of correctness, this function could detect invalid opcode names and fail.
+func opcodeNameToIdentifierName(name string) string {
 	switch name {
 	case "+":
 		return "Add"
@@ -143,7 +155,7 @@ func mapOpcodeName(name string) string {
 	case "!":
 		return "LogicalNot"
 	default:
-		return mapCase(name)
+		return uppercaseFirstCharacter(name)
 	}
 }
 
@@ -169,7 +181,12 @@ func mapImmEncoding(opcode string, encoding string) string {
 	}
 }
 
-var allowList = map[string]bool{
+// opcodeAllowed determines which operands does the backend support
+//
+// We're usuing this allow-list approach in the early stages of the language
+// to force a small set of opcodes we can control.
+// We would not be able to deal with all opcodes at this stage.
+var opcodeAllowed = map[string]bool{
 	// fake opcodes
 	"byte":  true,
 	"int":   true,
