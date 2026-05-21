@@ -8,26 +8,31 @@ import (
 )
 
 const code = `
-func main () int {
+func main (i int, j int) int {
 	return 0
 }
 `
 
 type CompilationUnit struct {
 	// FIXME use an union to have different types of declarations
-	FuncDeclarations []*FuncDeclaration `@@*`
+	FuncDeclarations []FuncDeclaration `@@*`
 }
 
-// TODO add function parameters
 type FuncDeclaration struct {
-	Func       string  `"func"`
-	Name       string  `@Ident`
-	LParen     string  `"("`
-	RParen     string  `")"`
-	ReturnType string  `@Ident`
-	LBrace     string  `"{"`
-	Stmts      []*Stmt `@@*` // TODO use an union to have different types of statements
-	RBrace     string  `"}"`
+	Func               string              `"func"`
+	Name               string              `@Ident`
+	LParen             string              `"("`
+	FunctionParameters []FunctionParameter `@@! ("," @@)*`
+	RParen             string              `")"`
+	ReturnType         string              `@Ident`
+	LBrace             string              `"{"`
+	Stmts              []*Stmt             `@@*` // TODO use an union to have different types of statements
+	RBrace             string              `"}"`
+}
+
+type FunctionParameter struct {
+	Ident string `@Ident`
+	Type  string `@Ident`
 }
 
 // TODO add different types of statements
@@ -57,4 +62,5 @@ func TestExperiment(t *testing.T) {
 
 	stmt := decl.Stmts[0]
 	assert.Equal(t, uint64(0), stmt.UInt)
+
 }
