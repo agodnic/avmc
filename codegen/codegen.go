@@ -84,6 +84,10 @@ func generateExpr(expr ast.Expr) (mnemonics []mnemonic.Mnemonic) {
 		// We should define, for each function, number and types of parameters.
 		// Then use a function to perform the type checking.
 		// This is would be easy to unit test.
+		//
+		// It may make sense to separate the type-checking logic that verifies the syntactic tree
+		// (which does not have strong invariants) vs the code generation logic that takes an AST
+		// node as parameter (which has stronger invariants).
 		if i.FuncName == "arg" {
 			if len(i.Args) != 1 {
 				msg := fmt.Sprintf("expected exactly 1 arguments on `arg` function call, but got %d", len(i.Args))
