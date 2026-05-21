@@ -3,7 +3,6 @@
 package main
 
 import (
-	"encoding/json"
 	"fmt"
 	"os"
 	"strings"
@@ -13,26 +12,7 @@ import (
 
 func main() {
 
-	// Read file contents
-	//
-	// TODO this block and the next one should just be in the tealspec package.
-	// Use go:embed for the JSON file.
-	// Encapsulate everything into a funcion.
-	// The rationale of doing this is encapsulation (hiding boilerplate) and code reuse
-	// (we'll probably parse the langspec many times through the codebase).
-	bs, err := os.ReadFile("../../tealspec/langspec_v12.json")
-	if err != nil {
-		msg := fmt.Sprintf("failed to read file: %v", err)
-		panic(msg)
-	}
-
-	// Parse as JSON
-	var spec tealspec.LangSpec
-	err = json.Unmarshal(bs, &spec)
-	if err != nil {
-		msg := fmt.Sprintf("failed to parse JSON: %v", err)
-		panic(msg)
-	}
+	spec := tealspec.MustParse()
 
 	// Add missing mnemonics that do not translate 1:1 to opcodes
 	fakeOpcodes := []tealspec.Op{
