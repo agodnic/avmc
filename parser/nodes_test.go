@@ -26,7 +26,7 @@ type FuncDeclaration struct {
 	RParen             string              `")"`
 	ReturnType         string              `@Ident`
 	LBrace             string              `"{"`
-	Stmts              []*Stmt             `@@*` // TODO use an union to have different types of statements
+	Stmts              []*ReturnStmt       `@@+` // TODO use an union to have different types of statements
 	RBrace             string              `"}"`
 }
 
@@ -36,9 +36,9 @@ type FunctionParameter struct {
 }
 
 // TODO add different types of statements
-type Stmt struct {
+type ReturnStmt struct {
 	Return string `"return"`
-	UInt   uint64 `@Int`
+	UInt   uint64 `@Int` //TODO this should be an expr node
 }
 
 // TODO write table-driven tests for each node
