@@ -7,6 +7,28 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+// TestCase defines a single input-output test case for a grammar element T
+type TestCase[T any] struct {
+	Name       string
+	SourceCode string
+	Error      bool
+	Expected   T
+}
+
+// testAll is a helper that runs all the test cases defined in a given table
+//
+// This is meant to be used in a table-driven test style.
+func testAll[T any](t *testing.T, testCases []TestCase[T]) {
+
+	for _, testCase := range testCases {
+		t.Run(testCase.Name, func(t *testing.T) {
+			returnStmt := mustParse[T](t, testCase.SourceCode)
+			assert.Equal(t, testCase.Expected, *returnStmt)
+		})
+	}
+}
+
+// mustParse is a helper that parses a grammar element of type T from source code
 func mustParse[T any](t *testing.T, sourceCode string) *T {
 
 	parser, err := participle.Build[T](
@@ -18,23 +40,6 @@ func mustParse[T any](t *testing.T, sourceCode string) *T {
 	assert.NoError(t, err)
 
 	return result
-}
-
-type TestCase[T any] struct {
-	Name       string
-	SourceCode string
-	Error      bool
-	Expected   T
-}
-
-func testAll[T any](t *testing.T, testCases []TestCase[T]) {
-
-	for _, testCase := range testCases {
-		t.Run(testCase.Name, func(t *testing.T) {
-			returnStmt := mustParse[T](t, testCase.SourceCode)
-			assert.Equal(t, testCase.Expected, *returnStmt)
-		})
-	}
 }
 
 // TestReturnStmt exercises the parsing of the ReturnStmt grammar element
