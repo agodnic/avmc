@@ -3,6 +3,7 @@
 package main
 
 import (
+	"bytes"
 	"fmt"
 	"os"
 	"strings"
@@ -15,21 +16,11 @@ func main() {
 	spec := tealspec.MustParse()
 	spec.Ops = append(spec.Ops, fakeOpcodes...)
 
-	// Open the output file
-	//
-	// TODO decouple the file writing logic from the string building logic
-	// I think we can use a bytes.Buffer for this.
-	// We can also split the logic into functions
-	file, err := os.OpenFile("generated_mnemonics.go", os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0644)
-	if err != nil {
-		msg := fmt.Sprintf("failed to open file: %v", err)
-		panic(msg)
-	}
-	defer file.Close()
+	var buf bytes.Buffer
 
 	// Generate a struct for each opcode
-	fmt.Fprintf(file, "package mnemonic\n\n")
-	fmt.Fprintf(file, "type (\n")
+	fmt.Fprintf(&buf, "package mnemonic\n\n")
+	fmt.Fprintf(&buf, "type (\n")
 	for _, op := range spec.Ops {
 
 		if _, ok := opcodeAllowed[op.Name]; !ok {
@@ -37,36 +28,42 @@ func main() {
 		}
 
 		// Print a comment above the struct definition
-		fmt.Fprintf(file, "\n")
-		fmt.Fprintf(file, "\t// %s", op.Name)
+		fmt.Fprintf(&buf, "\n")
+		fmt.Fprintf(&buf, "\t// %s", op.Name)
 		for _, imm := range op.ImmediateNote {
-			fmt.Fprintf(file, " %s", imm.Name)
+			fmt.Fprintf(&buf, " %s", imm.Name)
 		}
-		fmt.Fprintf(file, "\n")
+		fmt.Fprintf(&buf, "\n")
 
 		// Print the struct definition
-		fmt.Fprintf(file, "\t%s struct{\n", opcodeNameToIdentifierName(op.Name))
+		fmt.Fprintf(&buf, "\t%s struct{\n", opcodeNameToIdentifierName(op.Name))
 		for _, imm := range op.ImmediateNote {
-			fmt.Fprintf(file, "\t\t%s %s\n",
+			fmt.Fprintf(&buf, "\t\t%s %s\n",
 				uppercaseFirstCharacter(imm.Name),
 				mapImmEncoding(op.Name, imm.Encoding),
 			)
 		}
-		fmt.Fprintf(file, "\t}\n")
+		fmt.Fprintf(&buf, "\t}\n")
 	}
-	fmt.Fprintf(file, ")\n")
+	fmt.Fprintf(&buf, ")\n")
 
 	// Generate interface implementations for a little bit of extra type safety
-	fmt.Fprintf(file, "\n")
+	fmt.Fprintf(&buf, "\n")
 	for _, op := range spec.Ops {
 
 		if _, ok := opcodeAllowed[op.Name]; !ok {
 			continue
 		}
 
-		fmt.Fprintf(file, "func (m %s) mnemonicTag() {}\n", opcodeNameToIdentifierName(op.Name))
+		fmt.Fprintf(&buf, "func (m %s) mnemonicTag() {}\n", opcodeNameToIdentifierName(op.Name))
 	}
 
+	const filename = "generated_mnemonics.go"
+	err := os.WriteFile(filename, buf.Bytes(), 0644)
+	if err != nil {
+		msg := fmt.Sprintf("failed to write generated mnemonics to file %s: %v", filename, err)
+		panic(msg)
+	}
 }
 
 // uppercaseFirstCharacter sets the first character of the input string to uppercase.
