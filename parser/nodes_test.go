@@ -13,11 +13,13 @@ func main () {
 }
 `
 
-type CompulationUnit struct {
+type CompilationUnit struct {
 	// FIXME use an union to have different types of declarations
 	FuncDeclarations []*FuncDeclaration `@@*`
 }
 
+// TODO add function parameters
+// TODO add function return value
 type FuncDeclaration struct {
 	Func   string `"func"`
 	Name   string `@Ident`
@@ -31,14 +33,16 @@ type FuncDeclaration struct {
 	RBrace string `"}"`
 }
 
+// TODO add different types of statements
 type Stmt struct {
 	Return string `"return"`
 	UInt   uint64 `@Int`
 }
 
+// TODO write table-driven tests for each node
 func TestExperiment(t *testing.T) {
 
-	parser, err := participle.Build[CompulationUnit](
+	parser, err := participle.Build[CompilationUnit](
 		participle.Unquote("String"),
 		//participle.Union[Value](String{}, Number{}),
 	)
