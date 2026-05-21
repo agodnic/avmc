@@ -1,6 +1,8 @@
 package codegen
 
 import (
+	"fmt"
+
 	"github.com/agodnic/avmc/ir/ast"
 	"github.com/agodnic/avmc/ir/mnemonic"
 )
@@ -45,8 +47,8 @@ func generateStmt(stmt ast.Stmt) (mnemonics []mnemonic.Mnemonic) {
 		// end block
 		mnemonics = append(mnemonics, mnemonic.Label{I: endLabel})
 	default:
-		//TODO msg := fmt(...)
-		panic("not iplemented")
+		msg := fmt.Sprintf("encountered unexpected stmt type while generating code: %#v", stmt)
+		panic(msg)
 	}
 
 	return mnemonics
@@ -108,8 +110,8 @@ func generateExpr(expr ast.Expr) (mnemonics []mnemonic.Mnemonic) {
 		mnemonics = append(mnemonics, opcode)
 		return mnemonics
 	default:
-		//TODO msg := fmt(...)
-		panic("not iplemented")
+		msg := fmt.Sprintf("encountered unexpected expression type while generating code: %#v", expr)
+		panic(msg)
 	}
 
 }
