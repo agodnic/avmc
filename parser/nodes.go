@@ -1,8 +1,6 @@
 package parser
 
 type (
-	//TODO FunctionCallExpr
-
 	//TODO IfStmt
 
 	//TODO WhileLoop
@@ -47,6 +45,13 @@ type (
 		Value Expr   `@@`
 	}
 
+	CallExpr struct {
+		Ident  string `@Ident`
+		LParen string `"("`
+		Params []Expr `@@! ("," @@)*`
+		RParen string `")"`
+	}
+
 	IntegerExpr struct {
 		Value int64 `@Int`
 	}
@@ -65,6 +70,7 @@ type (
 	Stmt interface{ stmtTag() }
 )
 
+func (expr CallExpr) exprTag()    {}
 func (expr IntegerExpr) exprTag() {}
 func (expr StringExpr) exprTag()  {}
 func (expr VarExpr) exprTag()     {}

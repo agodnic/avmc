@@ -34,7 +34,7 @@ func mustParse[T any](t *testing.T, sourceCode string) *T {
 	parser, err := participle.Build[T](
 		participle.Unquote("String"), //FIXME figure out what this does
 		participle.Union[Stmt](AssignmentStmt{}, ReturnStmt{}, VariableDeclarationStmt{}),
-		participle.Union[Expr](IntegerExpr{}, StringExpr{}, VarExpr{}),
+		participle.Union[Expr](CallExpr{}, IntegerExpr{}, StringExpr{}, VarExpr{}),
 	)
 	assert.NoError(t, err)
 
@@ -170,6 +170,35 @@ func Test_FuncDeclaration(t *testing.T) {
 	testAll(t, testCases)
 }
 
+func Test_CallExpr(t *testing.T) {
+
+	testCases := []TestCase[CallExpr]{
+		{
+			Name:       "call expression with one param",
+			SourceCode: `strlen("foo")`,
+			Expected: CallExpr{
+				Ident: "strlen",
+				Params: []Expr{
+					StringExpr{Value: "foo"},
+				},
+			},
+		},
+		{
+			Name:       "call expression with two params",
+			SourceCode: `printf("number: %d", 1)`,
+			Expected: CallExpr{
+				Ident: "printf",
+				Params: []Expr{
+					StringExpr{Value: "number: %d"},
+					IntegerExpr{Value: 1},
+				},
+			},
+		},
+	}
+
+	testAll(t, testCases)
+}
+
 func Test_IntegerExpr(t *testing.T) {
 
 	testCases := []TestCase[IntegerExpr]{
@@ -211,6 +240,17 @@ func Test_VarExpr(t *testing.T) {
 func Test_Expr(t *testing.T) {
 
 	testCases := []TestCase[Expr]{
+		{
+			Name:       "function call expression",
+			SourceCode: `printf("number: %d", 1)`,
+			Expected: CallExpr{
+				Ident: "printf",
+				Params: []Expr{
+					StringExpr{Value: "number: %d"},
+					IntegerExpr{Value: 1},
+				},
+			},
+		},
 		{
 			Name:       "int literal",
 			SourceCode: `42`,
