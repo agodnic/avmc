@@ -59,6 +59,24 @@ func Test_VariableDeclarationStmt(t *testing.T) {
 	testAll(t, testCases)
 }
 
+func Test_Stmt(t *testing.T) {
+
+	testCases := []TestCase[Stmt]{
+		{
+			Name:       `return stmt`,
+			SourceCode: `return 1`,
+			Expected:   ReturnStmt{UInt: 1},
+		},
+		{
+			Name:       `variable declaration stmt`,
+			SourceCode: `var i = 1`,
+			Expected:   VariableDeclarationStmt{Ident: "i", Expr: "1"},
+		},
+	}
+
+	testAll(t, testCases)
+}
+
 func Test_ReturnStmt(t *testing.T) {
 
 	testCases := []TestCase[ReturnStmt]{
