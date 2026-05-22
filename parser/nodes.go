@@ -25,7 +25,7 @@ type (
 
 	ReturnStmt struct {
 		Return string `"return"`
-		UInt   uint64 `@Int` //TODO should be an expr node
+		Value  Expr   `@@`
 	}
 
 	VariableDeclarationStmt struct {

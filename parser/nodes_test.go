@@ -66,7 +66,7 @@ func Test_Stmt(t *testing.T) {
 		{
 			Name:       `return stmt`,
 			SourceCode: `return 1`,
-			Expected:   ReturnStmt{UInt: 1},
+			Expected:   ReturnStmt{Value: IntegerExpr{Value: 1}},
 		},
 		{
 			Name:       `variable declaration stmt`,
@@ -87,12 +87,12 @@ func Test_ReturnStmt(t *testing.T) {
 		{
 			Name:       `just return 0`,
 			SourceCode: `return 0`,
-			Expected:   ReturnStmt{UInt: 0},
+			Expected:   ReturnStmt{Value: IntegerExpr{Value: 0}},
 		},
 		{
 			Name:       `just return 1`,
 			SourceCode: `return 1`,
-			Expected:   ReturnStmt{UInt: 1},
+			Expected:   ReturnStmt{Value: IntegerExpr{Value: 1}},
 		},
 	}
 
@@ -136,7 +136,7 @@ func Test_FuncDeclaration(t *testing.T) {
 				ReturnType: "int",
 				Stmts: []Stmt{
 					ReturnStmt{
-						UInt: 0,
+						Value: IntegerExpr{Value: 0},
 					},
 				},
 			},
