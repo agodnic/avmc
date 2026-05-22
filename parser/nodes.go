@@ -38,6 +38,10 @@ type (
 	IntegerExpr struct {
 		Value int64 `@Int`
 	}
+
+	StringExpr struct {
+		Value string `@String`
+	}
 )
 
 type (
@@ -46,6 +50,7 @@ type (
 )
 
 func (expr IntegerExpr) exprTag() {}
+func (expr StringExpr) exprTag()  {}
 
 func (stmt ReturnStmt) stmtTag()              {}
 func (stmt VariableDeclarationStmt) stmtTag() {}

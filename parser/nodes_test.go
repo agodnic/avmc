@@ -34,7 +34,7 @@ func mustParse[T any](t *testing.T, sourceCode string) *T {
 	parser, err := participle.Build[T](
 		participle.Unquote("String"), //FIXME figure out what this does
 		participle.Union[Stmt](ReturnStmt{}, VariableDeclarationStmt{}),
-		participle.Union[Expr](IntegerExpr{}),
+		participle.Union[Expr](IntegerExpr{}, StringExpr{}),
 	)
 	assert.NoError(t, err)
 
@@ -150,9 +150,39 @@ func Test_IntegerExpr(t *testing.T) {
 
 	testCases := []TestCase[IntegerExpr]{
 		{
-			Name:       "naive case",
+			Name:       "int literal",
 			SourceCode: `42`,
 			Expected:   IntegerExpr{Value: 42},
+		},
+	}
+
+	testAll(t, testCases)
+}
+func Test_StringExpr(t *testing.T) {
+
+	testCases := []TestCase[StringExpr]{
+		{
+			Name:       "string literal",
+			SourceCode: `"this is a string literal"`,
+			Expected:   StringExpr{Value: "this is a string literal"},
+		},
+	}
+
+	testAll(t, testCases)
+}
+
+func Test_Expr(t *testing.T) {
+
+	testCases := []TestCase[Expr]{
+		{
+			Name:       "int literal",
+			SourceCode: `42`,
+			Expected:   IntegerExpr{Value: 42},
+		},
+		{
+			Name:       "string literal",
+			SourceCode: `"this is a string literal"`,
+			Expected:   StringExpr{Value: "this is a string literal"},
 		},
 	}
 
