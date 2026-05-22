@@ -35,6 +35,7 @@ type (
 	VariableDeclarationStmt struct {
 		Var   string `"var"`
 		Ident string `@Ident`
+		Type  string `@Ident`
 		Eq    string `"="`
 		Expr  Expr   `@@`
 	}

@@ -49,9 +49,10 @@ func Test_VariableDeclarationStmt(t *testing.T) {
 	testCases := []TestCase[VariableDeclarationStmt]{
 		{
 			Name:       "naive case",
-			SourceCode: "var a = 1",
+			SourceCode: "var a int = 1",
 			Expected: VariableDeclarationStmt{
 				Ident: "a",
+				Type:  "int",
 				Expr:  IntegerExpr{Value: 1},
 			},
 		},
@@ -78,10 +79,11 @@ func Test_Stmt(t *testing.T) {
 		},
 		{
 			Name:       `variable declaration stmt`,
-			SourceCode: `var i = 1`,
+			SourceCode: `var s string = "foo"`,
 			Expected: VariableDeclarationStmt{
-				Ident: "i",
-				Expr:  IntegerExpr{Value: 1},
+				Ident: "s",
+				Type:  "string",
+				Expr:  StringExpr{Value: "foo"},
 			},
 		},
 	}
