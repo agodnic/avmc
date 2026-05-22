@@ -1,6 +1,10 @@
 package parser
 
 type (
+	//TODO UnaryExpression
+
+	//TODO BinaryExpression
+
 	//TODO IfStmt
 
 	//TODO WhileLoop
@@ -11,15 +15,15 @@ type (
 	}
 
 	FuncDeclaration struct {
-		Func               string      `"func"`
-		Name               string      `@Ident`
-		LParen             string      `"("`
-		FunctionParameters []FuncParam `@@! ("," @@)*`
-		RParen             string      `")"`
-		ReturnType         string      `@Ident`
-		LBrace             string      `"{"`
-		Stmts              []Stmt      `@@+`
-		RBrace             string      `"}"`
+		Func       string      `"func"`
+		Name       string      `@Ident`
+		LParen     string      `"("`
+		FuncParams []FuncParam `@@! ("," @@)*`
+		RParen     string      `")"`
+		ReturnType string      `@Ident`
+		LBrace     string      `"{"`
+		Stmts      []Stmt      `@@+`
+		RBrace     string      `"}"`
 	}
 
 	FuncParam struct {

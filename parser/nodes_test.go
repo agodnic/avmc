@@ -153,7 +153,7 @@ func Test_FuncDeclaration(t *testing.T) {
 			`,
 			Expected: FuncDeclaration{
 				Name: "main",
-				FunctionParameters: []FuncParam{
+				FuncParams: []FuncParam{
 					{
 						Ident: "i",
 						Type:  "int",
