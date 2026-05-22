@@ -33,7 +33,7 @@ func mustParse[T any](t *testing.T, sourceCode string) *T {
 
 	parser, err := participle.Build[T](
 		participle.Unquote("String"),
-		participle.Union[Stmt](ReturnStmt{}, DeclarationStmt{}),
+		participle.Union[Stmt](ReturnStmt{}, VariableDeclarationStmt{}),
 	)
 	assert.NoError(t, err)
 
@@ -43,8 +43,23 @@ func mustParse[T any](t *testing.T, sourceCode string) *T {
 	return result
 }
 
-// TestReturnStmt exercises the parsing of the ReturnStmt grammar element
-func TestReturnStmt(t *testing.T) {
+func Test_VariableDeclarationStmt(t *testing.T) {
+
+	testCases := []TestCase[VariableDeclarationStmt]{
+		{
+			Name:       "naive case",
+			SourceCode: "var a = 1",
+			Expected: VariableDeclarationStmt{
+				Ident: "a",
+				Expr:  "1",
+			},
+		},
+	}
+
+	testAll(t, testCases)
+}
+
+func Test_ReturnStmt(t *testing.T) {
 
 	testCases := []TestCase[ReturnStmt]{
 		{
@@ -62,8 +77,7 @@ func TestReturnStmt(t *testing.T) {
 	testAll(t, testCases)
 }
 
-// TestFunctionParameter exercises the parsing of the FunctionParameter grammar element
-func TestFunctionParameter(t *testing.T) {
+func Test_FunctionParameter(t *testing.T) {
 
 	testCases := []TestCase[FunctionParameter]{
 		{
@@ -79,8 +93,7 @@ func TestFunctionParameter(t *testing.T) {
 	testAll(t, testCases)
 }
 
-// TestFuncDeclaration exercises the parsing of the FuncDeclaration grammar element
-func TestFuncDeclaration(t *testing.T) {
+func Test_FuncDeclaration(t *testing.T) {
 
 	testCases := []TestCase[FuncDeclaration]{
 		{

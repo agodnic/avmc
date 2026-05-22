@@ -27,14 +27,14 @@ type ReturnStmt struct {
 	UInt   uint64 `@Int` //TODO should be an expr node
 }
 
-type DeclarationStmt struct {
+type VariableDeclarationStmt struct {
 	Var   string `"var"`
-	Ident string `"@Ident"`
+	Ident string `@Ident`
 	Eq    string `"="`
-	Expr  string "`@Ident`" //FIXME should be an expr node
+	Expr  string `@Int` //FIXME should be an expr node
 }
 
 type Stmt interface{ stmtTag() }
 
-func (rs ReturnStmt) stmtTag()      {}
-func (rs DeclarationStmt) stmtTag() {}
+func (rs ReturnStmt) stmtTag()              {}
+func (rs VariableDeclarationStmt) stmtTag() {}
