@@ -32,8 +32,9 @@ func testAll[T any](t *testing.T, testCases []TestCase[T]) {
 func mustParse[T any](t *testing.T, sourceCode string) *T {
 
 	parser, err := participle.Build[T](
-		participle.Unquote("String"),
+		participle.Unquote("String"), //FIXME figure out what this does
 		participle.Union[Stmt](ReturnStmt{}, VariableDeclarationStmt{}),
+		participle.Union[Expr](IntegerExpr{}),
 	)
 	assert.NoError(t, err)
 
@@ -51,7 +52,7 @@ func Test_VariableDeclarationStmt(t *testing.T) {
 			SourceCode: "var a = 1",
 			Expected: VariableDeclarationStmt{
 				Ident: "a",
-				Expr:  "1",
+				Expr:  IntegerExpr{Value: 1},
 			},
 		},
 	}
@@ -70,7 +71,10 @@ func Test_Stmt(t *testing.T) {
 		{
 			Name:       `variable declaration stmt`,
 			SourceCode: `var i = 1`,
-			Expected:   VariableDeclarationStmt{Ident: "i", Expr: "1"},
+			Expected: VariableDeclarationStmt{
+				Ident: "i",
+				Expr:  IntegerExpr{Value: 1},
+			},
 		},
 	}
 

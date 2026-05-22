@@ -32,7 +32,7 @@ type (
 		Var   string `"var"`
 		Ident string `@Ident`
 		Eq    string `"="`
-		Expr  string `@Int` //FIXME should be an expr node
+		Expr  Expr   `@@`
 	}
 
 	IntegerExpr struct {
