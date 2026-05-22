@@ -95,13 +95,13 @@ func Test_ReturnStmt(t *testing.T) {
 	testAll(t, testCases)
 }
 
-func Test_FunctionParameter(t *testing.T) {
+func Test_FunctionParam(t *testing.T) {
 
-	testCases := []TestCase[FunctionParameter]{
+	testCases := []TestCase[FunctionParam]{
 		{
 			Name:       "Naive case",
 			SourceCode: "j int",
-			Expected: FunctionParameter{
+			Expected: FunctionParam{
 				Ident: "j",
 				Type:  "int",
 			},
@@ -123,7 +123,7 @@ func Test_FuncDeclaration(t *testing.T) {
 			`,
 			Expected: FuncDeclaration{
 				Name: "main",
-				FunctionParameters: []FunctionParameter{
+				FunctionParameters: []FunctionParam{
 					{
 						Ident: "i",
 						Type:  "int",
