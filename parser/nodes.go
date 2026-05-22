@@ -24,10 +24,17 @@ type FunctionParameter struct {
 
 type ReturnStmt struct {
 	Return string `"return"`
-	UInt   uint64 `@Int` //TODO this should be an expr node
+	UInt   uint64 `@Int` //TODO should be an expr node
 }
 
-func (rs ReturnStmt) stmtTag() {}
+type DeclarationStmt struct {
+	Var   string `"var"`
+	Ident string `"@Ident"`
+	Eq    string `"="`
+	Expr  string "`@Ident`" //FIXME should be an expr node
+}
 
-// TODO add different types of statements
 type Stmt interface{ stmtTag() }
+
+func (rs ReturnStmt) stmtTag()      {}
+func (rs DeclarationStmt) stmtTag() {}

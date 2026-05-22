@@ -33,7 +33,7 @@ func mustParse[T any](t *testing.T, sourceCode string) *T {
 
 	parser, err := participle.Build[T](
 		participle.Unquote("String"),
-		participle.Union[Stmt](ReturnStmt{}),
+		participle.Union[Stmt](ReturnStmt{}, DeclarationStmt{}),
 	)
 	assert.NoError(t, err)
 
