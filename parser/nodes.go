@@ -1,6 +1,14 @@
 package parser
 
 type (
+	//TODO FunctionCallExpr
+
+	//TODO IfStmt
+
+	//TODO WhileLoop
+
+	//TODO AssignmentStmt
+
 	CompilationUnit struct {
 		// FIXME use an union to have different types of declarations
 		FuncDeclarations []FuncDeclaration `@@*`
@@ -42,6 +50,10 @@ type (
 	StringExpr struct {
 		Value string `@String`
 	}
+
+	VarExpr struct {
+		Ident string `@Ident`
+	}
 )
 
 type (
@@ -51,6 +63,7 @@ type (
 
 func (expr IntegerExpr) exprTag() {}
 func (expr StringExpr) exprTag()  {}
+func (expr VarExpr) exprTag()     {}
 
 func (stmt ReturnStmt) stmtTag()              {}
 func (stmt VariableDeclarationStmt) stmtTag() {}
