@@ -7,18 +7,18 @@ type (
 	}
 
 	FuncDeclaration struct {
-		Func               string          `"func"`
-		Name               string          `@Ident`
-		LParen             string          `"("`
-		FunctionParameters []FunctionParam `@@! ("," @@)*`
-		RParen             string          `")"`
-		ReturnType         string          `@Ident`
-		LBrace             string          `"{"`
-		Stmts              []Stmt          `@@+`
-		RBrace             string          `"}"`
+		Func               string      `"func"`
+		Name               string      `@Ident`
+		LParen             string      `"("`
+		FunctionParameters []FuncParam `@@! ("," @@)*`
+		RParen             string      `")"`
+		ReturnType         string      `@Ident`
+		LBrace             string      `"{"`
+		Stmts              []Stmt      `@@+`
+		RBrace             string      `"}"`
 	}
 
-	FunctionParam struct {
+	FuncParam struct {
 		Ident string `@Ident`
 		Type  string `@Ident`
 	}
