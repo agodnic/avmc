@@ -7,8 +7,6 @@ type (
 
 	//TODO WhileLoop
 
-	//TODO AssignmentStmt
-
 	CompilationUnit struct {
 		// FIXME use an union to have different types of declarations
 		FuncDeclarations []FuncDeclaration `@@*`
@@ -43,6 +41,12 @@ type (
 		Expr  Expr   `@@`
 	}
 
+	AssignmentStmt struct {
+		Ident string `@Ident`
+		Eq    string `"="`
+		Value Expr   `@@`
+	}
+
 	IntegerExpr struct {
 		Value int64 `@Int`
 	}
@@ -65,5 +69,6 @@ func (expr IntegerExpr) exprTag() {}
 func (expr StringExpr) exprTag()  {}
 func (expr VarExpr) exprTag()     {}
 
+func (stmt AssignmentStmt) stmtTag()          {}
 func (stmt ReturnStmt) stmtTag()              {}
 func (stmt VariableDeclarationStmt) stmtTag() {}

@@ -33,7 +33,7 @@ func mustParse[T any](t *testing.T, sourceCode string) *T {
 
 	parser, err := participle.Build[T](
 		participle.Unquote("String"), //FIXME figure out what this does
-		participle.Union[Stmt](ReturnStmt{}, VariableDeclarationStmt{}),
+		participle.Union[Stmt](AssignmentStmt{}, ReturnStmt{}, VariableDeclarationStmt{}),
 		participle.Union[Expr](IntegerExpr{}, StringExpr{}, VarExpr{}),
 	)
 	assert.NoError(t, err)
@@ -64,6 +64,14 @@ func Test_Stmt(t *testing.T) {
 
 	testCases := []TestCase[Stmt]{
 		{
+			Name:       `assignment stmt`,
+			SourceCode: `a = 1`,
+			Expected: AssignmentStmt{
+				Ident: "a",
+				Value: IntegerExpr{Value: 1},
+			},
+		},
+		{
 			Name:       `return stmt`,
 			SourceCode: `return 1`,
 			Expected:   ReturnStmt{Value: IntegerExpr{Value: 1}},
@@ -74,6 +82,22 @@ func Test_Stmt(t *testing.T) {
 			Expected: VariableDeclarationStmt{
 				Ident: "i",
 				Expr:  IntegerExpr{Value: 1},
+			},
+		},
+	}
+
+	testAll(t, testCases)
+}
+
+func Test_AssignmentStmt(t *testing.T) {
+
+	testCases := []TestCase[AssignmentStmt]{
+		{
+			Name:       `assignment stmt`,
+			SourceCode: `a = 1`,
+			Expected: AssignmentStmt{
+				Ident: "a",
+				Value: IntegerExpr{Value: 1},
 			},
 		},
 	}
