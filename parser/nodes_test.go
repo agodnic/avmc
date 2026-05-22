@@ -141,3 +141,16 @@ func Test_FuncDeclaration(t *testing.T) {
 
 	testAll(t, testCases)
 }
+
+func Test_IntegerExpr(t *testing.T) {
+
+	testCases := []TestCase[IntegerExpr]{
+		{
+			Name:       "naive case",
+			SourceCode: `42`,
+			Expected:   IntegerExpr{Value: 42},
+		},
+	}
+
+	testAll(t, testCases)
+}

@@ -34,12 +34,18 @@ type (
 		Eq    string `"="`
 		Expr  string `@Int` //FIXME should be an expr node
 	}
+
+	IntegerExpr struct {
+		Value int64 `@Int`
+	}
 )
 
 type (
-	Stmt interface{ stmtTag() }
 	Expr interface{ exprTag() }
+	Stmt interface{ stmtTag() }
 )
 
-func (rs ReturnStmt) stmtTag()              {}
-func (rs VariableDeclarationStmt) stmtTag() {}
+func (expr IntegerExpr) exprTag() {}
+
+func (stmt ReturnStmt) stmtTag()              {}
+func (stmt VariableDeclarationStmt) stmtTag() {}
