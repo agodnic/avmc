@@ -200,21 +200,7 @@ func Test_Primary(t *testing.T) {
 			Name:       "subexpr",
 			SourceCode: `(1)`,
 			Expected: Primary{
-				Subexpr: &Expr{
-					Equality: &Equality{
-						Left: &Additive{
-							Left: &Multiplicative{
-								Left: &Unary{
-									Operand: &Postfix{
-										Primary: &Primary{
-											Number: ptr(1),
-										},
-									},
-								},
-							},
-						},
-					},
-				},
+				Subexpr: intPrimaryExpr(1),
 			},
 		},
 	}
