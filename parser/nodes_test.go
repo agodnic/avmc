@@ -132,6 +132,30 @@ func Test_Postfix(t *testing.T) {
 	testAll(t, testCases)
 }
 
+func Test_CompilationUnit(t *testing.T) {
+	testCases := []TestCase[CompilationUnit]{
+		{
+			Name:       "func with typed param and return",
+			SourceCode: `func main(int i) int { return 0 }`,
+			Expected: CompilationUnit{
+				FuncDecls: []FuncDecl{{
+					Name:       "main",
+					Params:     []Param{{Type: "int", Name: "i"}},
+					ReturnType: ptr("int"),
+					Body: &BlockStmt{
+						Statements: []*Statement{{
+							Return: &ReturnStmt{
+								Value: intPrimaryExpr(0),
+							},
+						}},
+					},
+				}},
+			},
+		},
+	}
+	testAll(t, testCases)
+}
+
 func primaryExpr(p Primary) *Expr {
 	return &Expr{
 		Equality: &Equality{

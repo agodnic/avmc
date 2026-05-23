@@ -102,9 +102,14 @@ type (
 		Value *Expr  `"=" @@`
 	}
 
+	Param struct {
+		Type string `@Ident`
+		Name string `@Ident`
+	}
+
 	FuncDecl struct {
 		Name       string     `"func" @Ident`
-		Params     []string   `"(" ( @Ident ( "," @Ident )* )? ")"`
+		Params     []Param    `"(" ( @@ ( "," @@ )* )? ")"`
 		ReturnType *string    "@Ident?"
 		Body       *BlockStmt `@@`
 	}
