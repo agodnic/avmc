@@ -260,20 +260,34 @@ func Test_Postfix(t *testing.T) {
 	testAll(t, testCases)
 }
 
-func intPrimaryExpr(n int) *Expr {
+func primaryExpr(p Primary) *Expr {
 	return &Expr{
 		Equality: &Equality{
 			Left: &Additive{
 				Left: &Multiplicative{
 					Left: &Unary{
-						Operand: &Postfix{
-							Primary: &Primary{Number: ptr(n)},
-						},
+						Operand: &Postfix{Primary: &p},
 					},
 				},
 			},
 		},
 	}
+}
+
+func intPrimaryExpr(n int) *Expr {
+	return primaryExpr(Primary{Number: ptr(n)})
+}
+
+func stringPrimaryExpr(s string) *Expr {
+	return primaryExpr(Primary{String: ptr(s)})
+}
+
+func identPrimaryExpr(name string) *Expr {
+	return primaryExpr(Primary{Ident: ptr(name)})
+}
+
+func subexprPrimaryExpr(inner *Expr) *Expr {
+	return primaryExpr(Primary{Subexpr: inner})
 }
 
 func ptr[T any](t T) *T {
