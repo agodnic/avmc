@@ -5,6 +5,11 @@ type (
 
 	//TODO BinaryExpression
 
+	//TODO Figure out how to represent parenthesized expressions without
+	//
+	// Could probably define ParenthesizedExpr as "(" @@ ")"
+	// and add it to the enum
+
 	//TODO IfStmt
 
 	//TODO WhileLoop
