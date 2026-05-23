@@ -68,47 +68,70 @@ type (
 	}
 )
 
-//TODO IfStmt
+/*
+Statements:
 
-//TODO WhileLoop
+	VarDecl
+	FuncDecl
+	IfStmt
+	WhileStmt
+	ReturnStmt
+	Assignment
+	ExprStmt
+	BlockStmt
+*/
+type (
+	Statement struct {
+		VarDecl   *VarDecl    `  @@`
+		FuncDecl  *FuncDecl   `| @@`
+		WhileStmt *WhileStmt  `| @@`
+		IfStmt    *IfStmt     `| @@`
+		Return    *ReturnStmt `| @@`
+		Assign    *Assignment `| @@`
+		Expr      *ExprStmt   `| @@`
+		Block     *BlockStmt  `| @@`
+	}
 
-//CompilationUnit struct {
-//	// FIXME use an union to have different types of declarations
-//	FuncDeclarations []FuncDeclaration `@@+`
-//}
+	VarDecl struct {
+		Name  string ` "let" @Ident`
+		Value *Expr  `"=" @@`
+	}
 
-//FuncDeclaration struct {
-//	Func       string      `"func"`
-//	Name       string      `@Ident`
-//	LParen     string      `"("`
-//	FuncParams []FuncParam `@@! ("," @@)*`
-//	RParen     string      `")"`
-//	ReturnType string      `@Ident`
-//	LBrace     string      `"{"`
-//	Stmts      []Stmt      `@@+`
-//	RBrace     string      `"}"`
-//}
+	Assignment struct {
+		Name  string `@Ident`
+		Value *Expr  `"=" @@`
+	}
 
-//FuncParam struct {
-//	Ident string `@Ident`
-//	Type  string `@Ident`
-//}
+	FuncDecl struct {
+		Name   string     `"fn" @Ident`
+		Params []string   `"(" ( @Ident ( "," @Ident )* )? ")"`
+		Body   *BlockStmt `@@`
+	}
 
-//ReturnStmt struct {
-//	Return string `"return"`
-//	Value  Expr   `@@`
-//}
+	WhileStmt struct {
+		Condition *Expr      `"while" @@`
+		Body      *BlockStmt `@@`
+	}
 
-//VariableDeclarationStmt struct {
-//	Var   string `"var"`
-//	Ident string `@Ident`
-//	Type  string `@Ident`
-//	Eq    string `"="`
-//	Expr  Expr   `@@`
-//}
+	IfStmt struct {
+		Condition *Expr      `"if" @@`
+		Then      *BlockStmt `@@`
+		Else      *BlockStmt `( "else" @@ )?`
+	}
 
-//AssignmentStmt struct {
-//	Ident string `@Ident`
-//	Eq    string `"="`
-//	Value Expr   `@@`
-//}
+	ReturnStmt struct {
+		Value *Expr `"return" @@?`
+	}
+
+	ExprStmt struct {
+		Expr *Expr `@@`
+	}
+
+	BlockStmt struct {
+		Statements []*Statement `"{" @@* "}"`
+	}
+)
+
+type CompilationUnit struct {
+	FuncDecls []FuncDecl `@@+`
+}
