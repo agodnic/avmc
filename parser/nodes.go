@@ -16,7 +16,7 @@ type (
 
 	CompilationUnit struct {
 		// FIXME use an union to have different types of declarations
-		FuncDeclarations []FuncDeclaration `@@*`
+		FuncDeclarations []FuncDeclaration `@@+`
 	}
 
 	FuncDeclaration struct {
@@ -70,6 +70,11 @@ type (
 		Value string `@String`
 	}
 
+	UnaryExpr struct {
+		Operator string `"!"`
+		Operand  Expr   `@@`
+	}
+
 	VarExpr struct {
 		Ident string `@Ident`
 	}
@@ -83,6 +88,7 @@ type (
 func (expr CallExpr) exprTag()    {}
 func (expr IntegerExpr) exprTag() {}
 func (expr StringExpr) exprTag()  {}
+func (expr UnaryExpr) exprTag()   {}
 func (expr VarExpr) exprTag()     {}
 
 func (stmt AssignmentStmt) stmtTag()          {}
