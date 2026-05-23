@@ -103,9 +103,10 @@ type (
 	}
 
 	FuncDecl struct {
-		Name   string     `"fn" @Ident`
-		Params []string   `"(" ( @Ident ( "," @Ident )* )? ")"`
-		Body   *BlockStmt `@@`
+		Name       string     `"func" @Ident`
+		Params     []string   `"(" ( @Ident ( "," @Ident )* )? ")"`
+		ReturnType *string    "@Ident?"
+		Body       *BlockStmt `@@`
 	}
 
 	WhileStmt struct {
