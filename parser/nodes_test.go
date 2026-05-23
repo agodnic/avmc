@@ -222,6 +222,74 @@ func Test_Primary(t *testing.T) {
 	testAll(t, testCases)
 }
 
+func Test_Postfix(t *testing.T) {
+
+	testCases := []TestCase[Postfix]{
+		{
+			Name:       "number",
+			SourceCode: `1`,
+			Expected: Postfix{
+				Primary: &Primary{Number: ptr(1)},
+			},
+		},
+		{
+			Name:       "ident",
+			SourceCode: `a`,
+			Expected: Postfix{
+				Primary: &Primary{Ident: ptr("a")},
+			},
+		},
+		{
+			Name:       "call no args",
+			SourceCode: `foo()`,
+			Expected: Postfix{
+				Primary: &Primary{Ident: ptr("foo")},
+				Calls: []*Call{
+					{Args: nil},
+				},
+			},
+		},
+		{
+			Name:       "call one arg",
+			SourceCode: `foo(1)`,
+			Expected: Postfix{
+				Primary: &Primary{Ident: ptr("foo")},
+				Calls: []*Call{
+					{Args: []*Expr{intPrimaryExpr(1)}},
+				},
+			},
+		},
+		{
+			Name:       "call two args",
+			SourceCode: `foo(1, 2)`,
+			Expected: Postfix{
+				Primary: &Primary{Ident: ptr("foo")},
+				Calls: []*Call{
+					{Args: []*Expr{intPrimaryExpr(1), intPrimaryExpr(2)}},
+				},
+			},
+		},
+	}
+
+	testAll(t, testCases)
+}
+
+func intPrimaryExpr(n int) *Expr {
+	return &Expr{
+		Equality: &Equality{
+			Left: &Additive{
+				Left: &Multiplicative{
+					Left: &Unary{
+						Operand: &Postfix{
+							Primary: &Primary{Number: ptr(n)},
+						},
+					},
+				},
+			},
+		},
+	}
+}
+
 func ptr[T any](t T) *T {
 	return &t
 }
