@@ -140,7 +140,7 @@ func mustParse[T any](t *testing.T, sourceCode string) *T {
 //
 //	testAll(t, testCases)
 //}
-//
+
 //func Test_FuncDeclaration(t *testing.T) {
 //
 //	testCases := []TestCase[FuncDeclaration]{
@@ -171,134 +171,6 @@ func mustParse[T any](t *testing.T, sourceCode string) *T {
 //
 //	testAll(t, testCases)
 //}
-//
-//func Test_CallExpr(t *testing.T) {
-//
-//	testCases := []TestCase[CallExpr]{
-//		{
-//			Name:       "call expression with one param",
-//			SourceCode: `strlen("foo")`,
-//			Expected: CallExpr{
-//				Ident: "strlen",
-//				Params: []Expr{
-//					StringExpr{Value: "foo"},
-//				},
-//			},
-//		},
-//		{
-//			Name:       "call expression with two params",
-//			SourceCode: `printf("number: %d", 1)`,
-//			Expected: CallExpr{
-//				Ident: "printf",
-//				Params: []Expr{
-//					StringExpr{Value: "number: %d"},
-//					IntegerExpr{Value: 1},
-//				},
-//			},
-//		},
-//	}
-//
-//	testAll(t, testCases)
-//}
-//
-//func Test_IntegerExpr(t *testing.T) {
-//
-//	testCases := []TestCase[IntegerExpr]{
-//		{
-//			Name:       "int literal",
-//			SourceCode: `42`,
-//			Expected:   IntegerExpr{Value: 42},
-//		},
-//	}
-//
-//	testAll(t, testCases)
-//}
-//func Test_StringExpr(t *testing.T) {
-//
-//	testCases := []TestCase[StringExpr]{
-//		{
-//			Name:       "string literal",
-//			SourceCode: `"this is a string literal"`,
-//			Expected:   StringExpr{Value: "this is a string literal"},
-//		},
-//	}
-//
-//	testAll(t, testCases)
-//}
-//
-//func Test_UnaryExpr(t *testing.T) {
-//
-//	testCases := []TestCase[UnaryExpr]{
-//		{
-//			Name:       "unary expression with variable expression",
-//			SourceCode: `!a`,
-//			Expected: UnaryExpr{
-//				Operand: VarExpr{
-//					Ident: "a",
-//				},
-//			},
-//		},
-//	}
-//
-//	testAll(t, testCases)
-//}
-//
-//func Test_VarExpr(t *testing.T) {
-//
-//	testCases := []TestCase[VarExpr]{
-//		{
-//			Name:       "variable expression",
-//			SourceCode: `a`,
-//			Expected:   VarExpr{Ident: "a"},
-//		},
-//	}
-//
-//	testAll(t, testCases)
-//}
-//
-//func Test_Expr(t *testing.T) {
-//
-//	testCases := []TestCase[Expr]{
-//		{
-//			Name:       "function call expression",
-//			SourceCode: `printf("number: %d", 1)`,
-//			Expected: CallExpr{
-//				Ident: "printf",
-//				Params: []Expr{
-//					StringExpr{Value: "number: %d"},
-//					IntegerExpr{Value: 1},
-//				},
-//			},
-//		},
-//		{
-//			Name:       "int literal",
-//			SourceCode: `42`,
-//			Expected:   IntegerExpr{Value: 42},
-//		},
-//		{
-//			Name:       "string literal",
-//			SourceCode: `"this is a string literal"`,
-//			Expected:   StringExpr{Value: "this is a string literal"},
-//		},
-//		{
-//			Name:       "unary expression with variable expression",
-//			SourceCode: `!a`,
-//			Expected: UnaryExpr{
-//				Operand: VarExpr{
-//					Ident: "a",
-//				},
-//			},
-//		},
-//		{
-//			Name:       "variable expression",
-//			SourceCode: `a`,
-//			Expected:   VarExpr{Ident: "a"},
-//		},
-//	}
-//
-//	testAll(t, testCases)
-//}
-//
 
 func Test_Primary(t *testing.T) {
 

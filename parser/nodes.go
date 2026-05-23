@@ -68,14 +68,6 @@ type (
 	}
 )
 
-//type (
-//TODO BinaryExpression
-
-//TODO Figure out how to represent parenthesized expressions without
-//
-// Could probably define ParenthesizedExpr as "(" @@ ")"
-// and add it to the enum
-
 //TODO IfStmt
 
 //TODO WhileLoop
@@ -120,43 +112,3 @@ type (
 //	Eq    string `"="`
 //	Value Expr   `@@`
 //}
-
-//CallExpr struct {
-//	Ident  string `@Ident`
-//	LParen string `"("`
-//	Params []Expr `@@! ("," @@)*`
-//	RParen string `")"`
-//}
-
-//IntegerExpr struct {
-//	Value int64 `@Int`
-//}
-
-//StringExpr struct {
-//	Value string `@String`
-//}
-
-//UnaryExpr struct {
-//	Operator string `"!"`
-//	Operand  Expr   `@@`
-//}
-
-//VarExpr struct {
-//	Ident string `@Ident`
-//}
-//)
-
-//type (
-//	Expr interface{ exprTag() }
-//	Stmt interface{ stmtTag() }
-//)
-//
-//func (expr CallExpr) exprTag()    {}
-//func (expr IntegerExpr) exprTag() {}
-//func (expr StringExpr) exprTag()  {}
-//func (expr UnaryExpr) exprTag()   {}
-//func (expr VarExpr) exprTag()     {}
-//
-//func (stmt AssignmentStmt) stmtTag()          {}
-//func (stmt ReturnStmt) stmtTag()              {}
-//func (stmt VariableDeclarationStmt) stmtTag() {}
