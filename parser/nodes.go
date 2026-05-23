@@ -1,8 +1,6 @@
 package parser
 
 type (
-	//TODO UnaryExpression
-
 	//TODO BinaryExpression
 
 	//TODO Figure out how to represent parenthesized expressions without
