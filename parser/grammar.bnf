@@ -1,0 +1,144 @@
+/* Lexical Part */
+
+ident: 'a'-'z' {'a'-'z' | '0'-'9'} ;
+
+intLit: '0'-'9' {'0'-'9'} ;
+
+strLit: '"' {.} '"' ;
+
+!whitespace : ' ' | '\t' | '\n' | '\r' ;
+
+/* Syntax Part */
+
+<< import "github.com/agodnic/avmc/parser/cst" >>
+
+Stmt
+: VarDecl
+| FuncDecl
+| ConstDecl
+| Return
+| Block
+| IfStmt
+| Assignment
+| ExprStmt
+;
+
+ExprStmt
+: Expr1 ";" << $0, nil >>
+;
+
+VarDecl
+: "var" ident Type "=" Expr1 ";"      << cst.MakeVarDecl($1, $2, $4) >>
+;
+
+Type
+: ident      << cst.MakeType($0) >>
+;
+
+FuncDecl
+: "func" ident "(" ArgList ")" Type Block ";"       << cst.MakeFuncDecl($1, $3, $5, $6) >>
+;
+
+ArgList
+: empty                   << []any{}, nil >>
+| Arg                     << []any{$0}, nil >>
+| ArgList "," Arg         << append($0.([]any), $2), nil >>
+;
+
+Arg
+: ident Type             << cst.MakeArg($0, $1) >>
+;
+
+ConstDecl
+: "const" ident Type "=" Expr1 ";"     << cst.MakeConstDecl($1, $2, $4) >>
+;
+
+Assignment
+: ident "=" Expr1 ";"             << cst.MakeAssignment($0, $2) >>
+;
+
+Return
+: "return" ";"                   << cst.MakeReturn(nil) >>
+| "return" Expr1 ";"               << cst.MakeReturn($1) >>
+;
+
+Block
+: "{" StmtList "}"            << cst.MakeBlock($1) >>
+;
+
+StmtList
+: Stmt                     << []any{$0}, nil >>
+| StmtList Stmt            << append($0.([]any), $1), nil >>
+;
+
+IfStmt
+: "if" Expr1 Block                 << cst.MakeIf($1, $2, nil) >>
+| "if" Expr1 Block "else" Block    << cst.MakeIf($1, $2, $4) >>
+| "if" Expr1 Block "else" IfStmt   << cst.MakeIf($1, $2, $4) >>
+;
+
+Expr1
+: Expr1 LogOp Expr2    << cst.MakeBinOp($0, $1, $2) >>
+| Expr2                << $0, nil >>
+;
+
+Expr2
+: Expr2 CmpOp Expr3    << cst.MakeBinOp($0, $1, $2) >>
+| Expr3                << $0, nil >>
+;
+
+Expr3
+: Expr3 AddOp Expr4    << cst.MakeBinOp($0, $1, $2) >>
+| Expr4                << $0, nil >>
+;
+
+Expr4
+: Expr4 MulOp Expr5    << cst.MakeBinOp($0, $1, $2) >>
+| Expr5                << $0, nil >>
+;
+
+Expr5:
+: UnaryOp Expr5  << cst.MakeUnaryOp($0, $1) >>
+| PrimaryExpr    << $0, nil >>
+;
+
+PrimaryExpr
+: Operand       << $0, nil >>
+// TODO: // https://go.dev/ref/spec#PrimaryExpr
+// | Conversion
+// | PrimaryExpr Index
+// | PrimaryExpr Slice
+| PrimaryExpr Arguments  << cst.MakeCall($0, $1) >>
+;
+
+Arguments
+: "(" ")"                   << []any{}, nil >>
+| "(" ExpressionList ")"    << $1, nil >>
+;
+
+ExpressionList
+: Expr1                     << []any{$0}, nil >>
+| ExpressionList "," Expr1  << append($0.([]any), $2), nil >>
+;
+
+Operand
+: Lit           << $0, nil >>
+| OperandName   << $0, nil >>
+| "(" Expr1 ")" << $1, nil >>
+;
+
+OperandName
+: ident              << cst.MakeIdent(nil, $0) >>
+| ident "." ident    << cst.MakeIdent($0, $2) >>
+;
+
+Lit
+: strLit    << cst.MakeStrLit($0) >>
+| intLit    << cst.MakeIntLit($0) >>
+;
+
+LogOp: "||" | "&&";
+CmpOp: "==" | "!=" | ">" | "<" | ">=" | "<=";
+AddOp: "+" | "-" | "|" | "^";
+MulOp: "*" | "/" | "%" | "<<" | ">>" | "&";
+UnaryOp: "-" | "!";
