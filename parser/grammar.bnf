@@ -119,7 +119,7 @@ Expr4
 | Expr5                << $0, nil >>
 ;
 
-Expr5:
+Expr5
 : UnaryOp Expr5  << cst.MakeUnaryOp($0, $1) >>
 | PrimaryExpr    << $0, nil >>
 ;
