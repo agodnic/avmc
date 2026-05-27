@@ -43,7 +43,7 @@ type (
 	}
 	Call struct {
 		Ident any
-		Args  any
+		Args  []any
 	}
 	Type struct {
 		TypeEnum TypeEnum
@@ -192,7 +192,7 @@ func MakeCall(t0, t1 any) (Call, error) {
 		Ident: t0,
 	}
 	if t1 != nil {
-		result.Args = t1
+		result.Args = t1.([]any)
 	}
 	return result, nil
 }
