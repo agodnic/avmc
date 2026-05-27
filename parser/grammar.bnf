@@ -15,9 +15,8 @@ var:    'v' 'a' 'r';
 
 identifier: 'a'-'z' {'a'-'z' | '0'-'9'} ;
 
-intLit: '0'-'9' {'0'-'9'} ;
-
-strLit: '"' {.} '"' ;
+intLiteral: '0'-'9' {'0'-'9'} ;
+stringLiteral: '"' {.} '"' ;
 
 !whitespace : ' ' | '\t' | '\n' | '\r' ;
 
@@ -152,12 +151,12 @@ Operand
 
 OperandName
 : identifier                     << cst.MakeIdent(nil, $0) >>
-| identifier "." identifier    << cst.MakeIdent($0, $2) >>
+| identifier "." identifier      << cst.MakeIdent($0, $2) >>
 ;
 
 Lit
-: strLit    << cst.MakeStrLit($0) >>
-| intLit    << cst.MakeIntLit($0) >>
+: stringLiteral    << cst.MakeStrLit($0) >>
+| intLiteral       << cst.MakeIntLit($0) >>
 ;
 
 LogOp: "||" | "&&";
