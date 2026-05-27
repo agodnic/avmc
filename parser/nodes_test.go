@@ -49,11 +49,11 @@ func Test_FuncDecl(t *testing.T) {
 
 	tcs := []TestCase{
 		{
-			Input: `func f() void { a; return ; } ;`,
+			Input: `func f() string { a; return ; } ;`,
 			Output: cst.FuncDecl{
 				Ident:  "f",
 				Params: []cst.Param{},
-				Type:   cst.Type{Type: "void"},
+				Type:   cst.Type{TypeEnum: cst.TypeEnum_String},
 				Block: cst.Block{
 					Stmts: []any{
 						cst.Ident{Ident: "a"},
@@ -62,43 +62,70 @@ func Test_FuncDecl(t *testing.T) {
 				},
 			},
 		},
+		//{
+		//	Input: `func f() void { a; return ; } ;`,
+		//	Output: cst.FuncDecl{
+		//		Ident:  "f",
+		//		Params: []cst.Param{},
+		//		Type:   cst.Type{TypeEnum: cst.TypeEnum_Void},
+		//		Block: cst.Block{
+		//			Stmts: []any{
+		//				cst.Ident{Ident: "a"},
+		//				cst.Return{},
+		//			},
+		//		},
+		//	},
+		//},
 		{
-			Input: `func f(i int) void { return ; } ;`,
+			Input: `func f(i uint64) uint64 { return ; } ;`,
 			Output: cst.FuncDecl{
 				Ident: "f",
 				Params: []cst.Param{
-					{Ident: "i", Type: cst.Type{Type: "int"}},
+					{Ident: "i", Type: cst.Type{TypeEnum: cst.TypeEnum_Uint64}},
 				},
-				Type: cst.Type{Type: "void"},
+				Type: cst.Type{TypeEnum: cst.TypeEnum_Uint64},
+				Block: cst.Block{
+					Stmts: []any{cst.Return{}},
+				},
+			},
+		},
+		//{
+		//	Input: `func f(i uint64) void { return ; } ;`,
+		//	Output: cst.FuncDecl{
+		//		Ident: "f",
+		//		Params: []cst.Param{
+		//			{Ident: "i", Type: cst.Type{TypeEnum: cst.TypeEnum_Uint64}},
+		//		},
+		//		Type: cst.Type{TypeEnum: cst.TypeEnum_Void},
+		//		Block: cst.Block{
+		//			Stmts: []any{cst.Return{}},
+		//		},
+		//	},
+		//},
+		{
+			Input: `func f(s string, i uint64) uint64 { return ; } ;`,
+			Output: cst.FuncDecl{
+				Ident: "f",
+				Params: []cst.Param{
+					{Ident: "s", Type: cst.Type{TypeEnum: cst.TypeEnum_String}},
+					{Ident: "i", Type: cst.Type{TypeEnum: cst.TypeEnum_Uint64}},
+				},
+				Type: cst.Type{TypeEnum: cst.TypeEnum_Uint64},
 				Block: cst.Block{
 					Stmts: []any{cst.Return{}},
 				},
 			},
 		},
 		{
-			Input: `func f(s string, i int) u64 { return ; } ;`,
+			Input: `func f(i uint64, j uint64, k uint64) uint64 { return ; } ;`,
 			Output: cst.FuncDecl{
 				Ident: "f",
 				Params: []cst.Param{
-					{Ident: "s", Type: cst.Type{Type: "string"}},
-					{Ident: "i", Type: cst.Type{Type: "int"}},
+					{Ident: "i", Type: cst.Type{TypeEnum: cst.TypeEnum_Uint64}},
+					{Ident: "j", Type: cst.Type{TypeEnum: cst.TypeEnum_Uint64}},
+					{Ident: "k", Type: cst.Type{TypeEnum: cst.TypeEnum_Uint64}},
 				},
-				Type: cst.Type{Type: "u64"},
-				Block: cst.Block{
-					Stmts: []any{cst.Return{}},
-				},
-			},
-		},
-		{
-			Input: `func f(i int, j int, k int) u64 { return ; } ;`,
-			Output: cst.FuncDecl{
-				Ident: "f",
-				Params: []cst.Param{
-					{Ident: "i", Type: cst.Type{Type: "int"}},
-					{Ident: "j", Type: cst.Type{Type: "int"}},
-					{Ident: "k", Type: cst.Type{Type: "int"}},
-				},
-				Type: cst.Type{Type: "u64"},
+				Type: cst.Type{TypeEnum: cst.TypeEnum_Uint64},
 				Block: cst.Block{
 					Stmts: []any{cst.Return{}},
 				},
@@ -200,10 +227,10 @@ func Test_ConstDecl(t *testing.T) {
 
 	tcs := []TestCase{
 		{
-			Input: `const a int = 1;`,
+			Input: `const a uint64 = 1;`,
 			Output: cst.ConstDecl{
 				Ident: "a",
-				Type:  cst.Type{Type: "int"},
+				Type:  cst.Type{TypeEnum: cst.TypeEnum_Uint64},
 				Expr:  cst.IntLit{Value: "1"},
 			},
 		},
@@ -216,10 +243,10 @@ func Test_VarDecl(t *testing.T) {
 
 	tcs := []TestCase{
 		{
-			Input: `var a int = 1;`,
+			Input: `var a uint64 = 1;`,
 			Output: cst.VarDecl{
 				Ident: "a",
-				Type:  cst.Type{Type: "int"},
+				Type:  cst.Type{TypeEnum: cst.TypeEnum_Uint64},
 				Expr:  cst.IntLit{Value: "1"},
 			},
 		},
@@ -227,7 +254,7 @@ func Test_VarDecl(t *testing.T) {
 			Input: `var b string = strcat("a", "b");`,
 			Output: cst.VarDecl{
 				Ident: "b",
-				Type:  cst.Type{Type: "string"},
+				Type:  cst.Type{TypeEnum: cst.TypeEnum_String},
 				Expr: cst.Call{
 					Ident: cst.Ident{
 						Ident: "strcat",

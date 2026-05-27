@@ -6,7 +6,16 @@
 package cst
 
 import (
+	"fmt"
+
 	"github.com/agodnic/avmc/parser/generated/token"
+)
+
+type TypeEnum int
+
+const (
+	TypeEnum_Uint64 TypeEnum = 0
+	TypeEnum_String TypeEnum = 1
 )
 
 type (
@@ -34,7 +43,7 @@ type (
 		Args  any
 	}
 	Type struct {
-		Type string
+		TypeEnum TypeEnum
 	}
 	VarDecl struct {
 		Ident string
@@ -147,8 +156,21 @@ func MakeVarDecl(t0, t1, t2 any) (VarDecl, error) {
 }
 
 func MakeType(t0 any) (Type, error) {
+
+	str := string(t0.(*token.Token).Lit)
+
+	var val TypeEnum
+	switch str {
+	case "uint64":
+		val = TypeEnum_Uint64
+	case "string":
+		val = TypeEnum_String
+	default:
+		return Type{}, fmt.Errorf("unexpected type: %s", str)
+	}
+
 	result := Type{
-		Type: string(t0.(*token.Token).Lit),
+		TypeEnum: val,
 	}
 	return result, nil
 }
