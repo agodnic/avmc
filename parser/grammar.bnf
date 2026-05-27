@@ -40,9 +40,9 @@ FuncDecl
 ;
 
 ArgList
-: empty                   << []any{}, nil >>
-| Arg                     << []any{$0}, nil >>
-| ArgList "," Arg         << append($0.([]any), $2), nil >>
+: empty                   << []cst.Arg{}, nil >>
+| Arg                     << []cst.Arg{$0.(cst.Arg)}, nil >>
+| ArgList "," Arg         << append($0.([]cst.Arg), $2.(cst.Arg)), nil >>
 ;
 
 Arg
