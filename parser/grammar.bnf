@@ -3,7 +3,7 @@
 // Lexer rules have somewhat user-understandable names because gocc sometimes
 // includes them in error messages.
 // We would eventually create these error messages ourselves, but for the time
-// being it helps.
+// being this convention helps.
 const:  'c' 'o' 'n' 's' 't';
 else:   'e' 'l' 's' 'e';
 func:   'f' 'u' 'n' 'c';
