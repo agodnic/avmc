@@ -287,7 +287,7 @@ func Test_VarDecl(t *testing.T) {
 				Ident: "b",
 				Type:  cst.Type{TypeEnum: cst.TypeEnum_Bytes},
 				Expr: cst.Call{
-					Ident: cst.Ident{
+					QualifiedIdent: cst.QualifiedIdent{
 						Ident: "f",
 					},
 				},
@@ -305,7 +305,7 @@ func Test_Call(t *testing.T) {
 			Name:  "function call with no args",
 			Input: `f();`,
 			Output: cst.Call{
-				Ident: cst.Ident{
+				QualifiedIdent: cst.QualifiedIdent{
 					Ident: "f",
 				},
 			},
@@ -314,7 +314,7 @@ func Test_Call(t *testing.T) {
 			Name:  "function call with one arg",
 			Input: `f(1);`,
 			Output: cst.Call{
-				Ident: cst.Ident{
+				QualifiedIdent: cst.QualifiedIdent{
 					Ident: "f",
 				},
 				Args: []any{
@@ -328,7 +328,7 @@ func Test_Call(t *testing.T) {
 			Name:  "function call with two args",
 			Input: `f(1, 2);`,
 			Output: cst.Call{
-				Ident: cst.Ident{
+				QualifiedIdent: cst.QualifiedIdent{
 					Ident: "f",
 				},
 				Args: []any{
@@ -345,7 +345,7 @@ func Test_Call(t *testing.T) {
 			Name:  "function call with three args",
 			Input: `f(1, 2, 3);`,
 			Output: cst.Call{
-				Ident: cst.Ident{
+				QualifiedIdent: cst.QualifiedIdent{
 					Ident: "f",
 				},
 				Args: []any{
@@ -365,7 +365,7 @@ func Test_Call(t *testing.T) {
 			Name:  "function call with package name",
 			Input: `pkg.f();`,
 			Output: cst.Call{
-				Ident: cst.Ident{
+				QualifiedIdent: cst.QualifiedIdent{
 					PackageName: "pkg",
 					Ident:       "f",
 				},
@@ -382,35 +382,35 @@ func Test_Ident(t *testing.T) {
 		{
 			Name:  "all lowercase",
 			Input: `myvariable;`,
-			Output: cst.Ident{
+			Output: cst.QualifiedIdent{
 				Ident: "myvariable",
 			},
 		},
 		{
 			Name:  "start with lowercase, then mixed case",
 			Input: `myVariable;`,
-			Output: cst.Ident{
+			Output: cst.QualifiedIdent{
 				Ident: "myVariable",
 			},
 		},
 		{
 			Name:  "start with uppercase",
 			Input: `MyVariable;`,
-			Output: cst.Ident{
+			Output: cst.QualifiedIdent{
 				Ident: "MyVariable",
 			},
 		},
 		{
 			Name:  "alphanumeric",
 			Input: `a1;`,
-			Output: cst.Ident{
+			Output: cst.QualifiedIdent{
 				Ident: "a1",
 			},
 		},
 		{
 			Name:  "variable with package name",
 			Input: `mypackage.myvariable;`,
-			Output: cst.Ident{
+			Output: cst.QualifiedIdent{
 				PackageName: "mypackage",
 				Ident:       "myvariable",
 			},
@@ -420,7 +420,7 @@ func Test_Ident(t *testing.T) {
 			Input: `!pkg.myvar;`,
 			Output: cst.UnaryOp{
 				Op: "!",
-				Expr: cst.Ident{
+				Expr: cst.QualifiedIdent{
 					PackageName: "pkg",
 					Ident:       "myvar",
 				},
