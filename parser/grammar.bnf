@@ -70,7 +70,7 @@ Assignment
 
 Return
 : kwReturn ";"                   << cst.MakeReturn(nil) >>
-| kwReturn Expr1 ";"               << cst.MakeReturn($1) >>
+| kwReturn Expr1 ";"             << cst.MakeReturn($1) >>
 ;
 
 Block
