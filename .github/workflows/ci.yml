@@ -14,5 +14,5 @@ jobs:
           go-version: '1.22.5'
           cache: true
 
-      - name: Run make
+      - name: Run the Makefile
         run: make
