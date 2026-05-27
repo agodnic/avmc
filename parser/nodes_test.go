@@ -58,14 +58,13 @@ func Test_FuncDecl(t *testing.T) {
 	tcs := []TestCase{
 		{
 			Name:  "string return value",
-			Input: `func f() string { a; return ; } ;`,
+			Input: `func f() string { return; } ;`,
 			Output: cst.FuncDecl{
 				Ident:  "f",
 				Params: []cst.Param{},
 				Type:   cst.Type{TypeEnum: cst.TypeEnum_String},
 				Block: cst.Block{
 					Stmts: []any{
-						cst.Ident{Ident: "a"},
 						cst.Return{},
 					},
 				},
@@ -73,13 +72,11 @@ func Test_FuncDecl(t *testing.T) {
 		},
 		{
 			Name:  "int return value",
-			Input: `func f(i uint64) uint64 { return ; } ;`,
+			Input: `func f() uint64 { return; } ;`,
 			Output: cst.FuncDecl{
-				Ident: "f",
-				Params: []cst.Param{
-					{Ident: "i", Type: cst.Type{TypeEnum: cst.TypeEnum_Uint64}},
-				},
-				Type: cst.Type{TypeEnum: cst.TypeEnum_Uint64},
+				Ident:  "f",
+				Params: []cst.Param{},
+				Type:   cst.Type{TypeEnum: cst.TypeEnum_Uint64},
 				Block: cst.Block{
 					Stmts: []any{cst.Return{}},
 				},
@@ -87,14 +84,13 @@ func Test_FuncDecl(t *testing.T) {
 		},
 		{
 			Name:  "no parameters",
-			Input: `func f() { a; return ; } ;`,
+			Input: `func f() { return ; } ;`,
 			Output: cst.FuncDecl{
 				Ident:  "f",
 				Params: []cst.Param{},
 				Type:   cst.Type{TypeEnum: cst.TypeEnum_Void},
 				Block: cst.Block{
 					Stmts: []any{
-						cst.Ident{Ident: "a"},
 						cst.Return{},
 					},
 				},
@@ -116,14 +112,14 @@ func Test_FuncDecl(t *testing.T) {
 		},
 		{
 			Name:  "two parameters",
-			Input: `func f(s string, i uint64) uint64 { return ; } ;`,
+			Input: `func f(s string, i uint64) { return ; } ;`,
 			Output: cst.FuncDecl{
 				Ident: "f",
 				Params: []cst.Param{
 					{Ident: "s", Type: cst.Type{TypeEnum: cst.TypeEnum_String}},
 					{Ident: "i", Type: cst.Type{TypeEnum: cst.TypeEnum_Uint64}},
 				},
-				Type: cst.Type{TypeEnum: cst.TypeEnum_Uint64},
+				Type: cst.Type{TypeEnum: cst.TypeEnum_Void},
 				Block: cst.Block{
 					Stmts: []any{cst.Return{}},
 				},
@@ -131,7 +127,7 @@ func Test_FuncDecl(t *testing.T) {
 		},
 		{
 			Name:  "three parameters",
-			Input: `func f(i uint64, j uint64, k uint64) uint64 { return ; } ;`,
+			Input: `func f(i uint64, j uint64, k uint64) { return ; } ;`,
 			Output: cst.FuncDecl{
 				Ident: "f",
 				Params: []cst.Param{
@@ -139,9 +135,24 @@ func Test_FuncDecl(t *testing.T) {
 					{Ident: "j", Type: cst.Type{TypeEnum: cst.TypeEnum_Uint64}},
 					{Ident: "k", Type: cst.Type{TypeEnum: cst.TypeEnum_Uint64}},
 				},
-				Type: cst.Type{TypeEnum: cst.TypeEnum_Uint64},
+				Type: cst.Type{TypeEnum: cst.TypeEnum_Void},
 				Block: cst.Block{
 					Stmts: []any{cst.Return{}},
+				},
+			},
+		},
+		{
+			Name:  "two statements in block",
+			Input: `func f() { return; return ; } ;`,
+			Output: cst.FuncDecl{
+				Ident:  "f",
+				Params: []cst.Param{},
+				Type:   cst.Type{TypeEnum: cst.TypeEnum_Void},
+				Block: cst.Block{
+					Stmts: []any{
+						cst.Return{},
+						cst.Return{},
+					},
 				},
 			},
 		},
