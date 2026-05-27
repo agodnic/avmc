@@ -1,5 +1,8 @@
 /* Lexical Part */
 
+kwUint64: 'u' 'i' 'n' 't' '6' '4';
+kwString: 's' 't' 'r' 'i' 'n' 'g';
+
 ident: 'a'-'z' {'a'-'z' | '0'-'9'} ;
 
 intLit: '0'-'9' {'0'-'9'} ;
@@ -32,11 +35,13 @@ VarDecl
 ;
 
 Type
-: ident      << cst.MakeType($0) >>
+: kwUint64    << cst.MakeType($0) >>
+| kwString    << cst.MakeType($0) >>
 ;
 
 FuncDecl
-: "func" ident "(" ParamList ")" Type Block ";"       << cst.MakeFuncDecl($1, $3, $5, $6) >>
+: "func" ident "(" ParamList ")" Type Block ";"   << cst.MakeFuncDecl($1, $3, $5, $6) >>
+| "func" ident "(" ParamList ")" Block ";"        << cst.MakeFuncDecl($1, $3, nil, $5) >>
 ;
 
 ParamList
