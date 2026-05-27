@@ -203,6 +203,15 @@ func MakeIdent(t0, t1 any) (Ident, error) {
 	}
 	if t0 != nil {
 		result.PackageName = string(t0.(*token.Token).Lit)
+
+		// Package names are being validated here because
+		// we had to express them in the grammar as regular
+		// identifiers.
+		// All package names are valid identifiers,
+		// but not all identifiers are valid package names.
+		if !isValidPackageName(result.PackageName) {
+			return Ident{}, fmt.Errorf("invalid package name")
+		}
 	}
 	return result, nil
 }
@@ -257,4 +266,17 @@ func MakeBytesLit(t any) (BytesLit, error) {
 		Value: b,
 	}
 	return result, nil
+}
+
+func isValidPackageName(s string) bool {
+	if s == "" {
+		return false
+	}
+
+	for _, r := range s {
+		if (r < 'a' || r > 'z') && (r < '0' || r > '9') {
+			return false
+		}
+	}
+	return true
 }
