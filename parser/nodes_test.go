@@ -356,6 +356,18 @@ func Test_Ident(t *testing.T) {
 			},
 		},
 		{
+			Input: `myVariable;`,
+			Output: cst.Ident{
+				Ident: "myVariable",
+			},
+		},
+		{
+			Input: `MyVariable;`,
+			Output: cst.Ident{
+				Ident: "MyVariable",
+			},
+		},
+		{
 			Input: `a1;`,
 			Output: cst.Ident{
 				Ident: "a1",
