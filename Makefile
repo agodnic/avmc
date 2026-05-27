@@ -5,7 +5,7 @@ all:
 	#
 	# The downside is that we'll have to update the dependency manually
 	# or somehow find a way to get notified if there are newer versions.
-	go install github.com/goccmack/gocc@1.0.2
+	go install github.com/goccmack/gocc@v1.0.2
 
 	mkdir -p parser/generated
 	cd parser/generated && gocc -p github.com/agodnic/avmc/parser/generated -v ../grammar.bnf && cd ..
