@@ -89,6 +89,21 @@ func Test_FuncDecl(t *testing.T) {
 				},
 			},
 		},
+		{
+			Input: `func f(i int, j int, k int) u64 { return ; } ;`,
+			Output: cst.FuncDecl{
+				Ident: "f",
+				Params: []cst.Param{
+					{Ident: "i", Type: cst.Type{Type: "int"}},
+					{Ident: "j", Type: cst.Type{Type: "int"}},
+					{Ident: "k", Type: cst.Type{Type: "int"}},
+				},
+				Type: cst.Type{Type: "u64"},
+				Block: cst.Block{
+					Stmts: []any{cst.Return{}},
+				},
+			},
+		},
 	}
 
 	testAll(t, tcs)
