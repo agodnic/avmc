@@ -8,6 +8,7 @@ package cst
 import (
 	"encoding/hex"
 	"fmt"
+	"strconv"
 
 	"github.com/agodnic/avmc/parser/generated/token"
 )
@@ -22,7 +23,7 @@ const (
 
 type (
 	IntLit struct {
-		Value string
+		Value uint64
 	}
 	BytesLit struct {
 		Value []uint8
@@ -224,8 +225,16 @@ func MakeBinOp(t0, t1, t2 any) (BinOp, error) {
 }
 
 func MakeIntLit(t any) (IntLit, error) {
+
+	s := string(t.(*token.Token).Lit)
+
+	value, err := strconv.ParseUint(s, 10, 64)
+	if err != nil {
+		return IntLit{}, fmt.Errorf("failed to parse integer literal: %w", err)
+	}
+
 	result := IntLit{
-		Value: string(t.(*token.Token).Lit),
+		Value: value,
 	}
 	return result, nil
 }
