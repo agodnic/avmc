@@ -6,6 +6,7 @@
 package cst
 
 import (
+	"encoding/hex"
 	"fmt"
 
 	"github.com/agodnic/avmc/parser/generated/token"
@@ -16,15 +17,15 @@ type TypeEnum int
 const (
 	TypeEnum_Void   TypeEnum = iota
 	TypeEnum_Uint64 TypeEnum = iota
-	TypeEnum_String TypeEnum = iota
+	TypeEnum_Bytes  TypeEnum = iota
 )
 
 type (
 	IntLit struct {
 		Value string
 	}
-	StrLit struct {
-		Value string
+	BytesLit struct {
+		Value []uint8
 	}
 	BinOp struct {
 		R  any
@@ -173,8 +174,8 @@ func MakeType(t0 any) (Type, error) {
 	switch str {
 	case "uint64":
 		val = TypeEnum_Uint64
-	case "string":
-		val = TypeEnum_String
+	case "bytes":
+		val = TypeEnum_Bytes
 	default:
 		return Type{}, fmt.Errorf("unexpected type: %s", str)
 	}
@@ -188,7 +189,9 @@ func MakeType(t0 any) (Type, error) {
 func MakeCall(t0, t1 any) (Call, error) {
 	result := Call{
 		Ident: t0,
-		Args:  t1,
+	}
+	if t1 != nil {
+		result.Args = t1
 	}
 	return result, nil
 }
@@ -227,10 +230,22 @@ func MakeIntLit(t any) (IntLit, error) {
 	return result, nil
 }
 
-func MakeStrLit(t any) (StrLit, error) {
+func MakeBytesLit(t any) (BytesLit, error) {
+
 	s := string(t.(*token.Token).Lit)
-	result := StrLit{
-		Value: s[1 : len(s)-1],
+	s = s[4 : len(s)-1]
+	if len(s) == 0 {
+		result := BytesLit{}
+		return result, nil
+	}
+
+	b, err := hex.DecodeString(s)
+	if err != nil {
+		return BytesLit{}, fmt.Errorf("failed to decode hex literal: %w", err)
+	}
+
+	result := BytesLit{
+		Value: b,
 	}
 	return result, nil
 }

@@ -57,11 +57,11 @@ func Test_FuncDecl(t *testing.T) {
 
 	tcs := []TestCase{
 		{
-			Name:  "string return value",
-			Input: `func f() string { return; } ;`,
+			Name:  "bytes return value",
+			Input: `func f() bytes { return; } ;`,
 			Output: cst.FuncDecl{
 				Ident: "f",
-				Type:  cst.Type{TypeEnum: cst.TypeEnum_String},
+				Type:  cst.Type{TypeEnum: cst.TypeEnum_Bytes},
 				Block: cst.Block{
 					Stmts: []any{
 						cst.Return{},
@@ -109,11 +109,11 @@ func Test_FuncDecl(t *testing.T) {
 		},
 		{
 			Name:  "two parameters",
-			Input: `func f(s string, i uint64) { return ; } ;`,
+			Input: `func f(b bytes, i uint64) { return ; } ;`,
 			Output: cst.FuncDecl{
 				Ident: "f",
 				Params: []cst.Param{
-					{Ident: "s", Type: cst.Type{TypeEnum: cst.TypeEnum_String}},
+					{Ident: "b", Type: cst.Type{TypeEnum: cst.TypeEnum_Bytes}},
 					{Ident: "i", Type: cst.Type{TypeEnum: cst.TypeEnum_Uint64}},
 				},
 				Type: cst.Type{TypeEnum: cst.TypeEnum_Void},
@@ -282,17 +282,13 @@ func Test_VarDecl(t *testing.T) {
 		},
 		{
 			Name:  "function call expression",
-			Input: `var b string = strcat("a", "b");`,
+			Input: `var b bytes = f();`,
 			Output: cst.VarDecl{
 				Ident: "b",
-				Type:  cst.Type{TypeEnum: cst.TypeEnum_String},
+				Type:  cst.Type{TypeEnum: cst.TypeEnum_Bytes},
 				Expr: cst.Call{
 					Ident: cst.Ident{
-						Ident: "strcat",
-					},
-					Args: []any{
-						cst.StrLit{Value: "a"},
-						cst.StrLit{Value: "b"},
+						Ident: "f",
 					},
 				},
 			},
@@ -312,7 +308,6 @@ func Test_Call(t *testing.T) {
 				Ident: cst.Ident{
 					Ident: "f",
 				},
-				Args: []any{},
 			},
 		},
 		{
@@ -374,7 +369,6 @@ func Test_Call(t *testing.T) {
 					PackageName: "pkg",
 					Ident:       "f",
 				},
-				Args: []any{},
 			},
 		},
 	}
@@ -531,18 +525,23 @@ func Test_IntLit(t *testing.T) {
 	testAll(t, tcs)
 }
 
-func Test_StrLit(t *testing.T) {
+func Test_BytesLit(t *testing.T) {
 
 	tcs := []TestCase{
 		{
-			Name:   "Empty string",
-			Input:  `"";`,
-			Output: cst.StrLit{Value: ""},
+			Name:   "empty bytes",
+			Input:  `hex"";`,
+			Output: cst.BytesLit{},
 		},
 		{
-			Name:   "lowercase string",
-			Input:  `"abc";`,
-			Output: cst.StrLit{Value: "abc"},
+			Name:   "one byte",
+			Input:  `hex"1a";`,
+			Output: cst.BytesLit{Value: []byte{0x1a}},
+		},
+		{
+			Name:   "two bytes",
+			Input:  `hex"12ab";`,
+			Output: cst.BytesLit{Value: []byte{0x12, 0xab}},
 		},
 	}
 
