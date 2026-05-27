@@ -41,6 +41,7 @@ func Test_Assignment(t *testing.T) {
 
 	tcs := []TestCase{
 		{
+			Name:  "int literal expression",
 			Input: `a = 1;`,
 			Output: cst.Assignment{
 				Ident: "a",
@@ -56,6 +57,7 @@ func Test_FuncDecl(t *testing.T) {
 
 	tcs := []TestCase{
 		{
+			Name:  "string return value",
 			Input: `func f() string { a; return ; } ;`,
 			Output: cst.FuncDecl{
 				Ident:  "f",
@@ -70,6 +72,21 @@ func Test_FuncDecl(t *testing.T) {
 			},
 		},
 		{
+			Name:  "int return value",
+			Input: `func f(i uint64) uint64 { return ; } ;`,
+			Output: cst.FuncDecl{
+				Ident: "f",
+				Params: []cst.Param{
+					{Ident: "i", Type: cst.Type{TypeEnum: cst.TypeEnum_Uint64}},
+				},
+				Type: cst.Type{TypeEnum: cst.TypeEnum_Uint64},
+				Block: cst.Block{
+					Stmts: []any{cst.Return{}},
+				},
+			},
+		},
+		{
+			Name:  "no parameters",
 			Input: `func f() { a; return ; } ;`,
 			Output: cst.FuncDecl{
 				Ident:  "f",
@@ -84,19 +101,7 @@ func Test_FuncDecl(t *testing.T) {
 			},
 		},
 		{
-			Input: `func f(i uint64) uint64 { return ; } ;`,
-			Output: cst.FuncDecl{
-				Ident: "f",
-				Params: []cst.Param{
-					{Ident: "i", Type: cst.Type{TypeEnum: cst.TypeEnum_Uint64}},
-				},
-				Type: cst.Type{TypeEnum: cst.TypeEnum_Uint64},
-				Block: cst.Block{
-					Stmts: []any{cst.Return{}},
-				},
-			},
-		},
-		{
+			Name:  "one parameter",
 			Input: `func f(i uint64) { return ; } ;`,
 			Output: cst.FuncDecl{
 				Ident: "f",
@@ -110,6 +115,7 @@ func Test_FuncDecl(t *testing.T) {
 			},
 		},
 		{
+			Name:  "two parameters",
 			Input: `func f(s string, i uint64) uint64 { return ; } ;`,
 			Output: cst.FuncDecl{
 				Ident: "f",
@@ -124,6 +130,7 @@ func Test_FuncDecl(t *testing.T) {
 			},
 		},
 		{
+			Name:  "three parameters",
 			Input: `func f(i uint64, j uint64, k uint64) uint64 { return ; } ;`,
 			Output: cst.FuncDecl{
 				Ident: "f",
@@ -147,6 +154,7 @@ func Test_IfStmt(t *testing.T) {
 
 	tcs := []TestCase{
 		{
+			Name:  "if statement without else part",
 			Input: `if 1 { return; }`,
 			Output: cst.If{
 				Cond: cst.IntLit{Value: "1"},
@@ -156,6 +164,7 @@ func Test_IfStmt(t *testing.T) {
 			},
 		},
 		{
+			Name:  "if statement with else part",
 			Input: `if 1 { return; } else { return; }`,
 			Output: cst.If{
 				Cond: cst.IntLit{Value: "1"},
@@ -168,6 +177,7 @@ func Test_IfStmt(t *testing.T) {
 			},
 		},
 		{
+			Name:  "if statement with else if part",
 			Input: `if 1 { return; } else if 2 { return; }`,
 			Output: cst.If{
 				Cond: cst.IntLit{Value: "1"},
@@ -191,6 +201,7 @@ func Test_Block(t *testing.T) {
 
 	tcs := []TestCase{
 		{
+			Name:  "block with one statement",
 			Input: `{ return; }`,
 			Output: cst.Block{
 				Stmts: []any{
@@ -199,6 +210,7 @@ func Test_Block(t *testing.T) {
 			},
 		},
 		{
+			Name:  "block with two statements",
 			Input: `{ 1; return; }`,
 			Output: cst.Block{
 				Stmts: []any{
@@ -216,10 +228,12 @@ func Test_Return(t *testing.T) {
 
 	tcs := []TestCase{
 		{
+			Name:   "return without expression",
 			Input:  `return;`,
 			Output: cst.Return{},
 		},
 		{
+			Name:  "return with expression",
 			Input: `return 1;`,
 			Output: cst.Return{
 				Expr: cst.IntLit{Value: "1"},
@@ -234,6 +248,7 @@ func Test_ConstDecl(t *testing.T) {
 
 	tcs := []TestCase{
 		{
+			Name:  "declare int constant",
 			Input: `const a uint64 = 1;`,
 			Output: cst.ConstDecl{
 				Ident: "a",
@@ -250,6 +265,7 @@ func Test_VarDecl(t *testing.T) {
 
 	tcs := []TestCase{
 		{
+			Name:  "int literal expression",
 			Input: `var a uint64 = 1;`,
 			Output: cst.VarDecl{
 				Ident: "a",
@@ -258,6 +274,7 @@ func Test_VarDecl(t *testing.T) {
 			},
 		},
 		{
+			Name:  "function call expression",
 			Input: `var b string = strcat("a", "b");`,
 			Output: cst.VarDecl{
 				Ident: "b",
@@ -282,6 +299,7 @@ func Test_Call(t *testing.T) {
 
 	tcs := []TestCase{
 		{
+			Name:  "function call with no args",
 			Input: `f();`,
 			Output: cst.Call{
 				Ident: cst.Ident{
@@ -291,6 +309,7 @@ func Test_Call(t *testing.T) {
 			},
 		},
 		{
+			Name:  "function call with one arg",
 			Input: `f(1);`,
 			Output: cst.Call{
 				Ident: cst.Ident{
@@ -304,6 +323,7 @@ func Test_Call(t *testing.T) {
 			},
 		},
 		{
+			Name:  "function call with two args",
 			Input: `f(1, 2);`,
 			Output: cst.Call{
 				Ident: cst.Ident{
@@ -320,6 +340,7 @@ func Test_Call(t *testing.T) {
 			},
 		},
 		{
+			Name:  "function call with three args",
 			Input: `f(1, 2, 3);`,
 			Output: cst.Call{
 				Ident: cst.Ident{
@@ -339,6 +360,7 @@ func Test_Call(t *testing.T) {
 			},
 		},
 		{
+			Name:  "function call with package name",
 			Input: `pkg.f();`,
 			Output: cst.Call{
 				Ident: cst.Ident{
@@ -357,30 +379,35 @@ func Test_Ident(t *testing.T) {
 
 	tcs := []TestCase{
 		{
+			Name:  "all lowercase",
 			Input: `myvariable;`,
 			Output: cst.Ident{
 				Ident: "myvariable",
 			},
 		},
 		{
+			Name:  "start with lowercase, then mixed case",
 			Input: `myVariable;`,
 			Output: cst.Ident{
 				Ident: "myVariable",
 			},
 		},
 		{
+			Name:  "start with uppercase",
 			Input: `MyVariable;`,
 			Output: cst.Ident{
 				Ident: "MyVariable",
 			},
 		},
 		{
+			Name:  "alphanumeric",
 			Input: `a1;`,
 			Output: cst.Ident{
 				Ident: "a1",
 			},
 		},
 		{
+			Name:  "variable with package name",
 			Input: `mypackage.myvariable;`,
 			Output: cst.Ident{
 				PackageName: "mypackage",
@@ -388,6 +415,7 @@ func Test_Ident(t *testing.T) {
 			},
 		},
 		{
+			Name:  `expression over variable with package name`,
 			Input: `!pkg.myvar;`,
 			Output: cst.UnaryOp{
 				Op: "!",
@@ -406,6 +434,7 @@ func Test_OperatorPrecedence(t *testing.T) {
 
 	tcs := []TestCase{
 		{
+			Name:  "+ has lower precedence than *",
 			Input: `1 + 2 * 3;`,
 			Output: cst.BinOp{
 				R:  cst.IntLit{Value: "1"},
@@ -418,6 +447,7 @@ func Test_OperatorPrecedence(t *testing.T) {
 			},
 		},
 		{
+			Name:  "* has higher precedence than +",
 			Input: `1 * 2 + 3;`,
 			Output: cst.BinOp{
 				R: cst.BinOp{
@@ -430,6 +460,7 @@ func Test_OperatorPrecedence(t *testing.T) {
 			},
 		},
 		{
+			Name:  "parenthesized expressions have higher precedence than *",
 			Input: `1 * (2 + 3);`,
 			Output: cst.BinOp{
 				R:  cst.IntLit{Value: "1"},
@@ -442,6 +473,7 @@ func Test_OperatorPrecedence(t *testing.T) {
 			},
 		},
 		{
+			Name:  "unary - has higher precedence than +",
 			Input: `-1 + 2;`,
 			Output: cst.BinOp{
 				R: cst.UnaryOp{
@@ -461,6 +493,7 @@ func Test_BinOp(t *testing.T) {
 
 	tcs := []TestCase{
 		{
+			Name:  "binary add between two integer literals",
 			Input: `1 + 2;`,
 			Output: cst.BinOp{
 				R:  cst.IntLit{Value: "1"},
@@ -477,10 +510,12 @@ func Test_IntLit(t *testing.T) {
 
 	tcs := []TestCase{
 		{
+			Name:   "single digit number",
 			Input:  `1;`,
 			Output: cst.IntLit{Value: "1"},
 		},
 		{
+			Name:   "multiple digit number",
 			Input:  `123;`,
 			Output: cst.IntLit{Value: "123"},
 		},
@@ -493,10 +528,12 @@ func Test_StrLit(t *testing.T) {
 
 	tcs := []TestCase{
 		{
+			Name:   "Empty string",
 			Input:  `"";`,
 			Output: cst.StrLit{Value: ""},
 		},
 		{
+			Name:   "lowercase string",
 			Input:  `"abc";`,
 			Output: cst.StrLit{Value: "abc"},
 		},
