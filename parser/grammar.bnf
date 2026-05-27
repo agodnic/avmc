@@ -41,8 +41,8 @@ FuncDecl
 
 ArgList
 : empty                   << []cst.Arg{}, nil >>
-| Arg                     << []cst.Arg{$0.(cst.Arg)}, nil >>
-| ArgList "," Arg         << append($0.([]cst.Arg), $2.(cst.Arg)), nil >>
+| Arg                     << cst.AppendToArgSlice([]cst.Arg{}, $0) >>
+| ArgList "," Arg         << cst.AppendToArgSlice($0, $2) >>
 ;
 
 Arg

@@ -73,6 +73,12 @@ type (
 	}
 )
 
+func AppendToArgSlice(slice, item any) ([]Arg, error) {
+	s := slice.([]Arg)
+	i := item.(Arg)
+	return append(s, i), nil
+}
+
 func MakeArg(ident, ty any) (Arg, error) {
 	result := Arg{
 		Ident: string(ident.(*token.Token).Lit),
