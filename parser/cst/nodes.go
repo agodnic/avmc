@@ -14,8 +14,9 @@ import (
 type TypeEnum int
 
 const (
-	TypeEnum_Uint64 TypeEnum = 0
-	TypeEnum_String TypeEnum = 1
+	TypeEnum_Void   TypeEnum = iota
+	TypeEnum_Uint64 TypeEnum = iota
+	TypeEnum_String TypeEnum = iota
 )
 
 type (
@@ -97,11 +98,18 @@ func MakeParam(ident, ty any) (Param, error) {
 }
 
 func MakeFuncDecl(tIdent, args, ty, block any) (FuncDecl, error) {
+
 	result := FuncDecl{
 		Ident:  string(tIdent.(*token.Token).Lit),
 		Params: args.([]Param),
-		Type:   ty.(Type),
 		Block:  block.(Block),
+	}
+
+	if ty == nil {
+		// NOTE This will have no src line/span information (if we ever add the feature)
+		result.Type.TypeEnum = TypeEnum_Void
+	} else {
+		result.Type = ty.(Type)
 	}
 	return result, nil
 }
