@@ -37,13 +37,13 @@ type (
 		Op   string
 		Expr any
 	}
-	Ident struct {
+	QualifiedIdent struct {
 		PackageName string
 		Ident       string
 	}
 	Call struct {
-		Ident any
-		Args  []any
+		QualifiedIdent QualifiedIdent
+		Args           []any
 	}
 	Type struct {
 		TypeEnum TypeEnum
@@ -189,7 +189,7 @@ func MakeType(t0 any) (Type, error) {
 
 func MakeCall(t0, t1 any) (Call, error) {
 	result := Call{
-		Ident: t0,
+		QualifiedIdent: t0.(QualifiedIdent),
 	}
 	if t1 != nil {
 		result.Args = t1.([]any)
@@ -197,8 +197,8 @@ func MakeCall(t0, t1 any) (Call, error) {
 	return result, nil
 }
 
-func MakeIdent(t0, t1 any) (Ident, error) {
-	result := Ident{
+func MakeQualifiedIdent(t0, t1 any) (QualifiedIdent, error) {
+	result := QualifiedIdent{
 		Ident: string(t1.(*token.Token).Lit),
 	}
 	if t0 != nil {
@@ -210,7 +210,7 @@ func MakeIdent(t0, t1 any) (Ident, error) {
 		// All package names are valid identifiers,
 		// but not all identifiers are valid package names.
 		if !isValidPackageName(result.PackageName) {
-			return Ident{}, fmt.Errorf("invalid package name")
+			return QualifiedIdent{}, fmt.Errorf("invalid package name")
 		}
 	}
 	return result, nil

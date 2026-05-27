@@ -152,8 +152,8 @@ Operand
 ;
 
 OperandName
-: identifier                     << cst.MakeIdent(nil, $0) >>
-| identifier "." identifier      << cst.MakeIdent($0, $2) >>
+: identifier                     << cst.MakeQualifiedIdent(nil, $0) >>
+| identifier "." identifier      << cst.MakeQualifiedIdent($0, $2) >>
 ;
 
 Lit
