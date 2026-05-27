@@ -21,6 +21,14 @@ strLit: '"' {.} '"' ;
 
 << import "github.com/agodnic/avmc/parser/cst" >>
 
+// Ideally we would define a TopLevelStmt symbol with rules for import statements,
+// function declaration statements, global variable declarations, etc.
+// The reason we're using Stmt as the top-level symbol is because it makes unit
+// tests so much easier, since any standalone statement can be parsed.
+// If we used a TopLevelStmt, we would need to provide complete programs to the
+// parser within the test.
+// For the time being this is a convenient decision, but I'd like to change it
+// in the future to prevent it from backfiring un unexpected ways.
 Stmt
 : VarDecl
 | FuncDecl
