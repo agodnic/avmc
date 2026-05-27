@@ -51,9 +51,9 @@ func Test_FuncDecl(t *testing.T) {
 		{
 			Input: `func f() void { a; return ; } ;`,
 			Output: cst.FuncDecl{
-				Ident: "f",
-				Args:  []cst.Arg{},
-				Type:  cst.Type{Type: "void"},
+				Ident:  "f",
+				Params: []cst.Param{},
+				Type:   cst.Type{Type: "void"},
 				Block: cst.Block{
 					Stmts: []any{
 						cst.Ident{Ident: "a"},
@@ -66,8 +66,8 @@ func Test_FuncDecl(t *testing.T) {
 			Input: `func f(i int) void { return ; } ;`,
 			Output: cst.FuncDecl{
 				Ident: "f",
-				Args: []cst.Arg{
-					cst.Arg{Ident: "i", Type: cst.Type{Type: "int"}},
+				Params: []cst.Param{
+					cst.Param{Ident: "i", Type: cst.Type{Type: "int"}},
 				},
 				Type: cst.Type{Type: "void"},
 				Block: cst.Block{
