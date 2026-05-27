@@ -67,9 +67,23 @@ func Test_FuncDecl(t *testing.T) {
 			Output: cst.FuncDecl{
 				Ident: "f",
 				Params: []cst.Param{
-					cst.Param{Ident: "i", Type: cst.Type{Type: "int"}},
+					{Ident: "i", Type: cst.Type{Type: "int"}},
 				},
 				Type: cst.Type{Type: "void"},
+				Block: cst.Block{
+					Stmts: []any{cst.Return{}},
+				},
+			},
+		},
+		{
+			Input: `func f(s string, i int) u64 { return ; } ;`,
+			Output: cst.FuncDecl{
+				Ident: "f",
+				Params: []cst.Param{
+					{Ident: "s", Type: cst.Type{Type: "string"}},
+					{Ident: "i", Type: cst.Type{Type: "int"}},
+				},
+				Type: cst.Type{Type: "u64"},
 				Block: cst.Block{
 					Stmts: []any{cst.Return{}},
 				},
