@@ -25,8 +25,9 @@ func parse(sourceCode []byte) (any, error) {
 func testAll(t *testing.T, tcs []TestCase) {
 	for _, tc := range tcs {
 		tree, err := parse([]byte(tc.Input))
-		assert.NoError(t, err)
-		assert.Equal(t, tc.Output, tree)
+		if assert.NoError(t, err) {
+			assert.Equal(t, tc.Output, tree)
+		}
 	}
 }
 
