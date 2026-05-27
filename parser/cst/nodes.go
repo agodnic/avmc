@@ -50,12 +50,12 @@ type (
 	}
 	VarDecl struct {
 		Ident string
-		Type  any
+		Type  Type
 		Expr  any
 	}
 	ConstDecl struct {
 		Ident string
-		Type  any
+		Type  Type
 		Expr  any
 	}
 	Assignment struct {
@@ -152,7 +152,7 @@ func MakeAssignment(t0, t1 any) (Assignment, error) {
 func MakeConstDecl(t0, t1, t2 any) (ConstDecl, error) {
 	result := ConstDecl{
 		Ident: string(t0.(*token.Token).Lit),
-		Type:  t1,
+		Type:  t1.(Type),
 		Expr:  t2,
 	}
 	return result, nil
@@ -161,7 +161,7 @@ func MakeConstDecl(t0, t1, t2 any) (ConstDecl, error) {
 func MakeVarDecl(t0, t1, t2 any) (VarDecl, error) {
 	result := VarDecl{
 		Ident: string(t0.(*token.Token).Lit),
-		Type:  t1,
+		Type:  t1.(Type),
 		Expr:  t2,
 	}
 	return result, nil
