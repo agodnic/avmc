@@ -100,9 +100,11 @@ func MakeParam(ident, ty any) (Param, error) {
 func MakeFuncDecl(tIdent, args, ty, block any) (FuncDecl, error) {
 
 	result := FuncDecl{
-		Ident:  string(tIdent.(*token.Token).Lit),
-		Params: args.([]Param),
-		Block:  block.(Block),
+		Ident: string(tIdent.(*token.Token).Lit),
+		Block: block.(Block),
+	}
+	if args != nil {
+		result.Params = args.([]Param)
 	}
 
 	if ty == nil {

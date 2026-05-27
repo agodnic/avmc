@@ -60,9 +60,8 @@ func Test_FuncDecl(t *testing.T) {
 			Name:  "string return value",
 			Input: `func f() string { return; } ;`,
 			Output: cst.FuncDecl{
-				Ident:  "f",
-				Params: []cst.Param{},
-				Type:   cst.Type{TypeEnum: cst.TypeEnum_String},
+				Ident: "f",
+				Type:  cst.Type{TypeEnum: cst.TypeEnum_String},
 				Block: cst.Block{
 					Stmts: []any{
 						cst.Return{},
@@ -74,9 +73,8 @@ func Test_FuncDecl(t *testing.T) {
 			Name:  "int return value",
 			Input: `func f() uint64 { return; } ;`,
 			Output: cst.FuncDecl{
-				Ident:  "f",
-				Params: []cst.Param{},
-				Type:   cst.Type{TypeEnum: cst.TypeEnum_Uint64},
+				Ident: "f",
+				Type:  cst.Type{TypeEnum: cst.TypeEnum_Uint64},
 				Block: cst.Block{
 					Stmts: []any{cst.Return{}},
 				},
@@ -86,9 +84,8 @@ func Test_FuncDecl(t *testing.T) {
 			Name:  "no parameters",
 			Input: `func f() { return ; } ;`,
 			Output: cst.FuncDecl{
-				Ident:  "f",
-				Params: []cst.Param{},
-				Type:   cst.Type{TypeEnum: cst.TypeEnum_Void},
+				Ident: "f",
+				Type:  cst.Type{TypeEnum: cst.TypeEnum_Void},
 				Block: cst.Block{
 					Stmts: []any{
 						cst.Return{},
@@ -145,9 +142,8 @@ func Test_FuncDecl(t *testing.T) {
 			Name:  "two statements in block",
 			Input: `func f() { return; return ; } ;`,
 			Output: cst.FuncDecl{
-				Ident:  "f",
-				Params: []cst.Param{},
-				Type:   cst.Type{TypeEnum: cst.TypeEnum_Void},
+				Ident: "f",
+				Type:  cst.Type{TypeEnum: cst.TypeEnum_Void},
 				Block: cst.Block{
 					Stmts: []any{
 						cst.Return{},

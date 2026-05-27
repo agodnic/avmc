@@ -62,7 +62,7 @@ FuncDecl
 ;
 
 ParamList
-: empty                   << []cst.Param{}, nil >>
+: empty                   << nil, nil >>
 | Param                   << cst.AppendToParamSlice([]cst.Param{}, $0) >>
 | ParamList "," Param     << cst.AppendToParamSlice($0, $2) >>
 ;
