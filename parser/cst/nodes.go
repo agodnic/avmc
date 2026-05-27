@@ -63,30 +63,36 @@ type (
 	}
 	FuncDecl struct {
 		Ident  string
-		Params []any
-		Type   any
+		Params []Param
+		Type   Type
 		Block  Block
 	}
-	Arg struct {
+	Param struct {
 		Ident string
 		Type  any
 	}
 )
 
-func MakeArg(t0, t1 any) (Arg, error) {
-	result := Arg{
-		Ident: string(t0.(*token.Token).Lit),
-		Type:  t1,
+func AppendToParamSlice(slice, item any) ([]Param, error) {
+	s := slice.([]Param)
+	i := item.(Param)
+	return append(s, i), nil
+}
+
+func MakeParam(ident, ty any) (Param, error) {
+	result := Param{
+		Ident: string(ident.(*token.Token).Lit),
+		Type:  ty.(Type),
 	}
 	return result, nil
 }
 
-func MakeFuncDecl(t0, t1, t2, t3 any) (FuncDecl, error) {
+func MakeFuncDecl(tIdent, args, ty, block any) (FuncDecl, error) {
 	result := FuncDecl{
-		Ident:  string(t0.(*token.Token).Lit),
-		Params: t1.([]any),
-		Type:   t2,
-		Block:  t3.(Block),
+		Ident:  string(tIdent.(*token.Token).Lit),
+		Params: args.([]Param),
+		Type:   ty.(Type),
+		Block:  block.(Block),
 	}
 	return result, nil
 }
