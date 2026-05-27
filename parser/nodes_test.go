@@ -45,7 +45,7 @@ func Test_Assignment(t *testing.T) {
 			Input: `a = 1;`,
 			Output: cst.Assignment{
 				Ident: "a",
-				Expr:  cst.IntLit{Value: "1"},
+				Expr:  cst.UintLit{Value: 1},
 			},
 		},
 	}
@@ -164,7 +164,7 @@ func Test_IfStmt(t *testing.T) {
 			Name:  "if statement without else part",
 			Input: `if 1 { return; }`,
 			Output: cst.If{
-				Cond: cst.IntLit{Value: "1"},
+				Cond: cst.UintLit{Value: 1},
 				Then: cst.Block{
 					Stmts: []any{cst.Return{}},
 				},
@@ -174,7 +174,7 @@ func Test_IfStmt(t *testing.T) {
 			Name:  "if statement with else part",
 			Input: `if 1 { return; } else { return; }`,
 			Output: cst.If{
-				Cond: cst.IntLit{Value: "1"},
+				Cond: cst.UintLit{Value: 1},
 				Then: cst.Block{
 					Stmts: []any{cst.Return{}},
 				},
@@ -187,12 +187,12 @@ func Test_IfStmt(t *testing.T) {
 			Name:  "if statement with else if part",
 			Input: `if 1 { return; } else if 2 { return; }`,
 			Output: cst.If{
-				Cond: cst.IntLit{Value: "1"},
+				Cond: cst.UintLit{Value: 1},
 				Then: cst.Block{
 					Stmts: []any{cst.Return{}},
 				},
 				Else: cst.If{
-					Cond: cst.IntLit{Value: "2"},
+					Cond: cst.UintLit{Value: 2},
 					Then: cst.Block{
 						Stmts: []any{cst.Return{}},
 					},
@@ -221,7 +221,7 @@ func Test_Block(t *testing.T) {
 			Input: `{ 1; return; }`,
 			Output: cst.Block{
 				Stmts: []any{
-					cst.IntLit{Value: "1"},
+					cst.UintLit{Value: 1},
 					cst.Return{},
 				},
 			},
@@ -243,7 +243,7 @@ func Test_Return(t *testing.T) {
 			Name:  "return with expression",
 			Input: `return 1;`,
 			Output: cst.Return{
-				Expr: cst.IntLit{Value: "1"},
+				Expr: cst.UintLit{Value: 1},
 			},
 		},
 	}
@@ -260,7 +260,7 @@ func Test_ConstDecl(t *testing.T) {
 			Output: cst.ConstDecl{
 				Ident: "a",
 				Type:  cst.Type{TypeEnum: cst.TypeEnum_Uint64},
-				Expr:  cst.IntLit{Value: "1"},
+				Expr:  cst.UintLit{Value: 1},
 			},
 		},
 	}
@@ -277,7 +277,7 @@ func Test_VarDecl(t *testing.T) {
 			Output: cst.VarDecl{
 				Ident: "a",
 				Type:  cst.Type{TypeEnum: cst.TypeEnum_Uint64},
-				Expr:  cst.IntLit{Value: "1"},
+				Expr:  cst.UintLit{Value: 1},
 			},
 		},
 		{
@@ -318,8 +318,8 @@ func Test_Call(t *testing.T) {
 					Ident: "f",
 				},
 				Args: []any{
-					cst.IntLit{
-						Value: "1",
+					cst.UintLit{
+						Value: 1,
 					},
 				},
 			},
@@ -332,11 +332,11 @@ func Test_Call(t *testing.T) {
 					Ident: "f",
 				},
 				Args: []any{
-					cst.IntLit{
-						Value: "1",
+					cst.UintLit{
+						Value: 1,
 					},
-					cst.IntLit{
-						Value: "2",
+					cst.UintLit{
+						Value: 2,
 					},
 				},
 			},
@@ -349,14 +349,14 @@ func Test_Call(t *testing.T) {
 					Ident: "f",
 				},
 				Args: []any{
-					cst.IntLit{
-						Value: "1",
+					cst.UintLit{
+						Value: 1,
 					},
-					cst.IntLit{
-						Value: "2",
+					cst.UintLit{
+						Value: 2,
 					},
-					cst.IntLit{
-						Value: "3",
+					cst.UintLit{
+						Value: 3,
 					},
 				},
 			},
@@ -438,12 +438,12 @@ func Test_OperatorPrecedence(t *testing.T) {
 			Name:  "+ has lower precedence than *",
 			Input: `1 + 2 * 3;`,
 			Output: cst.BinOp{
-				R:  cst.IntLit{Value: "1"},
+				R:  cst.UintLit{Value: 1},
 				Op: "+",
 				L: cst.BinOp{
-					R:  cst.IntLit{Value: "2"},
+					R:  cst.UintLit{Value: 2},
 					Op: "*",
-					L:  cst.IntLit{Value: "3"},
+					L:  cst.UintLit{Value: 3},
 				},
 			},
 		},
@@ -452,24 +452,24 @@ func Test_OperatorPrecedence(t *testing.T) {
 			Input: `1 * 2 + 3;`,
 			Output: cst.BinOp{
 				R: cst.BinOp{
-					R:  cst.IntLit{Value: "1"},
+					R:  cst.UintLit{Value: 1},
 					Op: "*",
-					L:  cst.IntLit{Value: "2"},
+					L:  cst.UintLit{Value: 2},
 				},
 				Op: "+",
-				L:  cst.IntLit{Value: "3"},
+				L:  cst.UintLit{Value: 3},
 			},
 		},
 		{
 			Name:  "parenthesized expressions have higher precedence than *",
 			Input: `1 * (2 + 3);`,
 			Output: cst.BinOp{
-				R:  cst.IntLit{Value: "1"},
+				R:  cst.UintLit{Value: 1},
 				Op: "*",
 				L: cst.BinOp{
-					R:  cst.IntLit{Value: "2"},
+					R:  cst.UintLit{Value: 2},
 					Op: "+",
-					L:  cst.IntLit{Value: "3"},
+					L:  cst.UintLit{Value: 3},
 				},
 			},
 		},
@@ -479,10 +479,10 @@ func Test_OperatorPrecedence(t *testing.T) {
 			Output: cst.BinOp{
 				R: cst.UnaryOp{
 					Op:   "-",
-					Expr: cst.IntLit{Value: "1"},
+					Expr: cst.UintLit{Value: 1},
 				},
 				Op: "+",
-				L:  cst.IntLit{Value: "2"},
+				L:  cst.UintLit{Value: 2},
 			},
 		},
 	}
@@ -497,9 +497,9 @@ func Test_BinOp(t *testing.T) {
 			Name:  "binary add between two integer literals",
 			Input: `1 + 2;`,
 			Output: cst.BinOp{
-				R:  cst.IntLit{Value: "1"},
+				R:  cst.UintLit{Value: 1},
 				Op: "+",
-				L:  cst.IntLit{Value: "2"},
+				L:  cst.UintLit{Value: 2},
 			},
 		},
 	}
@@ -513,12 +513,12 @@ func Test_IntLit(t *testing.T) {
 		{
 			Name:   "single digit number",
 			Input:  `1;`,
-			Output: cst.IntLit{Value: "1"},
+			Output: cst.UintLit{Value: 1},
 		},
 		{
 			Name:   "multiple digit number",
 			Input:  `123;`,
-			Output: cst.IntLit{Value: "123"},
+			Output: cst.UintLit{Value: 123},
 		},
 	}
 
