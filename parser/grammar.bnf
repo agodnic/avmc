@@ -13,7 +13,7 @@ string: 's' 't' 'r' 'i' 'n' 'g';
 uint64: 'u' 'i' 'n' 't' '6' '4';
 var:    'v' 'a' 'r';
 
-identifier: 'a'-'z' {'a'-'z' | '0'-'9'} ;
+identifier: ('a'-'z' | 'A'-'Z') {'a'-'z' | 'A'-'Z' | '0'-'9'} ;
 
 intLiteral: '0'-'9' {'0'-'9'} ;
 stringLiteral: '"' {.} '"' ;
