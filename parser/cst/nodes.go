@@ -22,7 +22,7 @@ const (
 )
 
 type (
-	IntLit struct {
+	UintLit struct {
 		Value uint64
 	}
 	BytesLit struct {
@@ -224,16 +224,16 @@ func MakeBinOp(t0, t1, t2 any) (BinOp, error) {
 	return result, nil
 }
 
-func MakeIntLit(t any) (IntLit, error) {
+func MakeUintLit(t any) (UintLit, error) {
 
 	s := string(t.(*token.Token).Lit)
 
 	value, err := strconv.ParseUint(s, 10, 64)
 	if err != nil {
-		return IntLit{}, fmt.Errorf("failed to parse integer literal: %w", err)
+		return UintLit{}, fmt.Errorf("failed to parse integer literal: %w", err)
 	}
 
-	result := IntLit{
+	result := UintLit{
 		Value: value,
 	}
 	return result, nil

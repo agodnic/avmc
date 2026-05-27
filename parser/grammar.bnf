@@ -16,7 +16,7 @@ var:    'v' 'a' 'r';
 
 _hexDigit: '0'-'9' | 'a'-'f' | 'A'-'F' ;
 bytesLiteral: 'h' 'e' 'x' '"' { _hexDigit } '"';
-intLiteral: '0'-'9' {'0'-'9'} ;
+uintLiteral: '0'-'9' {'0'-'9'} ;
 
 identifier: ('a'-'z' | 'A'-'Z') {'a'-'z' | 'A'-'Z' | '0'-'9'} ;
 
@@ -158,7 +158,7 @@ OperandName
 
 Lit
 : bytesLiteral     << cst.MakeBytesLit($0) >>
-| intLiteral       << cst.MakeIntLit($0) >>
+| uintLiteral       << cst.MakeUintLit($0) >>
 ;
 
 LogOp: "||" | "&&";
