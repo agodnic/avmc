@@ -1,15 +1,19 @@
 /* Lexical Part */
 
-kwConst:  'c' 'o' 'n' 's' 't';
-kwElse:   'e' 'l' 's' 'e';
-kwFunc:   'f' 'u' 'n' 'c';
-kwIf:     'i' 'f';
-kwReturn: 'r' 'e' 't' 'u' 'r' 'n';
-kwString: 's' 't' 'r' 'i' 'n' 'g';
-kwUint64: 'u' 'i' 'n' 't' '6' '4';
-kwVar:    'v' 'a' 'r';
+// Lexer rules have somewhat user-understandable names because gocc sometimes
+// includes them in error messages.
+// We would eventually create these error messages ourselves, but for the time
+// being it helps.
+const:  'c' 'o' 'n' 's' 't';
+else:   'e' 'l' 's' 'e';
+func:   'f' 'u' 'n' 'c';
+if:     'i' 'f';
+return: 'r' 'e' 't' 'u' 'r' 'n';
+string: 's' 't' 'r' 'i' 'n' 'g';
+uint64: 'u' 'i' 'n' 't' '6' '4';
+var:    'v' 'a' 'r';
 
-ident: 'a'-'z' {'a'-'z' | '0'-'9'} ;
+identifier: 'a'-'z' {'a'-'z' | '0'-'9'} ;
 
 intLit: '0'-'9' {'0'-'9'} ;
 
@@ -45,17 +49,17 @@ ExprStmt
 ;
 
 VarDecl
-: kwVar ident Type "=" Expr1 ";"      << cst.MakeVarDecl($1, $2, $4) >>
+: var identifier Type "=" Expr1 ";"      << cst.MakeVarDecl($1, $2, $4) >>
 ;
 
 Type
-: kwUint64    << cst.MakeType($0) >>
-| kwString    << cst.MakeType($0) >>
+: uint64    << cst.MakeType($0) >>
+| string    << cst.MakeType($0) >>
 ;
 
 FuncDecl
-: kwFunc ident "(" ParamList ")" Type Block ";"   << cst.MakeFuncDecl($1, $3, $5, $6) >>
-| kwFunc ident "(" ParamList ")" Block ";"        << cst.MakeFuncDecl($1, $3, nil, $5) >>
+: func identifier "(" ParamList ")" Type Block ";"   << cst.MakeFuncDecl($1, $3, $5, $6) >>
+| func identifier "(" ParamList ")" Block ";"        << cst.MakeFuncDecl($1, $3, nil, $5) >>
 ;
 
 ParamList
@@ -65,20 +69,20 @@ ParamList
 ;
 
 Param
-: ident Type             << cst.MakeParam($0, $1) >>
+: identifier Type             << cst.MakeParam($0, $1) >>
 ;
 
 ConstDecl
-: kwConst ident Type "=" Expr1 ";"     << cst.MakeConstDecl($1, $2, $4) >>
+: const identifier Type "=" Expr1 ";"     << cst.MakeConstDecl($1, $2, $4) >>
 ;
 
 Assignment
-: ident "=" Expr1 ";"             << cst.MakeAssignment($0, $2) >>
+: identifier "=" Expr1 ";"             << cst.MakeAssignment($0, $2) >>
 ;
 
 Return
-: kwReturn ";"                   << cst.MakeReturn(nil) >>
-| kwReturn Expr1 ";"             << cst.MakeReturn($1) >>
+: return ";"                   << cst.MakeReturn(nil) >>
+| return Expr1 ";"             << cst.MakeReturn($1) >>
 ;
 
 Block
@@ -91,9 +95,9 @@ StmtList
 ;
 
 IfStmt
-: kwIf Expr1 Block                 << cst.MakeIf($1, $2, nil) >>
-| kwIf Expr1 Block kwElse Block    << cst.MakeIf($1, $2, $4) >>
-| kwIf Expr1 Block kwElse IfStmt   << cst.MakeIf($1, $2, $4) >>
+: if Expr1 Block                 << cst.MakeIf($1, $2, nil) >>
+| if Expr1 Block else Block    << cst.MakeIf($1, $2, $4) >>
+| if Expr1 Block else IfStmt   << cst.MakeIf($1, $2, $4) >>
 ;
 
 Expr1
@@ -147,8 +151,8 @@ Operand
 ;
 
 OperandName
-: ident              << cst.MakeIdent(nil, $0) >>
-| ident "." ident    << cst.MakeIdent($0, $2) >>
+: identifier                     << cst.MakeIdent(nil, $0) >>
+| identifier "." identifier    << cst.MakeIdent($0, $2) >>
 ;
 
 Lit
