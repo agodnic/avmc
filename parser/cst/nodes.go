@@ -83,85 +83,85 @@ func AppendToParamSlice(slice, item any) ([]Param, error) {
 	return append(s, i), nil
 }
 
-func MakeParam(ident, ty any) (Param, error) {
+func MakeParam(identToken, typeNode any) (Param, error) {
 	result := Param{
-		Ident: string(ident.(*token.Token).Lit),
-		Type:  ty,
+		Ident: string(identToken.(*token.Token).Lit),
+		Type:  typeNode,
 	}
 	return result, nil
 }
 
-func MakeFuncDecl(tIdent, args, ty, block any) (FuncDecl, error) {
+func MakeFuncDecl(identToken, argsNode, typeNode, blockNode any) (FuncDecl, error) {
 
 	result := FuncDecl{
-		Ident: string(tIdent.(*token.Token).Lit),
-		Block: block.(Block),
+		Ident: string(identToken.(*token.Token).Lit),
+		Block: blockNode.(Block),
 	}
-	if args != nil {
-		result.Params = args.([]Param)
+	if argsNode != nil {
+		result.Params = argsNode.([]Param)
 	}
 
-	if ty == nil {
+	if typeNode == nil {
 		// NOTE This will have no src line/span information (if we ever add the feature)
 		result.Type = VoidType{}
 	} else {
-		result.Type = ty
+		result.Type = typeNode
 	}
 	return result, nil
 }
 
-func MakeIf(t0, t1, t2 any) (If, error) {
+func MakeIf(exprNode, blockNode, elseNode any) (If, error) {
 	result := If{
-		Cond: t0,
-		Then: t1.(Block),
-		Else: t2,
+		Cond: exprNode,
+		Then: blockNode.(Block),
+		Else: elseNode,
 	}
 	return result, nil
 }
 
-func MakeBlock(t0 any) (Block, error) {
+func MakeBlock(stmtsNode any) (Block, error) {
 	result := Block{
-		Stmts: t0.([]any),
+		Stmts: stmtsNode.([]any),
 	}
 	return result, nil
 }
 
-func MakeReturn(t0 any) (Return, error) {
+func MakeReturn(typeNode any) (Return, error) {
 	result := Return{
-		Expr: t0,
+		Expr: typeNode,
 	}
 	return result, nil
 }
 
-func MakeAssignment(t0, t1 any) (Assignment, error) {
+func MakeAssignment(identToken, exprNode any) (Assignment, error) {
 	result := Assignment{
-		Ident: string(t0.(*token.Token).Lit),
-		Expr:  t1,
+		Ident: string(identToken.(*token.Token).Lit),
+		Expr:  exprNode,
 	}
 	return result, nil
 }
 
-func MakeConstDecl(t0, t1, t2 any) (ConstDecl, error) {
+func MakeConstDecl(identToken, typeNode, exprNode any) (ConstDecl, error) {
 	result := ConstDecl{
-		Ident: string(t0.(*token.Token).Lit),
-		Type:  t1,
-		Expr:  t2,
+		Ident: string(identToken.(*token.Token).Lit),
+		Type:  typeNode,
+		Expr:  exprNode,
 	}
 	return result, nil
 }
 
-func MakeVarDecl(t0, t1, t2 any) (VarDecl, error) {
+func MakeVarDecl(identToken, typeNode, exprNode any) (VarDecl, error) {
 	result := VarDecl{
-		Ident: string(t0.(*token.Token).Lit),
-		Type:  t1,
-		Expr:  t2,
+		Ident: string(identToken.(*token.Token).Lit),
+		Type:  typeNode,
+		Expr:  exprNode,
 	}
 	return result, nil
 }
 
-func MakeType(t0 any) (any, error) {
+func MakeType(typeToken any) (any, error) {
 
-	s := string(t0.(*token.Token).Lit)
+	s := string(typeToken.(*token.Token).Lit)
 
 	switch s {
 	case "uint64":
@@ -173,22 +173,22 @@ func MakeType(t0 any) (any, error) {
 	}
 }
 
-func MakeCall(t0, t1 any) (Call, error) {
+func MakeCall(qualifiedIdentNode, argsNode any) (Call, error) {
 	result := Call{
-		QualifiedIdent: t0.(QualifiedIdent),
+		QualifiedIdent: qualifiedIdentNode.(QualifiedIdent),
 	}
-	if t1 != nil {
-		result.Args = t1.([]any)
+	if argsNode != nil {
+		result.Args = argsNode.([]any)
 	}
 	return result, nil
 }
 
-func MakeQualifiedIdent(t0, t1 any) (QualifiedIdent, error) {
+func MakeQualifiedIdent(packageNameToken, identToken any) (QualifiedIdent, error) {
 	result := QualifiedIdent{
-		Ident: string(t1.(*token.Token).Lit),
+		Ident: string(identToken.(*token.Token).Lit),
 	}
-	if t0 != nil {
-		result.PackageName = string(t0.(*token.Token).Lit)
+	if packageNameToken != nil {
+		result.PackageName = string(packageNameToken.(*token.Token).Lit)
 
 		// Package names are being validated here because
 		// we had to express them in the grammar as regular
@@ -202,26 +202,26 @@ func MakeQualifiedIdent(t0, t1 any) (QualifiedIdent, error) {
 	return result, nil
 }
 
-func MakeUnaryOp(t0, t1 any) (UnaryOp, error) {
+func MakeUnaryOp(opetatorToken, exprNode any) (UnaryOp, error) {
 	result := UnaryOp{
-		Op:   string(t0.(*token.Token).Lit),
-		Expr: t1,
+		Op:   string(opetatorToken.(*token.Token).Lit),
+		Expr: exprNode,
 	}
 	return result, nil
 }
 
-func MakeBinOp(t0, t1, t2 any) (BinOp, error) {
+func MakeBinOp(expr1, operatorToken, expr2 any) (BinOp, error) {
 	result := BinOp{
-		R:  t0,
-		Op: string(t1.(*token.Token).Lit),
-		L:  t2,
+		R:  expr1,
+		Op: string(operatorToken.(*token.Token).Lit),
+		L:  expr2,
 	}
 	return result, nil
 }
 
-func MakeUintLit(t any) (UintLit, error) {
+func MakeUintLit(uintLiteralToken any) (UintLit, error) {
 
-	s := string(t.(*token.Token).Lit)
+	s := string(uintLiteralToken.(*token.Token).Lit)
 
 	value, err := strconv.ParseUint(s, 10, 64)
 	if err != nil {
@@ -234,9 +234,9 @@ func MakeUintLit(t any) (UintLit, error) {
 	return result, nil
 }
 
-func MakeBytesLit(t any) (BytesLit, error) {
+func MakeBytesLit(bytesLiteralToken any) (BytesLit, error) {
 
-	s := string(t.(*token.Token).Lit)
+	s := string(bytesLiteralToken.(*token.Token).Lit)
 	s = s[4 : len(s)-1]
 	if len(s) == 0 {
 		result := BytesLit{}
