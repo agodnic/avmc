@@ -544,9 +544,9 @@ func Test_UnaryOp(t *testing.T) {
 	tcs := []TestCase{
 		{
 			Name:  "unary op over an integer literal",
-			Input: `!1;`,
+			Input: `-1;`,
 			Output: cst.UnaryOp{
-				Op:   "!",
+				Op:   "-",
 				Expr: cst.UintLit{Value: 1},
 			},
 		},
