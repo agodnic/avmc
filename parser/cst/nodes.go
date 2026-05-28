@@ -13,14 +13,6 @@ import (
 	"github.com/agodnic/avmc/parser/generated/token"
 )
 
-type TypeEnum int
-
-const (
-	TypeEnum_Void   TypeEnum = iota
-	TypeEnum_Uint64 TypeEnum = iota
-	TypeEnum_Bytes  TypeEnum = iota
-)
-
 type (
 	UintLit struct {
 		Value uint64
@@ -45,17 +37,17 @@ type (
 		QualifiedIdent QualifiedIdent
 		Args           []any
 	}
-	Type struct {
-		TypeEnum TypeEnum
-	}
-	VarDecl struct {
+	BytesType  struct{}
+	Uint64Type struct{}
+	VoidType   struct{}
+	VarDecl    struct {
 		Ident string
-		Type  Type
+		Type  any
 		Expr  any
 	}
 	ConstDecl struct {
 		Ident string
-		Type  Type
+		Type  any
 		Expr  any
 	}
 	Assignment struct {
@@ -76,7 +68,7 @@ type (
 	FuncDecl struct {
 		Ident  string
 		Params []Param
-		Type   Type
+		Type   any
 		Block  Block
 	}
 	Param struct {
@@ -94,7 +86,7 @@ func AppendToParamSlice(slice, item any) ([]Param, error) {
 func MakeParam(ident, ty any) (Param, error) {
 	result := Param{
 		Ident: string(ident.(*token.Token).Lit),
-		Type:  ty.(Type),
+		Type:  ty,
 	}
 	return result, nil
 }
@@ -111,9 +103,9 @@ func MakeFuncDecl(tIdent, args, ty, block any) (FuncDecl, error) {
 
 	if ty == nil {
 		// NOTE This will have no src line/span information (if we ever add the feature)
-		result.Type.TypeEnum = TypeEnum_Void
+		result.Type = VoidType{}
 	} else {
-		result.Type = ty.(Type)
+		result.Type = ty
 	}
 	return result, nil
 }
@@ -152,7 +144,7 @@ func MakeAssignment(t0, t1 any) (Assignment, error) {
 func MakeConstDecl(t0, t1, t2 any) (ConstDecl, error) {
 	result := ConstDecl{
 		Ident: string(t0.(*token.Token).Lit),
-		Type:  t1.(Type),
+		Type:  t1,
 		Expr:  t2,
 	}
 	return result, nil
@@ -161,30 +153,24 @@ func MakeConstDecl(t0, t1, t2 any) (ConstDecl, error) {
 func MakeVarDecl(t0, t1, t2 any) (VarDecl, error) {
 	result := VarDecl{
 		Ident: string(t0.(*token.Token).Lit),
-		Type:  t1.(Type),
+		Type:  t1,
 		Expr:  t2,
 	}
 	return result, nil
 }
 
-func MakeType(t0 any) (Type, error) {
+func MakeType(t0 any) (any, error) {
 
-	str := string(t0.(*token.Token).Lit)
+	s := string(t0.(*token.Token).Lit)
 
-	var val TypeEnum
-	switch str {
+	switch s {
 	case "uint64":
-		val = TypeEnum_Uint64
+		return Uint64Type{}, nil
 	case "bytes":
-		val = TypeEnum_Bytes
+		return BytesType{}, nil
 	default:
-		return Type{}, fmt.Errorf("unexpected type: %s", str)
+		return nil, fmt.Errorf("unexpected type: %s", s)
 	}
-
-	result := Type{
-		TypeEnum: val,
-	}
-	return result, nil
 }
 
 func MakeCall(t0, t1 any) (Call, error) {
