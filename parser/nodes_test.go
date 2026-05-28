@@ -550,6 +550,14 @@ func Test_UnaryOp(t *testing.T) {
 				Expr: cst.UintLit{Value: 1},
 			},
 		},
+		{
+			Name:  "unary op over a variable",
+			Input: `!a;`,
+			Output: cst.UnaryOp{
+				Op:   "!",
+				Expr: cst.QualifiedIdent{Ident: "a"},
+			},
+		},
 	}
 
 	testAll(t, tcs)
