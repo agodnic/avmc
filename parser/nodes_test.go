@@ -539,6 +539,22 @@ func Test_OperatorPrecedence(t *testing.T) {
 	testAll(t, tcs)
 }
 
+func Test_UnaryOp(t *testing.T) {
+
+	tcs := []TestCase{
+		{
+			Name:  "unary op over an integer literal",
+			Input: `!1;`,
+			Output: cst.UnaryOp{
+				Op:   "!",
+				Expr: cst.UintLit{Value: 1},
+			},
+		},
+	}
+
+	testAll(t, tcs)
+}
+
 func Test_BinOp(t *testing.T) {
 
 	tcs := []TestCase{
