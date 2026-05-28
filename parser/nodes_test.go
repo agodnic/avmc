@@ -41,11 +41,60 @@ func Test_Assignment(t *testing.T) {
 
 	tcs := []TestCase{
 		{
-			Name:  "int literal expression",
+			Name:  "assignment from integer literal expression",
 			Input: `a = 1;`,
 			Output: cst.Assignment{
 				Ident: "a",
 				Expr:  cst.UintLit{Value: 1},
+			},
+		},
+		{
+			Name:  "assignment from bytes literal expression",
+			Input: `a = hex"12ab";`,
+			Output: cst.Assignment{
+				Ident: "a",
+				Expr:  cst.BytesLit{Value: []uint8{0x12, 0xab}},
+			},
+		},
+		{
+			Name:  "assignment from identifier expression",
+			Input: `a = b;`,
+			Output: cst.Assignment{
+				Ident: "a",
+				Expr:  cst.QualifiedIdent{Ident: "b"},
+			},
+		},
+		{
+			Name:  "assignment from function call expression",
+			Input: `a = f();`,
+			Output: cst.Assignment{
+				Ident: "a",
+				Expr: cst.Call{
+					QualifiedIdent: cst.QualifiedIdent{Ident: "f"},
+				},
+			},
+		},
+		{
+			Name:  "assignment from unary operator expression",
+			Input: `a = !2;`,
+			Output: cst.Assignment{
+				Ident: "a",
+				Expr: cst.UnaryOp{
+					Op:   "!",
+					Expr: cst.UintLit{Value: 2},
+				},
+			},
+		},
+		{
+			Name:  "assignment from binary operator expression",
+			Input: `a = 1 + 2;`,
+			Output: cst.Assignment{
+				Ident: "a",
+				Expr: cst.BinOp{
+					R:  cst.UintLit{Value: 1},
+					Op: "+",
+					L:  cst.UintLit{Value: 2},
+				},
 			},
 		},
 	}
