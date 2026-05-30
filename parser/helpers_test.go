@@ -56,12 +56,14 @@ func testStmts(t *testing.T, tcs []TestForStmt) {
 				return
 			}
 
-			expectedTree := cst.FuncDecl{
-				Ident: functionName,
-				Type:  cst.VoidType{},
-				Block: cst.Block{
-					Stmts: []any{
-						tc.Output,
+			expectedTree := []any{
+				cst.FuncDecl{
+					Ident: functionName,
+					Type:  cst.VoidType{},
+					Block: cst.Block{
+						Stmts: []any{
+							tc.Output,
+						},
 					},
 				},
 			}

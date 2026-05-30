@@ -26,12 +26,10 @@ identifier: ('a'-'z' | 'A'-'Z') {'a'-'z' | 'A'-'Z' | '0'-'9'} ;
 
 << import "github.com/agodnic/avmc/parser/cst" >>
 
-/*
 CompilationUnit
-: TopLevelStmt                     <<  >>
-| TopLevelStmt CompilationUnit     <<  >>
+: TopLevelStmt                     << []any{$0}, nil >>
+| TopLevelStmt CompilationUnit     << append($1.([]any), $0), nil >>
 ;
-*/
 
 TopLevelStmt
 : FuncDecl
