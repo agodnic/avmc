@@ -123,3 +123,77 @@ func Test_FuncDecl(t *testing.T) {
 
 	testTopLevelStmts(t, tcs)
 }
+
+func Test_TopLevelStatements(t *testing.T) {
+
+	tcs := []TestForTopLevelStmt{
+		{
+			Name:  "declare two functions",
+			Input: `func f() bytes { return; } func g() bytes { return; }`,
+			Output: []any{
+				cst.FuncDecl{
+					Ident: "f",
+					Type:  cst.BytesType{},
+					Block: cst.Block{
+						Stmts: []any{
+							cst.Return{},
+						},
+					},
+				},
+				cst.FuncDecl{
+					Ident: "g",
+					Type:  cst.BytesType{},
+					Block: cst.Block{
+						Stmts: []any{
+							cst.Return{},
+						},
+					},
+				},
+			},
+		},
+		{
+			Name:  "declare two constants",
+			Input: `const c uint64 = 1 const d uint64 = 2`,
+			Output: []any{
+				cst.ConstDecl{
+					Ident: "c",
+					Type:  cst.Uint64Type{},
+					Expr: cst.UintLit{
+						Value: 1,
+					},
+				},
+				cst.ConstDecl{
+					Ident: "d",
+					Type:  cst.Uint64Type{},
+					Expr: cst.UintLit{
+						Value: 2,
+					},
+				},
+			},
+		},
+		{
+			Name:  "declare a function and a constant",
+			Input: `const c uint64 = 1 func f() bytes { return; }`,
+			Output: []any{
+				cst.ConstDecl{
+					Ident: "c",
+					Type:  cst.Uint64Type{},
+					Expr: cst.UintLit{
+						Value: 1,
+					},
+				},
+				cst.FuncDecl{
+					Ident: "f",
+					Type:  cst.BytesType{},
+					Block: cst.Block{
+						Stmts: []any{
+							cst.Return{},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	testTopLevelStmts(t, tcs)
+}

@@ -28,7 +28,7 @@ identifier: ('a'-'z' | 'A'-'Z') {'a'-'z' | 'A'-'Z' | '0'-'9'} ;
 
 CompilationUnit
 : TopLevelStmt                     << []any{$0}, nil >>
-| TopLevelStmt CompilationUnit     << append($1.([]any), $0), nil >>
+| CompilationUnit TopLevelStmt     << append($0.([]any), $1), nil >>
 ;
 
 TopLevelStmt
