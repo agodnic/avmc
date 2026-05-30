@@ -10,7 +10,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-type TestCase struct {
+type TestForTopLevelStmt struct {
 	Name   string
 	Input  string
 	Output any
@@ -24,7 +24,7 @@ func parse(sourceCode []byte) (any, error) {
 	return p.Parse(lex)
 }
 
-func testAll(t *testing.T, tcs []TestCase) {
+func testTopLevelStmts(t *testing.T, tcs []TestForTopLevelStmt) {
 	for _, tc := range tcs {
 		t.Run(tc.Name, func(t *testing.T) {
 
@@ -38,15 +38,13 @@ func testAll(t *testing.T, tcs []TestCase) {
 	}
 }
 
-///////////////////////////////
-
-type TestCaseInsideFunctionBody struct {
+type TestForStmt struct {
 	Name   string
 	Input  string
 	Output any
 }
 
-func testAllInsideFunctionBody(t *testing.T, tcs []TestCaseInsideFunctionBody) {
+func testStmts(t *testing.T, tcs []TestForStmt) {
 	for _, tc := range tcs {
 		t.Run(tc.Name, func(t *testing.T) {
 

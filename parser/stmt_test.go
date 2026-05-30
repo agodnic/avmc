@@ -8,7 +8,7 @@ import (
 
 func Test_Assignment(t *testing.T) {
 
-	tcs := []TestCaseInsideFunctionBody{
+	tcs := []TestForStmt{
 		{
 			Name:  "assignment from integer literal expression",
 			Input: `a = 1;`,
@@ -68,12 +68,12 @@ func Test_Assignment(t *testing.T) {
 		},
 	}
 
-	testAllInsideFunctionBody(t, tcs)
+	testStmts(t, tcs)
 }
 
 func Test_IfStmt(t *testing.T) {
 
-	tcs := []TestCaseInsideFunctionBody{
+	tcs := []TestForStmt{
 		{
 			Name:  "if statement without else part",
 			Input: `if 1 { return; }`,
@@ -115,12 +115,12 @@ func Test_IfStmt(t *testing.T) {
 		},
 	}
 
-	testAllInsideFunctionBody(t, tcs)
+	testStmts(t, tcs)
 }
 
 func Test_Block(t *testing.T) {
 
-	tcs := []TestCaseInsideFunctionBody{
+	tcs := []TestForStmt{
 		{
 			Name:  "block with one statement",
 			Input: `{ return; }`,
@@ -142,12 +142,12 @@ func Test_Block(t *testing.T) {
 		},
 	}
 
-	testAllInsideFunctionBody(t, tcs)
+	testStmts(t, tcs)
 }
 
 func Test_Return(t *testing.T) {
 
-	tcs := []TestCaseInsideFunctionBody{
+	tcs := []TestForStmt{
 		{
 			Name:   "return without expression",
 			Input:  `return;`,
@@ -162,12 +162,12 @@ func Test_Return(t *testing.T) {
 		},
 	}
 
-	testAllInsideFunctionBody(t, tcs)
+	testStmts(t, tcs)
 }
 
 func Test_ConstDecl(t *testing.T) {
 
-	tcs := []TestCaseInsideFunctionBody{
+	tcs := []TestForStmt{
 		{
 			Name:  "declare int constant",
 			Input: `const a uint64 = 1;`,
@@ -179,12 +179,12 @@ func Test_ConstDecl(t *testing.T) {
 		},
 	}
 
-	testAllInsideFunctionBody(t, tcs)
+	testStmts(t, tcs)
 }
 
 func Test_VarDecl(t *testing.T) {
 
-	tcs := []TestCaseInsideFunctionBody{
+	tcs := []TestForStmt{
 		{
 			Name:  "int literal expression",
 			Input: `var a uint64 = 1;`,
@@ -209,12 +209,12 @@ func Test_VarDecl(t *testing.T) {
 		},
 	}
 
-	testAllInsideFunctionBody(t, tcs)
+	testStmts(t, tcs)
 }
 
 func Test_Call(t *testing.T) {
 
-	tcs := []TestCaseInsideFunctionBody{
+	tcs := []TestForStmt{
 		{
 			Name:  "function call with no args",
 			Input: `f();`,
@@ -287,5 +287,5 @@ func Test_Call(t *testing.T) {
 		},
 	}
 
-	testAllInsideFunctionBody(t, tcs)
+	testStmts(t, tcs)
 }

@@ -8,7 +8,7 @@ import (
 
 func Test_UnaryOp(t *testing.T) {
 
-	tcs := []TestCaseInsideFunctionBody{
+	tcs := []TestForStmt{
 		{
 			Name:  "unary op over an integer literal",
 			Input: `-1;`,
@@ -27,12 +27,12 @@ func Test_UnaryOp(t *testing.T) {
 		},
 	}
 
-	testAllInsideFunctionBody(t, tcs)
+	testStmts(t, tcs)
 }
 
 func Test_BinOp(t *testing.T) {
 
-	tcs := []TestCaseInsideFunctionBody{
+	tcs := []TestForStmt{
 		{
 			Name:  "binary add between two integer literals",
 			Input: `1 + 2;`,
@@ -44,12 +44,12 @@ func Test_BinOp(t *testing.T) {
 		},
 	}
 
-	testAllInsideFunctionBody(t, tcs)
+	testStmts(t, tcs)
 }
 
 func Test_IntLit(t *testing.T) {
 
-	tcs := []TestCaseInsideFunctionBody{
+	tcs := []TestForStmt{
 		{
 			Name:   "single digit number",
 			Input:  `1;`,
@@ -62,12 +62,12 @@ func Test_IntLit(t *testing.T) {
 		},
 	}
 
-	testAllInsideFunctionBody(t, tcs)
+	testStmts(t, tcs)
 }
 
 func Test_BytesLit(t *testing.T) {
 
-	tcs := []TestCaseInsideFunctionBody{
+	tcs := []TestForStmt{
 		{
 			Name:   "empty bytes",
 			Input:  `hex"";`,
@@ -85,12 +85,12 @@ func Test_BytesLit(t *testing.T) {
 		},
 	}
 
-	testAllInsideFunctionBody(t, tcs)
+	testStmts(t, tcs)
 }
 
 func Test_Ident(t *testing.T) {
 
-	tcs := []TestCaseInsideFunctionBody{
+	tcs := []TestForStmt{
 		{
 			Name:  "all lowercase",
 			Input: `myvariable;`,
@@ -140,5 +140,5 @@ func Test_Ident(t *testing.T) {
 		},
 	}
 
-	testAllInsideFunctionBody(t, tcs)
+	testStmts(t, tcs)
 }

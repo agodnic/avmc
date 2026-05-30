@@ -8,7 +8,7 @@ import (
 
 func Test_FuncDecl(t *testing.T) {
 
-	tcs := []TestCase{
+	tcs := []TestForTopLevelStmt{
 		{
 			Name:  "bytes return value",
 			Input: `func f() bytes { return; } ;`,
@@ -107,5 +107,5 @@ func Test_FuncDecl(t *testing.T) {
 		},
 	}
 
-	testAll(t, tcs)
+	testTopLevelStmts(t, tcs)
 }
