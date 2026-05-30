@@ -49,7 +49,7 @@ func testStmts(t *testing.T, tcs []TestForStmt) {
 		t.Run(tc.Name, func(t *testing.T) {
 
 			const functionName = "functionNameThatShouldNowShadowAnything"
-			src := fmt.Sprintf(`func %s () { %s };`, functionName, tc.Input)
+			src := fmt.Sprintf(`func %s () { %s }`, functionName, tc.Input)
 
 			actualTree, err := parse([]byte(src))
 			if !assert.NoError(t, err) {

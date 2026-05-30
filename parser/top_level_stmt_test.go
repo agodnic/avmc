@@ -11,7 +11,7 @@ func Test_FuncDecl(t *testing.T) {
 	tcs := []TestForTopLevelStmt{
 		{
 			Name:  "bytes return value",
-			Input: `func f() bytes { return; } ;`,
+			Input: `func f() bytes { return; }`,
 			Output: cst.FuncDecl{
 				Ident: "f",
 				Type:  cst.BytesType{},
@@ -24,7 +24,7 @@ func Test_FuncDecl(t *testing.T) {
 		},
 		{
 			Name:  "int return value",
-			Input: `func f() uint64 { return; } ;`,
+			Input: `func f() uint64 { return; }`,
 			Output: cst.FuncDecl{
 				Ident: "f",
 				Type:  cst.Uint64Type{},
@@ -35,7 +35,7 @@ func Test_FuncDecl(t *testing.T) {
 		},
 		{
 			Name:  "no parameters",
-			Input: `func f() { return ; } ;`,
+			Input: `func f() { return ; }`,
 			Output: cst.FuncDecl{
 				Ident: "f",
 				Type:  cst.VoidType{},
@@ -48,7 +48,7 @@ func Test_FuncDecl(t *testing.T) {
 		},
 		{
 			Name:  "one parameter",
-			Input: `func f(i uint64) { return ; } ;`,
+			Input: `func f(i uint64) { return ; }`,
 			Output: cst.FuncDecl{
 				Ident: "f",
 				Params: []cst.Param{
@@ -62,7 +62,7 @@ func Test_FuncDecl(t *testing.T) {
 		},
 		{
 			Name:  "two parameters",
-			Input: `func f(b bytes, i uint64) { return ; } ;`,
+			Input: `func f(b bytes, i uint64) { return ; }`,
 			Output: cst.FuncDecl{
 				Ident: "f",
 				Params: []cst.Param{
@@ -77,7 +77,7 @@ func Test_FuncDecl(t *testing.T) {
 		},
 		{
 			Name:  "three parameters",
-			Input: `func f(i uint64, j uint64, k uint64) { return ; } ;`,
+			Input: `func f(i uint64, j uint64, k uint64) { return ; }`,
 			Output: cst.FuncDecl{
 				Ident: "f",
 				Params: []cst.Param{
@@ -93,7 +93,7 @@ func Test_FuncDecl(t *testing.T) {
 		},
 		{
 			Name:  "two statements in block",
-			Input: `func f() { return; return ; } ;`,
+			Input: `func f() { return; return ; }`,
 			Output: cst.FuncDecl{
 				Ident: "f",
 				Type:  cst.VoidType{},
