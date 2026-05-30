@@ -8,7 +8,7 @@ import (
 
 func Test_OperatorPrecedence(t *testing.T) {
 
-	tcs := []TestCase{
+	tcs := []TestCaseInsideFunctionBody{
 		{
 			Name:  "+ has lower precedence than *",
 			Input: `1 + 2 * 3;`,
@@ -62,5 +62,5 @@ func Test_OperatorPrecedence(t *testing.T) {
 		},
 	}
 
-	testAll(t, tcs)
+	testAllInsideFunctionBody(t, tcs)
 }
