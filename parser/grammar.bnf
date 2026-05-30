@@ -32,7 +32,6 @@ TopLevelStmt
 
 Stmt
 : VarDecl
-| FuncDecl
 | ConstDecl
 | Return
 | Block
