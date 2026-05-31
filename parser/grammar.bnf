@@ -118,12 +118,12 @@ IfStmt
 // Binary operator precedence is not represented in the grammar.
 // It is enforced by compiler passes later on.
 Expr
-: Expr BinaryOperator Expr5    << cst.MakeBinOp($0, $1, $2) >>
-| Expr5                         << $0, nil >>
+: Expr BinaryOperator Term    << cst.MakeBinOp($0, $1, $2) >>
+| Term                         << $0, nil >>
 ;
 
-Expr5
-: UnaryOperator Expr5  << cst.MakeUnaryOp($0, $1) >>
+Term
+: UnaryOperator Term  << cst.MakeUnaryOp($0, $1) >>
 | PrimaryExpr    << $0, nil >>
 ;
 
