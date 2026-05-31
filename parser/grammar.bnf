@@ -140,13 +140,17 @@ Expr5
 | PrimaryExpr    << $0, nil >>
 ;
 
-PrimaryExpr
-: Operand       << $0, nil >>
 // TODO: // https://go.dev/ref/spec#PrimaryExpr
 // | Conversion
-// | PrimaryExpr Index
 // | PrimaryExpr Slice
+PrimaryExpr
+: Operand       << $0, nil >>
+| PrimaryExpr Index << cst.MakeIndexExpr($0, $1) >>
 | PrimaryExpr Arguments  << cst.MakeCall($0, $1) >>
+;
+
+Index
+: "[" Expr1 "]"   << $1, nil >>
 ;
 
 Arguments

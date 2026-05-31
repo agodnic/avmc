@@ -47,6 +47,40 @@ func Test_BinOp(t *testing.T) {
 	testStmts(t, tcs)
 }
 
+func Test_IndexExpr(t *testing.T) {
+
+	tcs := []TestForStmt{
+		{
+			Name:  "identifier indexed with uint literal",
+			Input: `a[1];`,
+			Output: cst.IndexExpr{
+				BaseExpr:  cst.QualifiedIdent{Ident: "a"},
+				IndexExpr: cst.UintLit{Value: 1},
+			},
+		},
+		{
+			Name:  "identifier indexed with identifier",
+			Input: `a[i];`,
+			Output: cst.IndexExpr{
+				BaseExpr:  cst.QualifiedIdent{Ident: "a"},
+				IndexExpr: cst.QualifiedIdent{Ident: "i"},
+			},
+		},
+		{
+			Name:  "function call indexed with uint literal",
+			Input: `f()[1];`,
+			Output: cst.IndexExpr{
+				BaseExpr: cst.Call{
+					QualifiedIdent: cst.QualifiedIdent{Ident: "f"},
+				},
+				IndexExpr: cst.UintLit{Value: 1},
+			},
+		},
+	}
+
+	testStmts(t, tcs)
+}
+
 func Test_IntLit(t *testing.T) {
 
 	tcs := []TestForStmt{
