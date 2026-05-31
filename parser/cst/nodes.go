@@ -14,6 +14,9 @@ import (
 )
 
 type (
+	BoolLit struct {
+		Value bool
+	}
 	UintLit struct {
 		Value uint64
 	}
@@ -40,6 +43,7 @@ type (
 	SliceType struct {
 		Type any
 	}
+	BoolType   struct{}
 	Uint8Type  struct{}
 	Uint64Type struct{}
 	VoidType   struct{}
@@ -174,6 +178,8 @@ func MakeScalarType(typeToken any) (any, error) {
 	s := string(typeToken.(*token.Token).Lit)
 
 	switch s {
+	case "bool":
+		return BoolType{}, nil
 	case "uint8":
 		return Uint8Type{}, nil
 	case "uint64":
@@ -225,6 +231,26 @@ func MakeBinOp(expr1, operatorToken, expr2 any) (BinOp, error) {
 		R:  expr1,
 		Op: string(operatorToken.(*token.Token).Lit),
 		L:  expr2,
+	}
+	return result, nil
+}
+
+func MakeBoolLit(uintLiteralToken any) (BoolLit, error) {
+
+	s := string(uintLiteralToken.(*token.Token).Lit)
+
+	var value bool
+	switch s {
+	case "true":
+		value = true
+	case "false":
+		value = false
+	default:
+		return BoolLit{}, fmt.Errorf("failed to parse bool literal: %s", s)
+	}
+
+	result := BoolLit{
+		Value: value,
 	}
 	return result, nil
 }
