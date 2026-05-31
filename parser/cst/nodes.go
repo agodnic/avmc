@@ -40,6 +40,10 @@ type (
 		QualifiedIdent QualifiedIdent
 		Args           []any
 	}
+	IndexExpr struct {
+		BaseExpr  any
+		IndexExpr any
+	}
 	SliceType struct {
 		Type any
 	}
@@ -83,6 +87,14 @@ type (
 		Type  any
 	}
 )
+
+func MakeIndexExpr(baseExpr, indexExpr any) (IndexExpr, error) {
+	result := IndexExpr{
+		BaseExpr:  baseExpr,
+		IndexExpr: indexExpr,
+	}
+	return result, nil
+}
 
 func AppendToParamSlice(slice, item any) ([]Param, error) {
 	s := slice.([]Param)
