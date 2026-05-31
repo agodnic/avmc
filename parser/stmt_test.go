@@ -18,6 +18,14 @@ func Test_Assignment(t *testing.T) {
 			},
 		},
 		{
+			Name:  "assignment from bool literal expression",
+			Input: `a = true;`,
+			Output: cst.Assignment{
+				Ident: "a",
+				Expr:  cst.BoolLit{Value: true},
+			},
+		},
+		{
 			Name:  "assignment from bytes literal expression",
 			Input: `a = hex"12ab";`,
 			Output: cst.Assignment{
@@ -45,11 +53,11 @@ func Test_Assignment(t *testing.T) {
 		},
 		{
 			Name:  "assignment from unary operator expression",
-			Input: `a = !2;`,
+			Input: `a = -2;`,
 			Output: cst.Assignment{
 				Ident: "a",
 				Expr: cst.UnaryOp{
-					Op:   "!",
+					Op:   "-",
 					Expr: cst.UintLit{Value: 2},
 				},
 			},
