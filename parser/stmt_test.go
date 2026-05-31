@@ -18,6 +18,14 @@ func Test_Assignment(t *testing.T) {
 			},
 		},
 		{
+			Name:  "assignment from bool literal expression",
+			Input: `a = true;`,
+			Output: cst.Assignment{
+				Ident: "a",
+				Expr:  cst.BoolLit{Value: true},
+			},
+		},
+		{
 			Name:  "assignment from bytes literal expression",
 			Input: `a = hex"12ab";`,
 			Output: cst.Assignment{
@@ -45,11 +53,11 @@ func Test_Assignment(t *testing.T) {
 		},
 		{
 			Name:  "assignment from unary operator expression",
-			Input: `a = !2;`,
+			Input: `a = -2;`,
 			Output: cst.Assignment{
 				Ident: "a",
 				Expr: cst.UnaryOp{
-					Op:   "!",
+					Op:   "-",
 					Expr: cst.UintLit{Value: 2},
 				},
 			},
@@ -196,10 +204,12 @@ func Test_VarDecl(t *testing.T) {
 		},
 		{
 			Name:  "function call expression",
-			Input: `var b bytes = f();`,
+			Input: `var b []uint8 = f();`,
 			Output: cst.VarDecl{
 				Ident: "b",
-				Type:  cst.BytesType{},
+				Type: cst.SliceType{
+					Type: cst.Uint8Type{},
+				},
 				Expr: cst.Call{
 					QualifiedIdent: cst.QualifiedIdent{
 						Ident: "f",

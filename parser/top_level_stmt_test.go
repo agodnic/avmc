@@ -11,11 +11,13 @@ func Test_FuncDecl(t *testing.T) {
 	tcs := []TestForTopLevelStmt{
 		{
 			Name:  "bytes return value",
-			Input: `func f() bytes { return; }`,
+			Input: `func f() []uint8 { return; }`,
 			Output: []any{
 				cst.FuncDecl{
 					Ident: "f",
-					Type:  cst.BytesType{},
+					Type: cst.SliceType{
+						Type: cst.Uint8Type{},
+					},
 					Block: cst.Block{
 						Stmts: []any{
 							cst.Return{},
@@ -70,12 +72,12 @@ func Test_FuncDecl(t *testing.T) {
 		},
 		{
 			Name:  "two parameters",
-			Input: `func f(b bytes, i uint64) { return ; }`,
+			Input: `func f(b []uint8, i uint64) { return ; }`,
 			Output: []any{
 				cst.FuncDecl{
 					Ident: "f",
 					Params: []cst.Param{
-						{Ident: "b", Type: cst.BytesType{}},
+						{Ident: "b", Type: cst.SliceType{Type: cst.Uint8Type{}}},
 						{Ident: "i", Type: cst.Uint64Type{}},
 					},
 					Type: cst.VoidType{},
@@ -129,11 +131,13 @@ func Test_TopLevelStatements(t *testing.T) {
 	tcs := []TestForTopLevelStmt{
 		{
 			Name:  "declare two functions",
-			Input: `func f() bytes { return; } func g() bytes { return; }`,
+			Input: `func f() []uint8 { return; } func g() []uint8 { return; }`,
 			Output: []any{
 				cst.FuncDecl{
 					Ident: "f",
-					Type:  cst.BytesType{},
+					Type: cst.SliceType{
+						Type: cst.Uint8Type{},
+					},
 					Block: cst.Block{
 						Stmts: []any{
 							cst.Return{},
@@ -142,7 +146,9 @@ func Test_TopLevelStatements(t *testing.T) {
 				},
 				cst.FuncDecl{
 					Ident: "g",
-					Type:  cst.BytesType{},
+					Type: cst.SliceType{
+						Type: cst.Uint8Type{},
+					},
 					Block: cst.Block{
 						Stmts: []any{
 							cst.Return{},
@@ -173,7 +179,7 @@ func Test_TopLevelStatements(t *testing.T) {
 		},
 		{
 			Name:  "declare a function and a constant",
-			Input: `const c uint64 = 1 func f() bytes { return; }`,
+			Input: `const c uint64 = 1 func f() []uint8 { return; }`,
 			Output: []any{
 				cst.ConstDecl{
 					Ident: "c",
@@ -184,7 +190,9 @@ func Test_TopLevelStatements(t *testing.T) {
 				},
 				cst.FuncDecl{
 					Ident: "f",
-					Type:  cst.BytesType{},
+					Type: cst.SliceType{
+						Type: cst.Uint8Type{},
+					},
 					Block: cst.Block{
 						Stmts: []any{
 							cst.Return{},

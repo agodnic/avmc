@@ -4,12 +4,15 @@
 // includes them in error messages.
 // We would eventually create these error messages ourselves, but for the time
 // being this convention helps.
-bytes:  'b' 'y' 't' 'e' 's';
+bool:   'b' 'o' 'o' 'l';
 const:  'c' 'o' 'n' 's' 't';
 else:   'e' 'l' 's' 'e';
+false:  'f' 'a' 'l' 's' 'e';
 func:   'f' 'u' 'n' 'c';
 if:     'i' 'f';
 return: 'r' 'e' 't' 'u' 'r' 'n';
+true:   't' 'r' 'u' 'e';
+uint8:  'u' 'i' 'n' 't' '8';
 uint64: 'u' 'i' 'n' 't' '6' '4';
 var:    'v' 'a' 'r';
 
@@ -55,8 +58,18 @@ VarDecl
 ;
 
 Type
-: uint64    << cst.MakeType($0) >>
-| bytes     << cst.MakeType($0) >>
+: SliceType    << $0, nil >>
+| ScalarType   << $0, nil >>
+;
+
+SliceType
+: "[" "]" ScalarType     << cst.MakeSliceType($2) >>
+;
+
+ScalarType
+: bool      << cst.MakeScalarType($0) >>
+| uint8     << cst.MakeScalarType($0) >>
+| uint64    << cst.MakeScalarType($0) >>
 ;
 
 FuncDecl
@@ -159,7 +172,9 @@ OperandName
 
 Lit
 : bytesLiteral     << cst.MakeBytesLit($0) >>
-| uintLiteral       << cst.MakeUintLit($0) >>
+| false            << cst.MakeBoolLit($0) >>
+| true             << cst.MakeBoolLit($0) >>
+| uintLiteral      << cst.MakeUintLit($0) >>
 ;
 
 LogOp: "||" | "&&";

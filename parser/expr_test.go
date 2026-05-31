@@ -65,6 +65,24 @@ func Test_IntLit(t *testing.T) {
 	testStmts(t, tcs)
 }
 
+func Test_BoolLit(t *testing.T) {
+
+	tcs := []TestForStmt{
+		{
+			Name:   "true",
+			Input:  `true;`,
+			Output: cst.BoolLit{Value: true},
+		},
+		{
+			Name:   "false",
+			Input:  `false;`,
+			Output: cst.BoolLit{Value: false},
+		},
+	}
+
+	testStmts(t, tcs)
+}
+
 func Test_BytesLit(t *testing.T) {
 
 	tcs := []TestForStmt{
