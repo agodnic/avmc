@@ -115,28 +115,15 @@ IfStmt
 | if Expr1 Block else IfStmt   << cst.MakeIf($1, $2, $4) >>
 ;
 
+// Binary operator precedence is not represented in the grammar.
+// It is enforced by compiler passes later on.
 Expr1
-: Expr1 LogOp Expr2    << cst.MakeBinOp($0, $1, $2) >>
-| Expr2                << $0, nil >>
-;
-
-Expr2
-: Expr2 CmpOp Expr3    << cst.MakeBinOp($0, $1, $2) >>
-| Expr3                << $0, nil >>
-;
-
-Expr3
-: Expr3 AddOp Expr4    << cst.MakeBinOp($0, $1, $2) >>
-| Expr4                << $0, nil >>
-;
-
-Expr4
-: Expr4 MulOp Expr5    << cst.MakeBinOp($0, $1, $2) >>
-| Expr5                << $0, nil >>
+: Expr1 BinaryOperator Expr5    << cst.MakeBinOp($0, $1, $2) >>
+| Expr5                         << $0, nil >>
 ;
 
 Expr5
-: UnaryOp Expr5  << cst.MakeUnaryOp($0, $1) >>
+: UnaryOperator Expr5  << cst.MakeUnaryOp($0, $1) >>
 | PrimaryExpr    << $0, nil >>
 ;
 
@@ -164,9 +151,13 @@ ExpressionList
 ;
 
 Operand
-: Lit           << $0, nil >>
-| OperandName   << $0, nil >>
-| "(" Expr1 ")" << $1, nil >>
+: Lit               << $0, nil >>
+| OperandName       << $0, nil >>
+| ParenthesizedExpr << $0, nil >>
+;
+
+ParenthesizedExpr
+: "(" Expr1 ")"  << cst.MakeParenthesizedExpr($1) >>
 ;
 
 OperandName
@@ -181,8 +172,13 @@ Lit
 | uintLiteral      << cst.MakeUintLit($0) >>
 ;
 
-LogOp: "||" | "&&";
-CmpOp: "==" | "!=" | ">" | "<" | ">=" | "<=";
-AddOp: "+" | "-" | "|" | "^";
-MulOp: "*" | "/" | "%" | "<<" | ">>" | "&";
-UnaryOp: "-" | "!";
+BinaryOperator:
+"||" | "&&" |
+"==" | "!=" |
+">" | "<" | ">=" | "<=" |
+"+" | "-" |
+"|" | "&" | "^" |
+"*" | "/" | "%"
+;
+
+UnaryOperator: "-" | "!" | "~";
