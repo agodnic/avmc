@@ -196,10 +196,12 @@ func Test_VarDecl(t *testing.T) {
 		},
 		{
 			Name:  "function call expression",
-			Input: `var b bytes = f();`,
+			Input: `var b []uint8 = f();`,
 			Output: cst.VarDecl{
 				Ident: "b",
-				Type:  cst.BytesType{},
+				Type: cst.SliceType{
+					Type: cst.Uint8Type{},
+				},
 				Expr: cst.Call{
 					QualifiedIdent: cst.QualifiedIdent{
 						Ident: "f",

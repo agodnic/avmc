@@ -37,7 +37,10 @@ type (
 		QualifiedIdent QualifiedIdent
 		Args           []any
 	}
-	BytesType  struct{}
+	SliceType struct {
+		Type any
+	}
+	Uint8Type  struct{}
 	Uint64Type struct{}
 	VoidType   struct{}
 	VarDecl    struct {
@@ -81,6 +84,13 @@ func AppendToParamSlice(slice, item any) ([]Param, error) {
 	s := slice.([]Param)
 	i := item.(Param)
 	return append(s, i), nil
+}
+
+func MakeSliceType(ty any) (SliceType, error) {
+	result := SliceType{
+		Type: ty,
+	}
+	return result, nil
 }
 
 func MakeParam(identToken, typeNode any) (Param, error) {
@@ -159,15 +169,15 @@ func MakeVarDecl(identToken, typeNode, exprNode any) (VarDecl, error) {
 	return result, nil
 }
 
-func MakeType(typeToken any) (any, error) {
+func MakeScalarType(typeToken any) (any, error) {
 
 	s := string(typeToken.(*token.Token).Lit)
 
 	switch s {
+	case "uint8":
+		return Uint8Type{}, nil
 	case "uint64":
 		return Uint64Type{}, nil
-	case "bytes":
-		return BytesType{}, nil
 	default:
 		return nil, fmt.Errorf("unexpected type: %s", s)
 	}
