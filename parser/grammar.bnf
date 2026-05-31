@@ -127,9 +127,8 @@ Term
 | PrimaryExpr    << $0, nil >>
 ;
 
-// TODO: // https://go.dev/ref/spec#PrimaryExpr
+// TODO: https://go.dev/ref/spec#PrimaryExpr
 // | Conversion
-// | PrimaryExpr Slice
 PrimaryExpr
 : Operand       << $0, nil >>
 | PrimaryExpr Index << cst.MakeIndexExpr($0, $1) >>
