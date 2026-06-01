@@ -6,6 +6,96 @@ import (
 	"github.com/agodnic/avmc/parser/cst"
 )
 
+func Test_Call(t *testing.T) {
+
+	tcs := []TestForStmt{
+		{
+			Name:  "function call with no args",
+			Input: `f();`,
+			Output: cst.Call{
+				QualifiedIdent: cst.QualifiedIdent{
+					Ident: "f",
+				},
+			},
+		},
+		{
+			Name:  "function call with one arg",
+			Input: `f(1);`,
+			Output: cst.Call{
+				QualifiedIdent: cst.QualifiedIdent{
+					Ident: "f",
+				},
+				Args: []any{
+					cst.UintLit{
+						Value: 1,
+					},
+				},
+			},
+		},
+		{
+			Name:  "function call with two args",
+			Input: `f(1, 2);`,
+			Output: cst.Call{
+				QualifiedIdent: cst.QualifiedIdent{
+					Ident: "f",
+				},
+				Args: []any{
+					cst.UintLit{
+						Value: 1,
+					},
+					cst.UintLit{
+						Value: 2,
+					},
+				},
+			},
+		},
+		{
+			Name:  "function call with three args",
+			Input: `f(1, 2, 3);`,
+			Output: cst.Call{
+				QualifiedIdent: cst.QualifiedIdent{
+					Ident: "f",
+				},
+				Args: []any{
+					cst.UintLit{
+						Value: 1,
+					},
+					cst.UintLit{
+						Value: 2,
+					},
+					cst.UintLit{
+						Value: 3,
+					},
+				},
+			},
+		},
+		{
+			Name:  "function call with package name",
+			Input: `pkg.f();`,
+			Output: cst.Call{
+				QualifiedIdent: cst.QualifiedIdent{
+					PackageName: "pkg",
+					Ident:       "f",
+				},
+			},
+		},
+		{
+			Name:  "function call with a trailing comma in args",
+			Input: `f(1,);`,
+			Output: cst.Call{
+				QualifiedIdent: cst.QualifiedIdent{
+					Ident: "f",
+				},
+				Args: []any{
+					cst.UintLit{Value: 1},
+				},
+			},
+		},
+	}
+
+	testStmts(t, tcs)
+}
+
 func Test_UnaryOp(t *testing.T) {
 
 	tcs := []TestForStmt{

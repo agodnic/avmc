@@ -81,6 +81,7 @@ ParamList
 : empty                   << nil, nil >>
 | Param                   << cst.AppendToParamSlice([]cst.Param{}, $0) >>
 | ParamList "," Param     << cst.AppendToParamSlice($0, $2) >>
+| ParamList ","           << $0, nil >>
 ;
 
 Param
@@ -147,6 +148,7 @@ Arguments
 ExpressionList
 : Expr                     << []any{$0}, nil >>
 | ExpressionList "," Expr  << append($0.([]any), $2), nil >>
+| ExpressionList ","       << $0, nil >>
 ;
 
 Operand
