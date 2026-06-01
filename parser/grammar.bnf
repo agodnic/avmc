@@ -148,6 +148,7 @@ Arguments
 ExpressionList
 : Expr                     << []any{$0}, nil >>
 | ExpressionList "," Expr  << append($0.([]any), $2), nil >>
+| ExpressionList ","       << $0, nil >>
 ;
 
 Operand

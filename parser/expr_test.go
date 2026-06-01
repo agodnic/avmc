@@ -79,6 +79,18 @@ func Test_Call(t *testing.T) {
 				},
 			},
 		},
+		{
+			Name:  "function call with a trailing comma in args",
+			Input: `f(1,);`,
+			Output: cst.Call{
+				QualifiedIdent: cst.QualifiedIdent{
+					Ident: "f",
+				},
+				Args: []any{
+					cst.UintLit{Value: 1},
+				},
+			},
+		},
 	}
 
 	testStmts(t, tcs)
