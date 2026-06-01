@@ -50,11 +50,11 @@ Stmt
 ;
 
 ExprStmt
-: Expr1 << $0, nil >>
+: Expr << $0, nil >>
 ;
 
 VarDecl
-: var identifier Type "=" Expr1       << cst.MakeVarDecl($1, $2, $4) >>
+: var identifier Type "=" Expr       << cst.MakeVarDecl($1, $2, $4) >>
 ;
 
 Type
@@ -88,16 +88,16 @@ Param
 ;
 
 ConstDecl
-: const identifier Type "=" Expr1     << cst.MakeConstDecl($1, $2, $4) >>
+: const identifier Type "=" Expr     << cst.MakeConstDecl($1, $2, $4) >>
 ;
 
 Assignment
-: identifier "=" Expr1             << cst.MakeAssignment($0, $2) >>
+: identifier "=" Expr             << cst.MakeAssignment($0, $2) >>
 ;
 
 Return
 : return                   << cst.MakeReturn(nil) >>
-| return Expr1             << cst.MakeReturn($1) >>
+| return Expr             << cst.MakeReturn($1) >>
 ;
 
 Block
@@ -110,39 +110,25 @@ StmtList
 ;
 
 IfStmt
-: if Expr1 Block               << cst.MakeIf($1, $2, nil) >>
-| if Expr1 Block else Block    << cst.MakeIf($1, $2, $4) >>
-| if Expr1 Block else IfStmt   << cst.MakeIf($1, $2, $4) >>
+: if Expr Block               << cst.MakeIf($1, $2, nil) >>
+| if Expr Block else Block    << cst.MakeIf($1, $2, $4) >>
+| if Expr Block else IfStmt   << cst.MakeIf($1, $2, $4) >>
 ;
 
-Expr1
-: Expr1 LogOp Expr2    << cst.MakeBinOp($0, $1, $2) >>
-| Expr2                << $0, nil >>
+// Binary operator precedence is not represented in the grammar.
+// It is enforced by compiler passes later on.
+Expr
+: Expr BinaryOperator Term    << cst.MakeBinOp($0, $1, $2) >>
+| Term                         << $0, nil >>
 ;
 
-Expr2
-: Expr2 CmpOp Expr3    << cst.MakeBinOp($0, $1, $2) >>
-| Expr3                << $0, nil >>
-;
-
-Expr3
-: Expr3 AddOp Expr4    << cst.MakeBinOp($0, $1, $2) >>
-| Expr4                << $0, nil >>
-;
-
-Expr4
-: Expr4 MulOp Expr5    << cst.MakeBinOp($0, $1, $2) >>
-| Expr5                << $0, nil >>
-;
-
-Expr5
-: UnaryOp Expr5  << cst.MakeUnaryOp($0, $1) >>
+Term
+: UnaryOperator Term  << cst.MakeUnaryOp($0, $1) >>
 | PrimaryExpr    << $0, nil >>
 ;
 
-// TODO: // https://go.dev/ref/spec#PrimaryExpr
+// TODO: https://go.dev/ref/spec#PrimaryExpr
 // | Conversion
-// | PrimaryExpr Slice
 PrimaryExpr
 : Operand       << $0, nil >>
 | PrimaryExpr Index << cst.MakeIndexExpr($0, $1) >>
@@ -150,7 +136,7 @@ PrimaryExpr
 ;
 
 Index
-: "[" Expr1 "]"   << $1, nil >>
+: "[" Expr "]"   << $1, nil >>
 ;
 
 Arguments
@@ -159,14 +145,18 @@ Arguments
 ;
 
 ExpressionList
-: Expr1                     << []any{$0}, nil >>
-| ExpressionList "," Expr1  << append($0.([]any), $2), nil >>
+: Expr                     << []any{$0}, nil >>
+| ExpressionList "," Expr  << append($0.([]any), $2), nil >>
 ;
 
 Operand
-: Lit           << $0, nil >>
-| OperandName   << $0, nil >>
-| "(" Expr1 ")" << $1, nil >>
+: Lit               << $0, nil >>
+| OperandName       << $0, nil >>
+| ParenthesizedExpr << $0, nil >>
+;
+
+ParenthesizedExpr
+: "(" Expr ")"  << cst.MakeParenthesizedExpr($1) >>
 ;
 
 OperandName
@@ -181,8 +171,13 @@ Lit
 | uintLiteral      << cst.MakeUintLit($0) >>
 ;
 
-LogOp: "||" | "&&";
-CmpOp: "==" | "!=" | ">" | "<" | ">=" | "<=";
-AddOp: "+" | "-" | "|" | "^";
-MulOp: "*" | "/" | "%" | "<<" | ">>" | "&";
-UnaryOp: "-" | "!";
+BinaryOperator:
+"||" | "&&" |
+"==" | "!=" |
+">" | "<" | ">=" | "<=" |
+"+" | "-" |
+"|" | "&" | "^" |
+"*" | "/" | "%"
+;
+
+UnaryOperator: "-" | "!" | "~";

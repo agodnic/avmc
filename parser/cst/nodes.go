@@ -86,7 +86,15 @@ type (
 		Ident string
 		Type  any
 	}
+	ParenthesizedExpr struct {
+		Expr any
+	}
 )
+
+func MakeParenthesizedExpr(expr any) (ParenthesizedExpr, error) {
+	result := ParenthesizedExpr{expr}
+	return result, nil
+}
 
 func MakeIndexExpr(baseExpr, indexExpr any) (IndexExpr, error) {
 	result := IndexExpr{
