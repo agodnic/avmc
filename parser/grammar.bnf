@@ -81,6 +81,7 @@ ParamList
 : empty                   << nil, nil >>
 | Param                   << cst.AppendToParamSlice([]cst.Param{}, $0) >>
 | ParamList "," Param     << cst.AppendToParamSlice($0, $2) >>
+| ParamList ","           << $0, nil >>
 ;
 
 Param

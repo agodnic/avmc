@@ -121,6 +121,25 @@ func Test_FuncDecl(t *testing.T) {
 				},
 			},
 		},
+		{
+			Name:  "trailing comma in function parameters",
+			Input: `func f(i uint64,) { return; }`,
+			Output: []any{
+				cst.FuncDecl{
+					Ident: "f",
+					Type:  cst.VoidType{},
+					Params: []cst.Param{
+						{
+							Ident: "i",
+							Type:  cst.Uint64Type{},
+						},
+					},
+					Block: cst.Block{
+						Stmts: []any{cst.Return{}},
+					},
+				},
+			},
+		},
 	}
 
 	testTopLevelStmts(t, tcs)
