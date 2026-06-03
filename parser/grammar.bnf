@@ -102,7 +102,8 @@ Return
 ;
 
 Block
-: "{" StmtList "}"            << cst.MakeBlock($1) >>
+: "{" "}"                 << cst.MakeBlock([]any{}) >>
+| "{" StmtList "}"        << cst.MakeBlock($1) >>
 ;
 
 StmtList
@@ -131,18 +132,14 @@ Term
 // TODO: https://go.dev/ref/spec#PrimaryExpr
 // | Conversion
 PrimaryExpr
-: Operand       << $0, nil >>
-| PrimaryExpr Index << cst.MakeIndexExpr($0, $1) >>
-| PrimaryExpr Arguments  << cst.MakeCall($0, $1) >>
+: Operand                << $0, nil >>
+| PrimaryExpr Index      << cst.MakeIndexExpr($0, $1) >>
+| PrimaryExpr "(" ")"    << cst.MakeCall($0, nil) >>
+| PrimaryExpr "(" ExpressionList ")"  << cst.MakeCall($0, $2) >>
 ;
 
 Index
 : "[" Expr "]"   << $1, nil >>
-;
-
-Arguments
-: "(" ")"                   << nil, nil >>
-| "(" ExpressionList ")"    << $1, nil >>
 ;
 
 ExpressionList

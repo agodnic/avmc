@@ -130,6 +130,13 @@ func Test_Block(t *testing.T) {
 
 	tcs := []TestForStmt{
 		{
+			Name:  "empty block",
+			Input: `{ }`,
+			Output: cst.Block{
+				Stmts: []any{},
+			},
+		},
+		{
 			Name:  "block with one statement",
 			Input: `{ return; }`,
 			Output: cst.Block{
