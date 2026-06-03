@@ -1,0 +1,17 @@
+4 LR-1 conflicts: 
+	S59
+		symbol: }
+			Shift(115)
+			Reduce(33:StmtList : empty	<<  >>)
+	S101
+		symbol: }
+			Reduce(34:StmtList : Stmt	<< []any{X[0]}, nil >>)
+			Reduce(33:StmtList : empty	<<  >>)
+	S114
+		symbol: }
+			Shift(184)
+			Reduce(33:StmtList : empty	<<  >>)
+	S236
+		symbol: }
+			Shift(265)
+			Reduce(33:StmtList : empty	<<  >>)

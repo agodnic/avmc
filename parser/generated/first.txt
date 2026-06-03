@@ -1,0 +1,185 @@
+S': {
+	const
+	func
+}
+CompilationUnit: {
+	const
+	func
+}
+TopLevelStmt: {
+	const
+	func
+}
+Stmt: {
+	!
+	(
+	-
+	bytesLiteral
+	const
+	false
+	identifier
+	if
+	return
+	true
+	uintLiteral
+	var
+	{
+	~
+}
+ExprStmt: {
+	!
+	(
+	-
+	bytesLiteral
+	false
+	identifier
+	true
+	uintLiteral
+	~
+}
+VarDecl: {
+	var
+}
+Type: {
+	[
+	bool
+	uint64
+	uint8
+}
+SliceType: {
+	[
+}
+ScalarType: {
+	bool
+	uint64
+	uint8
+}
+FuncDecl: {
+	func
+}
+ParamList: {
+	,
+	empty
+	identifier
+}
+Param: {
+	identifier
+}
+ConstDecl: {
+	const
+}
+Assignment: {
+	identifier
+}
+Return: {
+	return
+}
+Block: {
+	{
+}
+StmtList: {
+	!
+	(
+	-
+	bytesLiteral
+	const
+	false
+	identifier
+	if
+	return
+	true
+	uintLiteral
+	var
+	{
+	~
+}
+IfStmt: {
+	if
+}
+Expr: {
+	!
+	(
+	-
+	bytesLiteral
+	false
+	identifier
+	true
+	uintLiteral
+	~
+}
+Term: {
+	!
+	(
+	-
+	bytesLiteral
+	false
+	identifier
+	true
+	uintLiteral
+	~
+}
+PrimaryExpr: {
+	(
+	bytesLiteral
+	false
+	identifier
+	true
+	uintLiteral
+}
+Index: {
+	[
+}
+ExpressionList: {
+	!
+	(
+	-
+	bytesLiteral
+	false
+	identifier
+	true
+	uintLiteral
+	~
+}
+Operand: {
+	(
+	bytesLiteral
+	false
+	identifier
+	true
+	uintLiteral
+}
+ParenthesizedExpr: {
+	(
+}
+OperandName: {
+	identifier
+}
+Lit: {
+	bytesLiteral
+	false
+	true
+	uintLiteral
+}
+BinaryOperator: {
+	!=
+	%
+	&
+	&&
+	*
+	+
+	-
+	/
+	<
+	<=
+	==
+	>
+	>=
+	^
+	|
+	||
+}
+UnaryOperator: {
+	!
+	-
+	~
+}

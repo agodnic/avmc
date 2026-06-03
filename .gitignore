@@ -27,8 +27,5 @@ go.work.sum
 # VSCode settings
 .vscode
 
-# gocc generated files
-parser/generated
-
 # files created by go:generate
 mnemonic/generated_mnemonics.go
