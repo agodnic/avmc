@@ -69,7 +69,7 @@ the IR and the emitter, not to the parser or the type checker.
 
 **The v0 invariant is what makes emission trivial:** every value has **exactly
 one use**, and uses appear in the order values are defined. Lowering an
-expression tree in post-order produces exactly this. The verifier (**R6** —
+expression tree in post-order produces exactly this. The verifier (**R5** —
 verify the IR) enforces it, along with type correctness and single assignment.
 
 **Lowering** translates the typed AST to IR and is where all desugaring lives.
@@ -92,9 +92,11 @@ Uniform, and enforced by review:
 pub fn stage(input: Input, diags: &mut Diagnostics) -> Option<Output>;
 ```
 
-- Pure (**R1** — pure stages), so every stage is trivially testable in
+- **Stages are pure functions.** No file I/O, no network, no environment
+  access, no global mutable state inside a stage. All I/O lives in the driver
+  module and `avmc-cli`. Purity is what makes every stage trivially testable in
   isolation.
-- `None` means errors were reported and no artifact is produced (**R3** — no
+- `None` means errors were reported and no artifact is produced (**R2** — no
   degraded output).
 - Every boundary is snapshot-testable, which means a change in any stage
   produces a reviewable diff at that stage's boundary rather than only in final

@@ -7,7 +7,7 @@ use std::collections::HashSet;
 
 /// Lowers every function in `program`, in source order.
 ///
-/// Reports every duplicate name and returns `None` if it found any (R3).
+/// Reports every duplicate name and returns `None` if it found any (R2).
 pub fn lower(program: &typed_ast::Program, diags: &mut Diagnostics) -> Option<Program> {
     check_duplicates(program, diags)?;
 
@@ -15,7 +15,7 @@ pub fn lower(program: &typed_ast::Program, diags: &mut Diagnostics) -> Option<Pr
 
     #[cfg(debug_assertions)]
     for func in &funcs {
-        // Only a compiler bug can reach this (R6, R7).
+        // Only a compiler bug can reach this (R5, R6).
         if let Err(message) = crate::ir::verify(func) {
             panic!("{message}");
         }

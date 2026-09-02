@@ -50,7 +50,7 @@ fn entry_point<'a>(program: &'a ir::Program, diags: &mut Diagnostics) -> Option<
 }
 
 /// Reports E0009 for every instruction whose opcode is newer than the target
-/// version, returning `None` if there was one (R3, R5).
+/// version, returning `None` if there was one (R2, R4).
 fn check_versions(func: &Function, version: TealVersion, diags: &mut Diagnostics) -> Option<()> {
     let mut ok = true;
 
@@ -100,7 +100,7 @@ fn line(inst: &Inst) -> String {
     }
 }
 
-/// The source an instruction came from (R2).
+/// The source an instruction came from (R1).
 fn span(inst: &Inst) -> Span {
     match inst {
         Inst::Const { span, .. } | Inst::Return { span, .. } => *span,

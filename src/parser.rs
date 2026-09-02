@@ -7,7 +7,7 @@ use crate::lexer::{Token, TokenKind};
 
 /// Parses the token stream `lex` produced for `source`.
 ///
-/// Returns `None` as soon as anything is wrong (R3); one run reports at most
+/// Returns `None` as soon as anything is wrong (R2); one run reports at most
 /// one diagnostic.
 pub fn parse(source: &str, tokens: &[Token], diags: &mut Diagnostics) -> Option<Program> {
     Parser {
@@ -120,7 +120,7 @@ impl Parser<'_> {
         }
     }
 
-    /// Reports a diagnostic and fails the parse (R3).
+    /// Reports a diagnostic and fails the parse (R2).
     fn report<T>(&mut self, code: &'static str, message: String, span: Span) -> Option<T> {
         self.diags.push(Diagnostic {
             code,

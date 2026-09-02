@@ -12,7 +12,7 @@ pub struct Span {
 /// A single problem found in the source, always located by a [`Span`].
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Diagnostic {
-    /// Stable identifier, documented in `docs/diagnostics.md` (R8).
+    /// Stable identifier, documented in `docs/diagnostics.md` (R7).
     pub code: &'static str,
     /// Human-readable description of the problem.
     pub message: String,

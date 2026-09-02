@@ -51,7 +51,7 @@ pub struct Program {
 }
 
 /// Checks the v0 IR invariant, returning a short description of the first
-/// violation (R6).
+/// violation (R5).
 ///
 /// Type correctness is vacuous with one type and is not checked.
 pub fn verify(func: &Function) -> Result<(), String> {

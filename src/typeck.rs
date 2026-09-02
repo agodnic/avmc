@@ -10,7 +10,7 @@ const UINT64: &str = "uint64";
 
 /// Checks every function in `program`, in source order.
 ///
-/// Reports every problem it finds, and returns `None` if it found any (R3).
+/// Reports every problem it finds, and returns `None` if it found any (R2).
 pub fn check(program: &ast::Program, diags: &mut Diagnostics) -> Option<Program> {
     let mut funcs = Vec::new();
     let mut ok = true;
