@@ -31,17 +31,6 @@ Every decision below derives from the target's constraints, so they come first.
 Sources: [AVM specification](https://developer.algorand.org/docs/get-details/dapps/avm/teal/specification/),
 [AVM concepts](https://dev.algorand.co/concepts/smart-contracts/avm/).
 
-Three consequences drive the whole design:
-
-1. **No heap means no general-purpose source language.** Closures, dynamic data
-   structures, recursion of unbounded depth, and garbage collection are not
-   merely slow here — they have nowhere to live.
-2. **The compute budget is a correctness property, not a performance concern.**
-   A program that exceeds 700 ops does not run slowly; it fails.
-3. **Failure is total.** There is no partial execution to recover from, which
-   makes the semantics simpler — and makes a miscompilation maximally
-   expensive, since it is discovered on-chain with real value at stake.
-
 ---
 
 ## 2. The three frozen decisions
