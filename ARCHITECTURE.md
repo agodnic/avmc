@@ -1,7 +1,7 @@
 # avmc — Architecture
 
 How `avmc` is built: the compilation pipeline, the contracts between its
-stages, and the correctness strategy.
+stages, the correctness strategy, and the invariants all of it holds to.
 
 Read [CONSTITUTION.md](CONSTITUTION.md) first. This document assumes it.
 
@@ -150,3 +150,20 @@ passes every snapshot test, and means something subtly different from the
 source. It is the technique that found hundreds of bugs in GCC and LLVM, and it
 is the reason we cross-check against the real AVM rather than something we
 wrote.
+
+---
+
+## 4. Invariants
+
+These hold across every stage. Agents and contributors must not violate them.
+
+- **Spans everywhere.** Spans are threaded end to end. Every token, AST node,
+  IR instruction, and emitted opcode carries a source span. A diagnostic
+  without a span is a bug.
+- **Determinism.** For a fixed compiler version, input, and target TEAL
+  version, output is byte-identical. No hash-map iteration order, no
+  timestamps, no absolute paths, no parallelism-dependent ordering in emitted
+  code.
+- **No panics.** Malformed source produces diagnostics, never a panic. In
+  crates that process untrusted input, `unwrap`/`expect`/`panic!` are permitted
+  only for conditions the IR verifier has already established.

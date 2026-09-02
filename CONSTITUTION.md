@@ -8,7 +8,8 @@ and to treat a conflict between this document and the code as a bug in the
 code.
 
 For how the compiler is actually built — the pipeline, the stage contracts, the
-correctness strategy — see **[ARCHITECTURE.md](ARCHITECTURE.md)**.
+correctness strategy, the invariants — see
+**[ARCHITECTURE.md](ARCHITECTURE.md)**.
 
 ---
 
@@ -48,22 +49,3 @@ pipeline.
   JSON over stdin/stdout: `{teal, mode, args}` in, `{approved, cost, error,
   final_stack}` out. Per-case overhead drops from a network round-trip to tens
   of microseconds, which is what makes large generative campaigns practical.
-
----
-
-## 2. Binding rules
-
-These are the invariants agents and contributors must not violate. Each has a
-number for citation and a short tag naming what it requires; references
-elsewhere carry both.
-
-- **R1 — spans everywhere.** Spans are threaded end to end. Every token, AST
-  node, IR instruction, and emitted opcode carries a source span. A diagnostic
-  without a span is a bug.
-- **R3 — determinism.** For a fixed compiler version, input, and target TEAL
-  version, output is byte-identical. No hash-map iteration order, no
-  timestamps, no absolute paths, no parallelism-dependent ordering in emitted
-  code.
-- **R6 — no panics.** Malformed source produces diagnostics, never a panic. In
-  crates that process untrusted input, `unwrap`/`expect`/`panic!` are permitted
-  only for conditions the IR verifier has already established.
