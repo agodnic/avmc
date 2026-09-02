@@ -84,9 +84,10 @@ codegen change is visible in a diff; it is stable and versioned; and the
 reference assembler and interpreter already exist and are the consensus
 implementation.
 
-**We define our own IR.** Not LLVM's — a typed, SSA-form CFG designed around
-`uint64`/`[]byte` and the absence of a heap. Optimisation and analysis run on
-it. See [ARCHITECTURE.md](ARCHITECTURE.md) §1.2.
+**We define our own IR.** Not LLVM's — a typed, single-assignment IR designed
+around `uint64`/`[]byte` and the absence of a heap. It begins as a flat
+instruction list and grows a control-flow graph when the language grows control
+flow. Analysis runs on it. See [ARCHITECTURE.md](ARCHITECTURE.md) §2.2.
 
 ### 2.2 Source language: our own, designed and frozen
 
@@ -188,7 +189,7 @@ short identifier so review comments can cite it.
 - **R1 — Stages are pure functions.** Every pipeline stage has the shape
   `fn(Input, &mut Diagnostics) -> Option<Output>`. No file I/O, no network, no
   environment access, no global mutable state inside a stage. All I/O lives in
-  `avmc-driver` and `avmc-cli`.
+  the driver module and `avmc-cli`.
 - **R2 — Spans are threaded end to end.** Every token, AST node, IR
   instruction, and emitted opcode carries a source span. A diagnostic without a
   span is a bug.
@@ -209,12 +210,14 @@ short identifier so review comments can cite it.
   parameter, never inferred from the source and never silently upgraded. Using
   an opcode unavailable in the target version is a compile error, not a runtime
   surprise.
-- **R7 — TEAL text is written in exactly one place.** Only `avmc-backend`'s
-  emitter produces TEAL. No other crate — and no ABI/ARC-4 support layer —
-  emits assembly text. Higher-level constructs are lowered into IR and go
-  through the same backend as everything else.
-- **R8 — The IR verifier runs after every pass** in debug and test builds. Type
-  correctness, SSA dominance, CFG well-formedness, and no-heap invariants are
+- **R7 — TEAL text is written in exactly one place.** Only the emitter
+  produces TEAL. No other module — and no ABI/ARC-4 support layer — emits
+  assembly text. Higher-level constructs are lowered into IR and go through the
+  same emitter as everything else.
+- **R8 — The IR verifier runs at every IR boundary** in debug and test builds:
+  after lowering, and after each pass once passes exist. What it checks grows
+  with the IR — type correctness and single assignment from the start,
+  dominance and CFG well-formedness once there is control flow. Invariants are
   checked, not assumed.
 - **R9 — No panics on user input.** Malformed source produces diagnostics. In
   crates that process untrusted input, `unwrap`/`expect`/`panic!` are permitted

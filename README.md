@@ -9,9 +9,10 @@ for the AVM's constraints — to TEAL.
 
 Pre-implementation. The architecture is settled; the code is not written yet.
 
-The current milestone is a thin vertical slice through every pipeline stage:
-a trivial signature-mode program compiled end to end and executed against a
-real AVM.
+The current milestone is a thin vertical slice: a variable-free signature-mode
+program compiled end to end and executed against a real AVM. The backend starts
+as a post-order walk and grows only when a language feature forces it — see the
+growth path in [ARCHITECTURE.md](ARCHITECTURE.md) §4.
 
 ## Start here
 
@@ -30,6 +31,7 @@ amended in the same pull request as the code it describes.
 
 - the pipeline, stage by stage, and the contracts between stages
 - the correctness strategy, in particular differential testing against a real AVM
+- the growth path: what gets built when, and the feature that forces each step
 - the repository layout
 
 Milestones and open design questions live in the issue tracker rather than in

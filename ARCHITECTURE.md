@@ -1,7 +1,7 @@
 # avmc — Architecture
 
 How `avmc` is built: the compilation pipeline, the contracts between its
-stages, the correctness strategy, and the repository layout.
+stages, the correctness strategy, the growth path, and the repository layout.
 
 This document is **living**. It is amended in the ordinary course of work, in
 the same pull request that changes the code it describes.
@@ -14,9 +14,36 @@ those requires a dedicated pull request; changing this one does not.
 
 Read the constitution first. This document assumes it.
 
+## 1. Design posture
+
+**Start at the simplest thing that is honestly end-to-end, and grow each stage
+only when a language feature forces it.**
+
+An earlier draft of this document specified an optimiser, a stack scheduler, a
+scratch-slot allocator, and a constant pooler before a line of code existed.
+That was over-built. The stated justification — that building them early
+retires the risk concentrated in the back half — does not survive inspection:
+a *trivial* implementation of a hard stage retires nothing about that stage.
+Post-order emission teaches you nothing about real stack scheduling.
+
+What v0 genuinely retires is **integration** risk: whether the whole path
+works, whether the oracle works, whether we can execute emitted TEAL on a real
+AVM and compare results. That is worth having on day one. Algorithmic risk in
+the backend is retired later, when there is a language feature that demands the
+algorithm.
+
+§2 is the pipeline as it exists. §4 is the schedule by which it grows, and the
+feature that forces each step. Nothing is added to §2 speculatively — if a
+stage has no work to do, it does not exist yet.
+
+The thing that makes this safe rather than reckless is §3. A strong oracle
+means the middle of the compiler can be torn out and replaced with confidence
+that no program changed meaning. "Simplify now, generalise later" is a bad plan
+without differential testing and a good one with it.
+
 ---
 
-## 1. Pipeline architecture
+## 2. The pipeline
 
 ```
    source text
@@ -30,28 +57,21 @@ Read the constitution first. This document assumes it.
    ├──────────┤
    │  typeck  │  AST ───────────────► typed AST
    ├──────────┤
-   │  lower   │  typed AST ─────────► IR  (SSA over a CFG)
+   │  lower   │  typed AST ─────────► IR  (flat single-assignment list)
    ├──────────┤
-   │   opt    │  IR ────────────────► IR
+   │   emit   │  IR ────────────────► TEAL text
    ├──────────┤
-   │   cost   │  IR ────────────────► cost bounds  (rejects over-budget code)
-   ╞══════════╡
-   │  sched   │  IR ────────────────► stack-scheduled IR      ┐
-   ├──────────┤                                                │ AVM-specific
-   │  regall  │  ──────────────────► scratch slot assignment  │ back half
-   ├──────────┤                                                │
-   │  pool    │  ──────────────────► constant blocks          │
-   ├──────────┤                                                │
-   │  emit    │  ──────────────────► TEAL text                ┘
+   │   cost   │  TEAL ──────────────► cost bound  (rejects over-budget code)
    └────┬─────┘
         │
    TEAL ──► (external assembler) ──► bytecode
 ```
 
-The first half is a conventional compiler frontend. The second half is where
-the actual difficulty of this project lives, and it is specific to the AVM.
+Seven stages, each of which does real work. There is no optimiser, no stack
+scheduler, no scratch allocator, and no constant pooler, because at the current
+language level none of them would have anything to do.
 
-### 1.1 Frontend stages
+### 2.1 Frontend
 
 **Lexer.** Hand-written, not generated. Produces a token stream with spans,
 recovering from unknown characters rather than aborting.
@@ -67,83 +87,73 @@ checker.
 
 **Type checking.** Produces a typed AST in which every expression has a
 resolved type. Types are checked, not inferred, beyond local `let`. This stage
-also enforces the AVM-derived static rules: array indices in range where
-statically known, byte-length bounds, and the absence of constructs the machine
-cannot support.
+also enforces the AVM-derived static rules: byte-length bounds and the absence
+of constructs the machine cannot support.
 
-### 1.2 IR
+### 2.2 IR
 
-A typed, SSA-form control-flow graph. Functions contain basic blocks; blocks
-contain instructions and end in a terminator. Block arguments rather than
-phi nodes.
+A typed, single-assignment **flat instruction list**. Not yet a control-flow
+graph — the language has no control flow, so a CFG would be one block, and a
+one-block CFG is an expression tree wearing a costume.
 
 The IR is deliberately *not* LLVM-shaped: there are no `alloca`, `load`, or
 `store` instructions, because there is no memory to address. Storage access is
 an explicit effectful instruction corresponding to an AVM opcode family
 (global state, local state, boxes), which keeps the analysis honest about what
-is a cheap register move and what is an expensive state access.
+is a cheap stack operation and what is an expensive state access.
 
-`spec/ir.md` is the normative definition. The verifier (**R8**) enforces it.
+The IR exists at v0 even though the AST could be emitted from directly, because
+it is the seam that lets the backend grow without the frontend noticing. The
+emitter consumes IR and nothing else; every step in §4 is a change to the IR
+and the emitter, not to the parser or the type checker.
 
-**Lowering** translates the typed AST to IR and is where all desugaring lives:
-control flow to blocks and branches, structs and fixed arrays to their
-component values, and — later — ARC-4 method routing and ABI encoding
-(**R7**: as generated IR, never as TEAL templates).
+**The v0 invariant is what makes emission trivial:** every value has **exactly
+one use**, and uses appear in the order values are defined. Lowering an
+expression tree in post-order produces exactly this. The verifier (**R8**)
+enforces it, along with type correctness and single assignment.
 
-**Optimisation** is a set of IR→IR passes. The absence of a heap and of
-aliasing makes the classical passes unusually straightforward: constant
-folding, dead-code elimination, common-subexpression elimination, copy
-propagation, function inlining. Each pass is independently testable, and the
-verifier runs after each.
+That invariant is also the growth schedule in miniature. v1 relaxes
+"exactly one use" and scratch slots appear. v2 relaxes "flat" and basic blocks
+appear. Each relaxation is a verifier clause being removed and a corresponding
+capability being added to the emitter — a legible, reviewable change rather
+than a rewrite.
 
-### 1.3 Cost analysis
+`spec/ir.md` is the normative definition.
 
-Computes a worst-case opcode-cost bound per entry point and **rejects programs
-that can exceed the budget** (700 for application mode, 20,000 for signature
-mode).
+**Lowering** translates the typed AST to IR and is where all desugaring lives.
+Later, ARC-4 method routing and ABI encoding land here too (**R7**: as
+generated IR, never as TEAL templates).
 
-Straight-line and branching code give exact bounds. Loops make this a bounds
-problem: where a bound is statically inferable it is used; where it is not, the
-loop must carry an explicit annotation acknowledging that the bound is
-unproven, and the compiler reports the program's cost as unbounded rather than
-guessing.
+### 2.3 Emission
 
-This is the most differentiating capability in the design. A program that
-cannot exceed its budget is a program that cannot fail on-chain for the most
-common non-logic reason. Rule **R11** keeps the analyser honest by checking it
-against the AVM's measured cost on every differential test.
+A single linear pass over the IR. Because every value has exactly one use and
+uses follow definitions in order, each instruction emits its opcodes and leaves
+its result on the stack for the next consumer. No `dup`, no `cover`, no
+`uncover`, no scratch traffic, no scheduling algorithm — a post-order traversal
+of an expression tree *is* optimal stack code.
 
-### 1.4 Stack scheduling
+This is the stage that grows the most over §4, and the reason **R7** confines
+TEAL text to it.
 
-Turning SSA values into stack-machine code. A value consumed once, in order,
-can stay on the stack; anything else must be stored to a scratch slot and
-reloaded.
+### 2.4 Cost analysis
 
-Doing this well — using `dup`, `swap`, `cover`, `uncover`, and `dig` in place
-of naive store/load pairs — is the difference between mediocre and good code
-generation, and it is where the interesting engineering is. Prior art worth
-studying: WebAssembly's "stackification" of a CFG, Koopman's *Stack Computers*,
-and the RVSDG literature on regionalised dataflow.
+Computes a cost bound and **rejects programs that can exceed the budget** (700
+for application mode, 20,000 for signature mode; see CONSTITUTION.md §1).
 
-### 1.5 Scratch allocation
+At v0 this is a sum over the emitted opcodes — genuinely a few dozen lines, and
+exact, because straight-line code has one path. It runs on emitted TEAL rather
+than on the IR so that it needs no second opcode-cost table to drift out of
+sync with the emitter. It moves onto the IR at v2, when branches make it a
+worst-case-path problem that wants a CFG.
 
-Register allocation, with 256 registers and no cheap spill target. Standard
-approaches (linear scan, graph colouring) apply, with one difference from a
-conventional backend: **running out of slots is a compile error**, not a
-performance cliff, because the only place to spill to is boxes, at a cost that
-would usually blow the opcode budget anyway.
+It is here at v0 despite being trivial, for two reasons. The **R11**
+differential assertion — measured cost never exceeds the predicted bound — is
+free to establish while cost is a sum, and expensive to retrofit trust into
+later. And static cost rejection is the capability that distinguishes this
+compiler from the existing AVM toolchains; a differentiating feature built last
+tends not to get built.
 
-### 1.6 Constant pooling and emission
-
-TEAL's `intcblock`/`bytecblock` mechanism makes constant pooling a genuine size
-optimisation rather than a cleanup: `intc_0` is one byte where `pushint` is
-variable-length, and program size is a hard 2 KB-per-page limit. Pooling
-selects which constants earn a block slot.
-
-Emission then produces TEAL text, and the linking step handles page splitting
-across the approval and clear programs within the size limit.
-
-### 1.7 Stage contracts
+### 2.5 Stage contracts
 
 Uniform, and enforced by review:
 
@@ -157,12 +167,11 @@ pub fn stage(input: Input, diags: &mut Diagnostics) -> Option<Output>;
   produces a reviewable diff at that stage's boundary rather than only in final
   TEAL.
 - A stage cannot reach into another stage's internals, because the only thing
-  it receives is the previous stage's output type. This is the property that
-  makes the codebase safe to hand to agents working in parallel.
+  it receives is the previous stage's output type.
 
 ---
 
-## 2. Correctness strategy
+## 3. Correctness strategy
 
 Four layers, in increasing order of strength.
 
@@ -194,33 +203,60 @@ automatically.
 
 This is what catches the bug class that matters: TEAL that assembles cleanly,
 passes every snapshot test, and means something subtly different from the
-source — a clobbered scratch slot, operands transposed by a `cover` sequence,
-an overflow check the optimiser removed. It is the technique that found
+source. At v0 that is mostly operand order and overflow behaviour. As the
+backend grows along §4 it becomes clobbered scratch slots, operands transposed
+by a `cover` sequence, and overflow checks removed by an optimiser — which is
+the other reason to have the harness at full strength from the start, well
+before the bugs it is built for can occur. It is the technique that found
 hundreds of bugs in GCC and LLVM, and it is the reason the oracle is the real
 AVM rather than something we wrote.
 
 ---
 
-## 3. Repository layout
+
+---
+
+## 4. Growth path
+
+Each row names the language feature that **forces** the machinery in it.
+Nothing on this list is built before its forcing feature lands. The point of
+writing it down is not to schedule the work — it is to keep "grow as needed"
+from decaying into "never architect anything", by fixing in advance what
+counts as needing it.
+
+| Step | Language feature | What it forces |
+|---|---|---|
+| **v0** | Expressions: arithmetic, comparison, `&&`/`\|\|`, transaction field access | Nothing beyond §2. The whole backend is a post-order walk. |
+| **v1** | `let` bindings | Scratch slots — and only for values with more than one use; single-use values still stay on the stack. Drops the IR's one-use invariant. |
+| **v2** | `if` / conditional expressions | Basic blocks, terminators, labels. The IR becomes a CFG and the verifier gains dominance checks. Cost analysis moves onto the IR and becomes worst-case-path. |
+| **v3** | Loops | Back edges. Loop bound annotations, and a real answer for programs whose cost cannot be bounded. |
+| **v4** | Functions | A calling convention over `callsub`/`retsub`; enough scratch pressure to need liveness-based allocation with slot reuse rather than one slot per value. |
+| **later** | — | Optimisation passes, once there is something to optimise. Constant pooling, once program size actually approaches the 2 KB page limit. Stack scheduling proper, once values have multiple uses across branches. Application mode and ARC-4 routing. |
+
+Note that v0 is not a toy. TEAL's `&&` and `||` are ordinary
+non-short-circuiting opcodes, so a useful signature-mode predicate over
+transaction fields needs no control flow at all.
+
+---
+
+## 5. Repository layout
 
 ```
 crates/
-  avmc-span/        source ids, spans, source map
-  avmc-diag/        diagnostics, codes, rendering
-  avmc-lexer/
-  avmc-ast/
-  avmc-parser/
-  avmc-sema/        name resolution, type checking
-  avmc-ir/          IR types, verifier, printer, reference interpreter
-  avmc-lower/       typed AST -> IR
-  avmc-opt/         IR -> IR passes
-  avmc-cost/        static budget analysis
-  avmc-backend/     stack scheduling, scratch allocation, pooling, TEAL emission
-  avmc-driver/      pipeline orchestration; the only crate with I/O
+  avmc/             the compiler library
+    span/           source ids, spans, source map
+    diag/           diagnostics, codes, rendering
+    lexer/
+    ast/
+    parser/
+    sema/           name resolution, type checking
+    ir/             IR types, verifier, printer, reference interpreter
+    lower/          typed AST -> IR
+    backend/        emission (R7: the only place TEAL text is written)
+    cost/           budget analysis
+    driver/         pipeline orchestration; the only module with I/O
   avmc-cli/         the `avmc` binary
   avmc-oracle/      test-only: the Oracle trait + algod HTTP implementation
-tools/
-  oracle-sidecar/   (future) Go binary linking go-algorand
 spec/
   language.md       normative Ava grammar and static semantics
   ir.md             normative IR definition
@@ -230,5 +266,19 @@ tests/
   differential/     generative cross-checking against the AVM
 ```
 
-The crate graph is a DAG matching the pipeline order. A dependency that runs
-backwards along the pipeline is an architecture violation.
+Three crates, not fourteen. The pipeline stages are **modules inside one
+library crate**, because a fourteen-crate workspace is a lot of ceremony for a
+compiler that does not exist yet, and modules can be split into crates later by
+moving directories.
+
+The two that are separate are separate for a reason. `avmc-cli` keeps the
+library usable as a library. `avmc-oracle` is test-only and carries an HTTP
+client; isolating it keeps those dependencies out of the compiler's dependency
+graph entirely.
+
+The cost of this is real and worth stating: with one crate, "the module graph
+is a DAG matching the pipeline order" is a **review rule** rather than
+something the compiler enforces, since Rust prevents cycles between crates but
+not between modules. A dependency that runs backwards along the pipeline is an
+architecture violation either way. If that rule turns out to need mechanical
+enforcement, the modules split back into crates.
