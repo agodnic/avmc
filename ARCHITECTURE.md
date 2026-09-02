@@ -3,9 +3,6 @@
 How `avmc` is built: the compilation pipeline, the contracts between its
 stages, the correctness strategy, and the invariants all of it holds to.
 
-The compiler is written in Rust, with sum types and exhaustive matching for
-the AST and the IR.
-
 ## 1. Design posture
 
 **Start at the simplest thing that is honestly end-to-end, and grow each stage
