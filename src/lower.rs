@@ -1,4 +1,4 @@
-//! Lowering: a typed AST to IR (see `ARCHITECTURE.md` §2.2).
+//! Lowering: a typed AST to IR.
 
 use crate::diagnostics::{Diagnostic, Diagnostics};
 use crate::ir::{Function, Inst, Program, ValueId};
@@ -7,7 +7,7 @@ use std::collections::HashSet;
 
 /// Lowers every function in `program`, in source order.
 ///
-/// Reports every duplicate name and returns `None` if it found any (R2).
+/// Reports every duplicate name and returns `None` if it found any.
 pub fn lower(program: &typed_ast::Program, diags: &mut Diagnostics) -> Option<Program> {
     check_duplicates(program, diags)?;
 
@@ -15,7 +15,7 @@ pub fn lower(program: &typed_ast::Program, diags: &mut Diagnostics) -> Option<Pr
 
     #[cfg(debug_assertions)]
     for func in &funcs {
-        // Only a compiler bug can reach this (R5, R6).
+        // Only a compiler bug can reach this.
         if let Err(message) = crate::ir::verify(func) {
             panic!("{message}");
         }

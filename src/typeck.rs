@@ -1,5 +1,4 @@
-//! The type checker: an AST to a typed AST, resolving every type it names
-//! (see `ARCHITECTURE.md` §2.1).
+//! The type checker: an AST to a typed AST, resolving every type it names.
 
 use crate::ast;
 use crate::diagnostics::{Diagnostic, Diagnostics};
@@ -10,7 +9,7 @@ const UINT64: &str = "uint64";
 
 /// Checks every function in `program`, in source order.
 ///
-/// Reports every problem it finds, and returns `None` if it found any (R2).
+/// Reports every problem it finds, and returns `None` if it found any.
 pub fn check(program: &ast::Program, diags: &mut Diagnostics) -> Option<Program> {
     let mut funcs = Vec::new();
     let mut ok = true;

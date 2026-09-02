@@ -1,5 +1,5 @@
 //! The typed AST: the type checker's output, an AST in which every expression
-//! has a resolved type (see `ARCHITECTURE.md` §2.1).
+//! has a resolved type.
 
 use crate::ast::Name;
 use crate::diagnostics::Span;

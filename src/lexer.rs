@@ -1,4 +1,4 @@
-//! The lexer: source text to a flat token stream (see `ARCHITECTURE.md` §2.1).
+//! The lexer: source text to a flat token stream.
 
 use crate::diagnostics::{Diagnostic, Diagnostics, Span};
 use std::iter::Peekable;
@@ -25,7 +25,7 @@ pub enum TokenKind {
     RBrace,
 }
 
-/// A token: a kind and the source range it covers (R1).
+/// A token: a kind and the source range it covers.
 ///
 /// Tokens carry no text; later stages slice the source with the span.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -38,7 +38,7 @@ pub struct Token {
 
 /// Tokenises `source`.
 ///
-/// Returns `None` if any diagnostic was reported (R2). Lexing still continues
+/// Returns `None` if any diagnostic was reported. Lexing still continues
 /// past an error, so one run reports every unexpected character.
 pub fn lex(source: &str, diags: &mut Diagnostics) -> Option<Vec<Token>> {
     let mut tokens = Vec::new();

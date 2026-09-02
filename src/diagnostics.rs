@@ -9,10 +9,10 @@ pub struct Span {
     pub end: usize,
 }
 
-/// A single problem found in the source, always located by a [`Span`].
+/// A single problem found in the source.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Diagnostic {
-    /// Stable identifier, documented in `docs/diagnostics.md` (R7).
+    /// Stable identifier, never reused for a different meaning.
     pub code: &'static str,
     /// Human-readable description of the problem.
     pub message: String,

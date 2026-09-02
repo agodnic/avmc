@@ -1,5 +1,4 @@
-//! Emission: IR to TEAL text, in a single linear pass (see
-//! `ARCHITECTURE.md` §2.3).
+//! Emission: IR to TEAL text, in a single linear pass.
 
 use crate::diagnostics::{Diagnostic, Diagnostics, Span};
 use crate::ir::{self, Function, Inst};
@@ -50,7 +49,7 @@ fn entry_point<'a>(program: &'a ir::Program, diags: &mut Diagnostics) -> Option<
 }
 
 /// Reports E0009 for every instruction whose opcode is newer than the target
-/// version, returning `None` if there was one (R2, R4).
+/// version, returning `None` if there was one.
 fn check_versions(func: &Function, version: TealVersion, diags: &mut Diagnostics) -> Option<()> {
     let mut ok = true;
 
@@ -91,8 +90,9 @@ fn opcode(inst: &Inst) -> &'static str {
 
 /// The line an instruction emits, without its terminator.
 ///
-/// `ValueId`s are not consulted: the IR invariant (`ARCHITECTURE.md` §2.2)
-/// leaves every operand on top of the stack for its consumer.
+/// `ValueId`s are not consulted: every value has exactly one use, and uses
+/// follow definitions in order, so each operand is already on top of the
+/// stack for its consumer.
 fn line(inst: &Inst) -> String {
     match inst {
         Inst::Const { value, .. } => format!("{} {value}", opcode(inst)),
@@ -100,7 +100,7 @@ fn line(inst: &Inst) -> String {
     }
 }
 
-/// The source an instruction came from (R1).
+/// The source an instruction came from.
 fn span(inst: &Inst) -> Span {
     match inst {
         Inst::Const { span, .. } | Inst::Return { span, .. } => *span,

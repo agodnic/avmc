@@ -1,5 +1,5 @@
 //! The IR: a flat single-assignment instruction list, and the verifier that
-//! enforces its invariant (see `ARCHITECTURE.md` §2.2).
+//! enforces its invariant.
 
 use crate::ast::Name;
 use crate::diagnostics::Span;
@@ -12,7 +12,7 @@ pub struct ValueId(pub u32);
 /// A single instruction.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Inst {
-    /// Defines `dest` as the constant `value`, of type [`Type::Uint64`].
+    /// Defines `dest` as the `uint64` constant `value`.
     Const {
         /// The value it defines.
         dest: ValueId,
@@ -51,7 +51,7 @@ pub struct Program {
 }
 
 /// Checks the v0 IR invariant, returning a short description of the first
-/// violation (R5).
+/// violation.
 ///
 /// Type correctness is vacuous with one type and is not checked.
 pub fn verify(func: &Function) -> Result<(), String> {
