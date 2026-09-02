@@ -12,30 +12,9 @@ correctness strategy — see **[ARCHITECTURE.md](ARCHITECTURE.md)**.
 
 ---
 
-## 1. The machine we are compiling for
+## 1. The three frozen decisions
 
-Every decision below derives from the target's constraints, so they come first.
-
-| Property | Value |
-|---|---|
-| Machine shape | Stack machine, maximum stack depth **1000** |
-| Value types | `uint64` and `[]byte` (max **4096** bytes). Nothing else. |
-| Scratch space | **256** slots, one value per slot |
-| Heap | **None.** No allocator, no pointers, no addressable linear memory |
-| Persistent storage | Global state, local state, boxes (**32 KB** each) — accessed via opcodes, not memory |
-| Compute budget | **700** ops per application call, pooled across a transaction group; **20,000** for signature mode |
-| Program size | **2 KB** for approval + clear programs combined, extendable in 2 KB steps to **8 KB** |
-| Integer arithmetic | `+`, `-`, `*` **fail the transaction** on overflow/underflow. No wrapping. No floats. |
-| Error model | Any failure aborts the entire transaction. No exceptions, no recovery, no unwinding. |
-
-Sources: [AVM specification](https://developer.algorand.org/docs/get-details/dapps/avm/teal/specification/),
-[AVM concepts](https://dev.algorand.co/concepts/smart-contracts/avm/).
-
----
-
-## 2. The three frozen decisions
-
-### 2.1 Target: TEAL, emitted directly
+### 1.1 Target: TEAL, emitted directly
 
 **We emit TEAL assembly text**, version-pinned with an explicit `#pragma
 version N`, and hand it to the existing Algorand assembler (`goal clerk
@@ -46,7 +25,7 @@ around `uint64`/`[]byte` and the absence of a heap. It begins as a flat
 instruction list and grows a control-flow graph when the language grows control
 flow. Analysis runs on it. See [ARCHITECTURE.md](ARCHITECTURE.md) §2.2.
 
-### 2.2 Source language: our own, designed and frozen
+### 1.2 Source language: our own, designed and frozen
 
 **We design the source language and freeze it early.** It has no name yet.
 
@@ -78,12 +57,12 @@ demonstrates the cost: a surface that looks like a familiar language but
 supports a small fraction of it generates permanent confusion. The language
 should look like what it is — a small language with real constraints.
 
-**The freeze has teeth.** See **R4** (language freeze) in §4: a language change is not a code
+**The freeze has teeth.** See **R4** (language freeze) in §3: a language change is not a code
 change. It is a specification edit plus a conformance test, landed *before* any
 implementation. This is the rule that prevents the language from being quietly
 redesigned by whoever is implementing the type checker that week.
 
-### 2.3 Implementation: Rust, cross-checked against the real AVM
+### 1.3 Implementation: Rust, cross-checked against the real AVM
 
 **The compiler is written in Rust.** Sum types with exhaustive matching for the
 AST and IR, no GC in analysis passes, `insta` for snapshot-testing stage
@@ -118,7 +97,7 @@ refactored continuously — to avoid a process boundary in the test harness.
 
 ---
 
-## 3. Non-goals
+## 2. Non-goals
 
 Stated explicitly so that "should we support X?" has a written answer.
 
@@ -137,7 +116,7 @@ Stated explicitly so that "should we support X?" has a written answer.
 
 ---
 
-## 4. Binding rules
+## 3. Binding rules
 
 These are the invariants agents and contributors must not violate. Each has a
 number for citation and a short tag naming what it requires; references
