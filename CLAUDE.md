@@ -15,3 +15,8 @@ The items in this section are not hard rules - they can be broken if there is a 
 `cargo test` is the entry point. CI runs `cargo fmt --all --check`,
 `cargo clippy --all-targets -- -D warnings`, and `cargo test` on every push to
 `main` and every pull request. The toolchain is pinned in `rust-toolchain.toml`.
+
+# Usage
+```sh
+cargo run -- program.txt --teal-version 10
+```
