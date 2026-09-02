@@ -91,7 +91,7 @@ of an expression tree *is* optimal stack code.
 
 **The target TEAL version is a required compilation parameter**, never inferred
 from the source and never silently upgraded. Using an opcode unavailable in the
-target version is a compile error, not a runtime surprise.
+target version is a compile error.
 
 ### 2.4 Stage contracts
 
