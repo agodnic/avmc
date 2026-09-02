@@ -1,6 +1,6 @@
 # Diagnostic codes
 
-Codes are stable: once assigned, a code keeps its meaning (**R7**).
+Codes are stable: once assigned, a code keeps its meaning.
 
 | Code | Message | Stage |
 |---|---|---|
