@@ -39,7 +39,7 @@ stage has no work to do, it does not exist yet.
 
 ### 2.1 Frontend
 
-**Lexer.** Hand-written, not generated. Produces a token stream with spans,
+**Lexer.** Hand-written. Produces a token stream with spans,
 recovering from unknown characters rather than aborting.
 
 **Parser.** Hand-written recursive descent with Pratt-style expression parsing.
