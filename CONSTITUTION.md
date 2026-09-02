@@ -76,26 +76,7 @@ refactored continuously — to avoid a process boundary in the test harness.
 
 ---
 
-## 2. Non-goals
-
-Stated explicitly so that "should we support X?" has a written answer.
-
-- **No heap, no allocator, no garbage collection.** Not in v0, not later.
-- **No closures or first-class functions.**
-- **No floating point.** The AVM has none; we will not emulate it.
-- **No exceptions, `try`, or recovery.** Failure aborts the transaction; that is
-  the only failure mode the language exposes.
-- **No dynamic code loading or `eval`.**
-- **We are not a TEAL assembler.** We emit TEAL text and delegate assembly to
-  the reference implementation.
-- **We are not a general-purpose language.** The language exists to compile to
-  the AVM.
-  A feature that cannot be lowered to efficient TEAL does not belong in it.
-- **No hand-written TEAL templates** (**R7** — single emitter).
-
----
-
-## 3. Binding rules
+## 2. Binding rules
 
 These are the invariants agents and contributors must not violate. Each has a
 number for citation and a short tag naming what it requires; references
