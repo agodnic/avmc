@@ -2,6 +2,7 @@
 
 pub mod ast;
 pub mod diagnostics;
+pub mod driver;
 pub mod emit;
 pub mod ir;
 pub mod lexer;
