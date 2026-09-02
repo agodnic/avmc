@@ -41,17 +41,6 @@ flow. Analysis runs on it. See [ARCHITECTURE.md](ARCHITECTURE.md) §2.2.
 - explicit about failure: the operations that can abort the transaction are
   visible in the source.
 
-We deliberately do **not** adopt Python-like syntax. Algorand Python
-demonstrates the cost: a surface that looks like a familiar language but
-supports a small fraction of it generates permanent confusion. The language
-should look like what it is — a small language with real constraints.
-
-**The freeze has teeth.** See **R4** (language freeze) in §3: a language change
-is not a code change. It is a specification edit plus a conformance test,
-landed *before* any implementation. This is the rule that prevents the language
-from being quietly redesigned by whoever is implementing the type checker that
-week.
-
 ### 1.3 Implementation: Rust, cross-checked against the real AVM
 
 **The compiler is written in Rust.** Sum types with exhaustive matching for the
