@@ -1,6 +1,6 @@
 //! Emission: IR to TEAL text, in a single linear pass.
 
-use crate::diagnostics::{Diagnostic, Diagnostics, Span};
+use crate::diagnostics::{Diagnostic, DiagnosticKind, Diagnostics, Span};
 use crate::ir::{self, Function, Inst};
 
 /// The TEAL version the output targets.
@@ -30,7 +30,7 @@ pub fn emit(
     Some(teal)
 }
 
-/// Finds the entry point, reporting E0008 if there is none.
+/// Finds the entry point, reporting it if there is none.
 fn entry_point<'a>(program: &'a ir::Program, diags: &mut Diagnostics) -> Option<&'a Function> {
     let entry = program
         .funcs
@@ -39,8 +39,7 @@ fn entry_point<'a>(program: &'a ir::Program, diags: &mut Diagnostics) -> Option<
 
     if entry.is_none() {
         diags.push(Diagnostic {
-            code: "E0008",
-            message: format!("missing entry point `{ENTRY_POINT}`"),
+            kind: DiagnosticKind::MissingEntryPoint { name: ENTRY_POINT },
             // There is no token to point at.
             span: Span { start: 0, end: 0 },
         });
@@ -48,8 +47,8 @@ fn entry_point<'a>(program: &'a ir::Program, diags: &mut Diagnostics) -> Option<
     entry
 }
 
-/// Reports E0009 for every instruction whose opcode is newer than the target
-/// version, returning `None` if there was one.
+/// Reports every instruction whose opcode is newer than the target version,
+/// returning `None` if there was one.
 fn check_versions(func: &Function, version: TealVersion, diags: &mut Diagnostics) -> Option<()> {
     let mut ok = true;
 
@@ -57,12 +56,11 @@ fn check_versions(func: &Function, version: TealVersion, diags: &mut Diagnostics
         let min = min_version(inst);
         if min > version.0 {
             diags.push(Diagnostic {
-                code: "E0009",
-                message: format!(
-                    "`{}` requires TEAL version {min}, target is {}",
-                    opcode(inst),
-                    version.0
-                ),
+                kind: DiagnosticKind::OpcodeUnavailable {
+                    opcode: opcode(inst),
+                    min,
+                    target: version.0,
+                },
                 span: span(inst),
             });
             ok = false;
@@ -196,8 +194,7 @@ mod tests {
         assert_eq!(
             emit_err("func f() uint64 { return 1 }", 10),
             vec![Diagnostic {
-                code: "E0008",
-                message: "missing entry point `approval`".to_string(),
+                kind: DiagnosticKind::MissingEntryPoint { name: "approval" },
                 span: Span { start: 0, end: 0 },
             }]
         );
@@ -208,8 +205,7 @@ mod tests {
         assert_eq!(
             emit_err("", 10),
             vec![Diagnostic {
-                code: "E0008",
-                message: "missing entry point `approval`".to_string(),
+                kind: DiagnosticKind::MissingEntryPoint { name: "approval" },
                 span: Span { start: 0, end: 0 },
             }]
         );
@@ -228,8 +224,11 @@ mod tests {
         assert_eq!(
             emit_err(EXAMPLE, 2),
             vec![Diagnostic {
-                code: "E0009",
-                message: "`pushint` requires TEAL version 3, target is 2".to_string(),
+                kind: DiagnosticKind::OpcodeUnavailable {
+                    opcode: "pushint",
+                    min: 3,
+                    target: 2,
+                },
                 span: span_of(EXAMPLE, "1", 0),
             }]
         );

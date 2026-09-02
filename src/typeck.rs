@@ -1,7 +1,7 @@
 //! The type checker: an AST to a typed AST, resolving every type it names.
 
 use crate::ast;
-use crate::diagnostics::{Diagnostic, Diagnostics};
+use crate::diagnostics::{Diagnostic, DiagnosticKind, Diagnostics};
 use crate::typed_ast::{Expr, ExprKind, FuncDecl, Program, Stmt, Type};
 
 /// The one type name the language has.
@@ -38,21 +38,22 @@ fn check_func(func: &ast::FuncDecl, diags: &mut Diagnostics) -> Option<FuncDecl>
     })
 }
 
-/// Resolves a written type name, reporting E0004 if it names no type.
+/// Resolves a written type name, reporting it if it names no type.
 fn resolve_type(ret: &ast::TypeRef, diags: &mut Diagnostics) -> Option<Type> {
     if ret.name.text == UINT64 {
         return Some(Type::Uint64);
     }
     diags.push(Diagnostic {
-        code: "E0004",
-        message: format!("unknown type `{}`", ret.name.text),
+        kind: DiagnosticKind::UnknownType {
+            name: ret.name.text.clone(),
+        },
         span: ret.name.span,
     });
     None
 }
 
-/// Checks a function body: it must end with a `return` (E0005), and nothing
-/// may follow one (E0006, reported for the first such statement only).
+/// Checks a function body: it must end with a `return`, and nothing may follow
+/// one — of which only the first is reported.
 fn check_body(func: &ast::FuncDecl, diags: &mut Diagnostics) -> Option<Vec<Stmt>> {
     let mut stmts = Vec::new();
     let mut returned = false;
@@ -72,16 +73,14 @@ fn check_body(func: &ast::FuncDecl, diags: &mut Diagnostics) -> Option<Vec<Stmt>
 
     if !returned {
         diags.push(Diagnostic {
-            code: "E0005",
-            message: "missing return".to_string(),
+            kind: DiagnosticKind::MissingReturn,
             span: func.name.span,
         });
         return None;
     }
     if let Some(span) = unreachable {
         diags.push(Diagnostic {
-            code: "E0006",
-            message: "unreachable statement".to_string(),
+            kind: DiagnosticKind::UnreachableStatement,
             span,
         });
         return None;
@@ -191,8 +190,9 @@ mod tests {
         assert_eq!(
             check_err(source),
             vec![Diagnostic {
-                code: "E0004",
-                message: "unknown type `bytes`".to_string(),
+                kind: DiagnosticKind::UnknownType {
+                    name: "bytes".to_string(),
+                },
                 span: spans(source)("bytes"),
             }]
         );
@@ -207,8 +207,7 @@ mod tests {
         assert_eq!(
             check_err(source),
             vec![Diagnostic {
-                code: "E0005",
-                message: "missing return".to_string(),
+                kind: DiagnosticKind::MissingReturn,
                 span: span("f"),
             }]
         );
@@ -220,8 +219,7 @@ mod tests {
         assert_eq!(
             check_err(source),
             vec![Diagnostic {
-                code: "E0006",
-                message: "unreachable statement".to_string(),
+                kind: DiagnosticKind::UnreachableStatement,
                 span: spans(source)("return 2"),
             }]
         );
@@ -236,13 +234,13 @@ mod tests {
             check_err(source),
             vec![
                 Diagnostic {
-                    code: "E0004",
-                    message: "unknown type `bytes`".to_string(),
+                    kind: DiagnosticKind::UnknownType {
+                        name: "bytes".to_string(),
+                    },
                     span: span("bytes"),
                 },
                 Diagnostic {
-                    code: "E0005",
-                    message: "missing return".to_string(),
+                    kind: DiagnosticKind::MissingReturn,
                     span: span("b"),
                 },
             ]
@@ -260,13 +258,13 @@ mod tests {
             check_err(source),
             vec![
                 Diagnostic {
-                    code: "E0004",
-                    message: "unknown type `bytes`".to_string(),
+                    kind: DiagnosticKind::UnknownType {
+                        name: "bytes".to_string(),
+                    },
                     span: span("bytes"),
                 },
                 Diagnostic {
-                    code: "E0005",
-                    message: "missing return".to_string(),
+                    kind: DiagnosticKind::MissingReturn,
                     span: func_name,
                 },
             ]

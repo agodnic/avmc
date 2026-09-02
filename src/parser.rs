@@ -1,7 +1,7 @@
 //! The parser: tokens to an AST by recursive descent.
 
 use crate::ast::{Expr, FuncDecl, Name, Program, Stmt, TypeRef};
-use crate::diagnostics::{Diagnostic, Diagnostics, Span};
+use crate::diagnostics::{Diagnostic, DiagnosticKind, Diagnostics, Span};
 use crate::lexer::{Token, TokenKind};
 
 /// Parses the token stream `lex` produced for `source`.
@@ -79,7 +79,7 @@ impl Parser<'_> {
             Ok(value) => Some(Expr::IntLit { value, span }),
             // The lexer only admits ASCII digits, so overflow is the one way
             // parsing can fail here.
-            Err(_) => self.report("E0003", "integer literal out of range".to_string(), span),
+            Err(_) => self.report(DiagnosticKind::IntegerLiteralOutOfRange, span),
         }
     }
 
@@ -91,16 +91,16 @@ impl Parser<'_> {
         })
     }
 
-    /// Consumes the next token if it is a `kind`, and reports E0002 otherwise.
-    /// `expected` describes what the grammar allows here.
-    fn expect(&mut self, kind: TokenKind, expected: &str) -> Option<Token> {
+    /// Consumes the next token if it is a `kind`, and reports the unexpected
+    /// one otherwise. `expected` describes what the grammar allows here.
+    fn expect(&mut self, kind: TokenKind, expected: &'static str) -> Option<Token> {
         match self.peek() {
             Some(&token) if token.kind == kind => {
                 self.next += 1;
                 Some(token)
             }
             found => {
-                let (found_desc, span) = match found {
+                let (found, span) = match found {
                     Some(token) => (describe(token.kind), token.span),
                     None => (
                         "end of input",
@@ -110,22 +110,14 @@ impl Parser<'_> {
                         },
                     ),
                 };
-                self.report(
-                    "E0002",
-                    format!("expected {expected}, found {found_desc}"),
-                    span,
-                )
+                self.report(DiagnosticKind::UnexpectedToken { expected, found }, span)
             }
         }
     }
 
     /// Reports a diagnostic and fails the parse.
-    fn report<T>(&mut self, code: &'static str, message: String, span: Span) -> Option<T> {
-        self.diags.push(Diagnostic {
-            code,
-            message,
-            span,
-        });
+    fn report<T>(&mut self, kind: DiagnosticKind, span: Span) -> Option<T> {
+        self.diags.push(Diagnostic { kind, span });
         None
     }
 
@@ -294,8 +286,10 @@ mod tests {
         assert_eq!(
             parse_err(source),
             Diagnostic {
-                code: "E0002",
-                message: "expected `)`, found an identifier".to_string(),
+                kind: DiagnosticKind::UnexpectedToken {
+                    expected: "`)`",
+                    found: "an identifier",
+                },
                 span: Span { start: 8, end: 14 },
             }
         );
@@ -307,8 +301,10 @@ mod tests {
         assert_eq!(
             parse_err(source),
             Diagnostic {
-                code: "E0002",
-                message: "expected `return` or `}`, found end of input".to_string(),
+                kind: DiagnosticKind::UnexpectedToken {
+                    expected: "`return` or `}`",
+                    found: "end of input",
+                },
                 span: Span {
                     start: source.len(),
                     end: source.len()
@@ -322,8 +318,10 @@ mod tests {
         assert_eq!(
             parse_err("}"),
             Diagnostic {
-                code: "E0002",
-                message: "expected `func`, found `}`".to_string(),
+                kind: DiagnosticKind::UnexpectedToken {
+                    expected: "`func`",
+                    found: "`}`",
+                },
                 span: Span { start: 0, end: 1 },
             }
         );
@@ -335,8 +333,7 @@ mod tests {
         assert_eq!(
             parse_err(source),
             Diagnostic {
-                code: "E0003",
-                message: "integer literal out of range".to_string(),
+                kind: DiagnosticKind::IntegerLiteralOutOfRange,
                 span: Span { start: 25, end: 45 },
             }
         );

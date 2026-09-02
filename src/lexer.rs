@@ -1,6 +1,6 @@
 //! The lexer: source text to a flat token stream.
 
-use crate::diagnostics::{Diagnostic, Diagnostics, Span};
+use crate::diagnostics::{Diagnostic, DiagnosticKind, Diagnostics, Span};
 use std::iter::Peekable;
 use std::str::CharIndices;
 
@@ -69,8 +69,7 @@ pub fn lex(source: &str, diags: &mut Diagnostics) -> Option<Vec<Token>> {
                 tokens.push(token(TokenKind::IntLit, start, end));
             }
             _ => diags.push(Diagnostic {
-                code: "E0001",
-                message: "unexpected character".to_string(),
+                kind: DiagnosticKind::UnexpectedCharacter,
                 span: Span { start, end: single },
             }),
         }
@@ -213,13 +212,11 @@ mod tests {
             reported,
             vec![
                 &Diagnostic {
-                    code: "E0001",
-                    message: "unexpected character".to_string(),
+                    kind: DiagnosticKind::UnexpectedCharacter,
                     span: Span { start: 0, end: 1 },
                 },
                 &Diagnostic {
-                    code: "E0001",
-                    message: "unexpected character".to_string(),
+                    kind: DiagnosticKind::UnexpectedCharacter,
                     span: Span { start: 1, end: 3 },
                 },
             ]

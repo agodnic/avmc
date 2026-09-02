@@ -30,10 +30,12 @@ fn main() -> ExitCode {
     };
 
     let mut diags = Diagnostics::default();
-    let Some(teal) = compile(&source, version, &mut diags) else {
-        for diagnostic in diags.iter() {
-            report(&render(diagnostic, &path, &source));
-        }
+    let teal = compile(&source, version, &mut diags);
+    // Warnings are reported for a source file that compiles too.
+    for diagnostic in diags.iter() {
+        report(&render(diagnostic, &path, &source));
+    }
+    let Some(teal) = teal else {
         return ExitCode::from(COMPILE_ERRORS);
     };
 
