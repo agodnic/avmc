@@ -60,20 +60,6 @@ pipeline.
   final_stack}` out. Per-case overhead drops from a network round-trip to tens
   of microseconds, which is what makes large generative campaigns practical.
 
-The sidecar is deferred, not abandoned. It is added when generative-testing
-throughput becomes the binding constraint. The interface to the AVM runner is
-therefore defined as a trait from day one, with the HTTP client as its first
-implementation, so adding the sidecar is a new implementation rather than a
-refactor.
-
-**We never reimplement the AVM to test against.** An AVM we wrote ourselves
-would share our own misconceptions and would be worthless as an independent
-check. What we run against is always the consensus implementation, wrapped.
-
-We rejected writing the whole compiler in Go: it would trade sum types across
-the AST, IR, every pass, and diagnostics — the ~90% of the codebase that gets
-refactored continuously — to avoid a process boundary in the test harness.
-
 ---
 
 ## 2. Binding rules
