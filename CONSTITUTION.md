@@ -12,20 +12,9 @@ correctness strategy — see **[ARCHITECTURE.md](ARCHITECTURE.md)**.
 
 ---
 
-## 1. The three frozen decisions
+## 1. The two frozen decisions
 
-### 1.1 Target: TEAL, emitted directly
-
-**We emit TEAL assembly text**, version-pinned with an explicit `#pragma
-version N`, and hand it to the existing Algorand assembler (`goal clerk
-compile` / algod's compile endpoint) to produce bytecode.
-
-**We define our own IR.** Not LLVM's — a typed, single-assignment IR designed
-around `uint64`/`[]byte` and the absence of a heap. It begins as a flat
-instruction list and grows a control-flow graph when the language grows control
-flow. Analysis runs on it. See [ARCHITECTURE.md](ARCHITECTURE.md) §2.2.
-
-### 1.2 Source language: our own, designed and frozen
+### 1.1 Source language: our own, designed and frozen
 
 **We design the source language and freeze it early.** It has no name yet.
 
@@ -41,7 +30,7 @@ flow. Analysis runs on it. See [ARCHITECTURE.md](ARCHITECTURE.md) §2.2.
 - explicit about failure: the operations that can abort the transaction are
   visible in the source.
 
-### 1.3 Implementation: Rust, cross-checked against the real AVM
+### 1.2 Implementation: Rust, cross-checked against the real AVM
 
 **The compiler is written in Rust.** Sum types with exhaustive matching for the
 AST and IR, no GC in analysis passes, `insta` for snapshot-testing stage
