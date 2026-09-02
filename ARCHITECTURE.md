@@ -69,11 +69,11 @@ the IR and the emitter, not to the parser or the type checker.
 
 **The v0 invariant is what makes emission trivial:** every value has **exactly
 one use**, and uses appear in the order values are defined. Lowering an
-expression tree in post-order produces exactly this. The verifier (**R8** —
+expression tree in post-order produces exactly this. The verifier (**R7** —
 verify the IR) enforces it, along with type correctness and single assignment.
 
 **Lowering** translates the typed AST to IR and is where all desugaring lives.
-Later, ARC-4 method routing and ABI encoding land here too (**R7** — single
+Later, ARC-4 method routing and ABI encoding land here too (**R6** — single
 emitter: as generated IR, never as TEAL templates).
 
 ### 2.3 Emission
@@ -84,7 +84,7 @@ its result on the stack for the next consumer. No `dup`, no `cover`, no
 `uncover`, no scratch traffic, no scheduling algorithm — a post-order traversal
 of an expression tree *is* optimal stack code.
 
-**R7** (single emitter) confines TEAL text to this stage.
+**R6** (single emitter) confines TEAL text to this stage.
 
 ### 2.4 Stage contracts
 
@@ -118,8 +118,7 @@ and then defended forever. This is the limitation that motivates the next
 layer.
 
 **Conformance tests** (`tests/conformance/`). The executable half of
-`spec/language.md`. Every language feature has at least one. Under **R4**
-(language freeze), these are written before the implementation they describe.
+`spec/language.md`. Every language feature has at least one.
 
 **Differential tests.** The primary defence against miscompilation:
 

@@ -93,31 +93,26 @@ elsewhere carry both.
   reports an error produces no output that a later stage will consume. We never
   emit "best effort" TEAL. Recovery for the purpose of reporting *more*
   diagnostics is encouraged; recovery that produces artifacts is forbidden.
-- **R4 — language freeze.** Changing the syntax or static semantics of the
-  language requires, in this order: (1) an edit to `spec/language.md`, (2) a
-  conformance test in `tests/conformance/` that fails, (3) the implementation.
-  A pull request that changes language behaviour without touching the spec is
-  rejected on sight.
-- **R5 — determinism.** For a fixed compiler version, input, and target TEAL
+- **R4 — determinism.** For a fixed compiler version, input, and target TEAL
   version, output is byte-identical. No hash-map iteration order, no
   timestamps, no absolute paths, no parallelism-dependent ordering in emitted
   code.
-- **R6 — explicit TEAL version.** The target version is a required compilation
+- **R5 — explicit TEAL version.** The target version is a required compilation
   parameter, never inferred from the source and never silently upgraded. Using
   an opcode unavailable in the target version is a compile error, not a runtime
   surprise.
-- **R7 — single emitter.** TEAL text is written in exactly one place. Only the
+- **R6 — single emitter.** TEAL text is written in exactly one place. Only the
   emitter produces TEAL. No other module — and no ABI/ARC-4 support layer —
   emits assembly text. Higher-level constructs are lowered into IR and go
   through the same emitter as everything else.
-- **R8 — verify the IR.** The verifier runs at every IR boundary in debug and
+- **R7 — verify the IR.** The verifier runs at every IR boundary in debug and
   test builds: after lowering, and after each pass once passes exist. What it
   checks grows with the IR — type correctness and single assignment from the
   start, dominance and CFG well-formedness once there is control flow.
   Invariants are checked, not assumed.
-- **R9 — no panics.** Malformed source produces diagnostics, never a panic. In
+- **R8 — no panics.** Malformed source produces diagnostics, never a panic. In
   crates that process untrusted input, `unwrap`/`expect`/`panic!` are permitted
   only for conditions the IR verifier has already established.
-- **R10 — stable diagnostic codes.** Every diagnostic has a stable code
+- **R9 — stable diagnostic codes.** Every diagnostic has a stable code
   (`E0001`, `W0001`, …) and an entry in the diagnostics index. Codes are never
   reused for a different meaning.
