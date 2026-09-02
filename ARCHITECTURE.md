@@ -106,9 +106,9 @@ pub fn stage(input: Input, diags: &mut Diagnostics) -> Option<Output>;
   module and `avmc-cli`. Purity is what makes every stage trivially testable in
   isolation.
 - **Errors never silently degrade.** A stage that reports an error produces no
-  output that a later stage will consume; `None` is how that is expressed. We
-  never emit "best effort" TEAL. Recovery for the purpose of reporting *more*
-  diagnostics is encouraged; recovery that produces artifacts is forbidden.
+  output that a later stage will consume; `None` is how that is expressed.
+  Recovery for the purpose of reporting *more* diagnostics is encouraged;
+  recovery that produces artifacts is forbidden.
 - Every boundary is snapshot-testable, which means a change in any stage
   produces a reviewable diff at that stage's boundary rather than only in final
   TEAL.
