@@ -22,9 +22,10 @@ pub fn compile(source: &str, version: TealVersion, diags: &mut Diagnostics) -> O
 /// Renders `diagnostic` as one line, without a trailing newline.
 pub fn render(diagnostic: &Diagnostic, file_name: &str, source: &str) -> String {
     let (line, column) = position(source, diagnostic.span.start);
-    let code = diagnostic.code;
-    let message = &diagnostic.message;
-    format!("{file_name}:{line}:{column}: error[{code}]: {message}")
+    let code = diagnostic.kind.code();
+    let severity = code.severity;
+    let message = &diagnostic.kind;
+    format!("{file_name}:{line}:{column}: {severity}[{code}]: {message}")
 }
 
 /// The 1-based line and column of `offset` in `source`.
@@ -47,24 +48,23 @@ fn position(source: &str, offset: usize) -> (usize, usize) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::diagnostics::Span;
+    use crate::diagnostics::{DiagnosticKind, Span};
 
     /// The example program of the v0 milestone.
     const EXAMPLE: &str = "func approval() uint64 { return 1 }";
 
-    /// The diagnostic codes reported while compiling `source` for `version`,
+    /// The diagnostics reported while compiling `source` for `version`,
     /// asserting that nothing was emitted.
-    fn compile_err(source: &str, version: u8) -> Vec<&'static str> {
+    fn compile_err(source: &str, version: u8) -> Vec<DiagnosticKind> {
         let mut diags = Diagnostics::default();
         assert_eq!(compile(source, TealVersion(version), &mut diags), None);
-        diags.iter().map(|diag| diag.code).collect()
+        diags.iter().map(|diag| diag.kind.clone()).collect()
     }
 
     /// A diagnostic covering `span`, for [`render`] to format.
     fn diagnostic(span: Span) -> Diagnostic {
         Diagnostic {
-            code: "E0008",
-            message: "missing entry point `approval`".to_string(),
+            kind: DiagnosticKind::MissingEntryPoint { name: "approval" },
             span,
         }
     }
@@ -92,13 +92,20 @@ mod tests {
     fn lexing_stops_the_pipeline() {
         assert_eq!(
             compile_err("func approval() uint64 { return @ }", 10),
-            ["E0001"]
+            [DiagnosticKind::UnexpectedCharacter]
         );
     }
 
     #[test]
     fn emission_reports_an_unsupported_version() {
-        assert_eq!(compile_err(EXAMPLE, 2), ["E0009"]);
+        assert_eq!(
+            compile_err(EXAMPLE, 2),
+            [DiagnosticKind::OpcodeUnavailable {
+                opcode: "pushint",
+                min: 3,
+                target: 2,
+            }]
+        );
     }
 
     #[test]

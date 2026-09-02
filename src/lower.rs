@@ -1,6 +1,6 @@
 //! Lowering: a typed AST to IR.
 
-use crate::diagnostics::{Diagnostic, Diagnostics};
+use crate::diagnostics::{Diagnostic, DiagnosticKind, Diagnostics};
 use crate::ir::{Function, Inst, Program, ValueId};
 use crate::typed_ast::{self, Expr, ExprKind, Stmt};
 use std::collections::HashSet;
@@ -24,8 +24,8 @@ pub fn lower(program: &typed_ast::Program, diags: &mut Diagnostics) -> Option<Pr
     Some(Program { funcs })
 }
 
-/// Reports E0007 for every declaration whose name was already declared,
-/// returning `None` if there was one.
+/// Reports every declaration whose name was already declared, returning `None`
+/// if there was one.
 fn check_duplicates(program: &typed_ast::Program, diags: &mut Diagnostics) -> Option<()> {
     let mut seen = HashSet::new();
     let mut ok = true;
@@ -33,8 +33,9 @@ fn check_duplicates(program: &typed_ast::Program, diags: &mut Diagnostics) -> Op
     for func in &program.funcs {
         if !seen.insert(func.name.text.as_str()) {
             diags.push(Diagnostic {
-                code: "E0007",
-                message: format!("duplicate function `{}`", func.name.text),
+                kind: DiagnosticKind::DuplicateFunction {
+                    name: func.name.text.clone(),
+                },
                 span: func.name.span,
             });
             ok = false;
@@ -221,8 +222,9 @@ mod tests {
         assert_eq!(
             lower_err(source),
             vec![Diagnostic {
-                code: "E0007",
-                message: "duplicate function `a`".to_string(),
+                kind: DiagnosticKind::DuplicateFunction {
+                    name: "a".to_string(),
+                },
                 span: span_of(source, "a", 1),
             }]
         );
@@ -235,13 +237,15 @@ mod tests {
             lower_err(source),
             vec![
                 Diagnostic {
-                    code: "E0007",
-                    message: "duplicate function `a`".to_string(),
+                    kind: DiagnosticKind::DuplicateFunction {
+                        name: "a".to_string(),
+                    },
                     span: span_of(source, "a", 1),
                 },
                 Diagnostic {
-                    code: "E0007",
-                    message: "duplicate function `a`".to_string(),
+                    kind: DiagnosticKind::DuplicateFunction {
+                        name: "a".to_string(),
+                    },
                     span: span_of(source, "a", 2),
                 },
             ]
