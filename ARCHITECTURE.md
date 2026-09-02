@@ -3,8 +3,6 @@
 How `avmc` is built: the compilation pipeline, the contracts between its
 stages, the correctness strategy, and the invariants all of it holds to.
 
-Read [CONSTITUTION.md](CONSTITUTION.md) first. This document assumes it.
-
 ## 1. Design posture
 
 **Start at the simplest thing that is honestly end-to-end, and grow each stage
@@ -144,6 +142,17 @@ Two independently derived answers to "what does this program mean". Any
 disagreement is a bug in the compiler or the interpreter — either way, a bug.
 `proptest` generates programs and shrinks failures to minimal reproducers
 automatically.
+
+**Reaching the real AVM** happens in two phases:
+
+- **v0 — algod over HTTP.** The harness compiles to TEAL and runs it on AlgoKit
+  LocalNet via algod's compile and `simulate` endpoints, which return execution
+  result, per-opcode cost, and stack traces.
+- **Later — a Go sidecar.** A Go binary linking
+  `go-algorand/data/transactions/logic` directly, speaking newline-delimited
+  JSON over stdin/stdout: `{teal, mode, args}` in, `{approved, cost, error,
+  final_stack}` out. Per-case overhead drops from a network round-trip to tens
+  of microseconds, which is what makes large generative campaigns practical.
 
 This is what catches the bug class that matters: TEAL that assembles cleanly,
 passes every snapshot test, and means something subtly different from the
