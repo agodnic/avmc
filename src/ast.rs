@@ -1,5 +1,4 @@
-//! The AST: the parser's output, mirroring the surface syntax (see
-//! `ARCHITECTURE.md` §2.1).
+//! The AST: the parser's output, mirroring the surface syntax.
 
 use crate::diagnostics::Span;
 
@@ -23,7 +22,7 @@ pub struct FuncDecl {
     pub span: Span,
 }
 
-/// An identifier and where it was written (R1).
+/// An identifier and where it was written.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Name {
     /// The identifier text, sliced from the source.

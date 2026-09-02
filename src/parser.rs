@@ -1,5 +1,4 @@
-//! The parser: tokens to an AST by recursive descent (see `ARCHITECTURE.md`
-//! §2.1).
+//! The parser: tokens to an AST by recursive descent.
 
 use crate::ast::{Expr, FuncDecl, Name, Program, Stmt, TypeRef};
 use crate::diagnostics::{Diagnostic, Diagnostics, Span};
@@ -7,7 +6,7 @@ use crate::lexer::{Token, TokenKind};
 
 /// Parses the token stream `lex` produced for `source`.
 ///
-/// Returns `None` as soon as anything is wrong (R2); one run reports at most
+/// Returns `None` as soon as anything is wrong; one run reports at most
 /// one diagnostic.
 pub fn parse(source: &str, tokens: &[Token], diags: &mut Diagnostics) -> Option<Program> {
     Parser {
@@ -120,7 +119,7 @@ impl Parser<'_> {
         }
     }
 
-    /// Reports a diagnostic and fails the parse (R2).
+    /// Reports a diagnostic and fails the parse.
     fn report<T>(&mut self, code: &'static str, message: String, span: Span) -> Option<T> {
         self.diags.push(Diagnostic {
             code,

@@ -10,6 +10,7 @@ The items in this section are not hard rules - they can be broken if there is a 
 - Avoid feature scope creep
 - Keep doc comments small
 - Avoid adding redundant information to doc comments that can be obtained somewhere else
+- Try to avoid cross-references in comments. These tend to get stale, or need constant updating as the code changes. It is also a form of duplicate information.
 
 # Building
 `cargo test` is the entry point. CI runs `cargo fmt --all --check`,
