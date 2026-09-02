@@ -29,17 +29,6 @@ flow. Analysis runs on it. See [ARCHITECTURE.md](ARCHITECTURE.md) §2.2.
 
 **We design the source language and freeze it early.** It has no name yet.
 
-We rejected adopting an existing specified language (a C subset, Lua, Scheme, a
-small ML). Their value is their conformance suites — but those suites
-predominantly test heap features: `malloc` and pointer arithmetic, tables and
-closures, `call/cc` and heap-allocated pairs, algebraic datatypes. On a machine
-with no heap we would implement an allocator to fail most of the suite anyway,
-spending the project on emulation rather than compilation.
-
-This is not a shortcut. Every serious AVM language — Algorand Python (Puya),
-TEALScript, PyTeal — independently converged on a restricted, first-order,
-heap-free subset. The constraint is real.
-
 **The v0 language is:**
 
 - statically typed, with no inference beyond local `let` bindings;
@@ -57,10 +46,11 @@ demonstrates the cost: a surface that looks like a familiar language but
 supports a small fraction of it generates permanent confusion. The language
 should look like what it is — a small language with real constraints.
 
-**The freeze has teeth.** See **R4** (language freeze) in §3: a language change is not a code
-change. It is a specification edit plus a conformance test, landed *before* any
-implementation. This is the rule that prevents the language from being quietly
-redesigned by whoever is implementing the type checker that week.
+**The freeze has teeth.** See **R4** (language freeze) in §3: a language change
+is not a code change. It is a specification edit plus a conformance test,
+landed *before* any implementation. This is the rule that prevents the language
+from being quietly redesigned by whoever is implementing the type checker that
+week.
 
 ### 1.3 Implementation: Rust, cross-checked against the real AVM
 
@@ -122,22 +112,22 @@ These are the invariants agents and contributors must not violate. Each has a
 number for citation and a short tag naming what it requires; references
 elsewhere carry both.
 
-- **R1 — pure stages.** Stages are pure functions. Every pipeline stage has the shape
-  `fn(Input, &mut Diagnostics) -> Option<Output>`. No file I/O, no network, no
-  environment access, no global mutable state inside a stage. All I/O lives in
-  the driver module and `avmc-cli`.
-- **R2 — spans everywhere.** Spans are threaded end to end. Every token, AST node, IR
-  instruction, and emitted opcode carries a source span. A diagnostic without a
-  span is a bug.
-- **R3 — no degraded output.** Errors never silently degrade. A stage that reports an error
-  produces no output that a later stage will consume. We never emit "best
-  effort" TEAL. Recovery for the purpose of reporting *more* diagnostics is
-  encouraged; recovery that produces artifacts is forbidden.
+- **R1 — pure stages.** Stages are pure functions. Every pipeline stage has the
+  shape `fn(Input, &mut Diagnostics) -> Option<Output>`. No file I/O, no
+  network, no environment access, no global mutable state inside a stage. All
+  I/O lives in the driver module and `avmc-cli`.
+- **R2 — spans everywhere.** Spans are threaded end to end. Every token, AST
+  node, IR instruction, and emitted opcode carries a source span. A diagnostic
+  without a span is a bug.
+- **R3 — no degraded output.** Errors never silently degrade. A stage that
+  reports an error produces no output that a later stage will consume. We never
+  emit "best effort" TEAL. Recovery for the purpose of reporting *more*
+  diagnostics is encouraged; recovery that produces artifacts is forbidden.
 - **R4 — language freeze.** Changing the syntax or static semantics of the
-  language requires, in this order: (1) an edit to `spec/language.md`, (2) a conformance
-  test in `tests/conformance/` that fails, (3) the implementation. A pull
-  request that changes language behaviour without touching the spec is rejected
-  on sight.
+  language requires, in this order: (1) an edit to `spec/language.md`, (2) a
+  conformance test in `tests/conformance/` that fails, (3) the implementation.
+  A pull request that changes language behaviour without touching the spec is
+  rejected on sight.
 - **R5 — determinism.** For a fixed compiler version, input, and target TEAL
   version, output is byte-identical. No hash-map iteration order, no
   timestamps, no absolute paths, no parallelism-dependent ordering in emitted
@@ -146,15 +136,15 @@ elsewhere carry both.
   parameter, never inferred from the source and never silently upgraded. Using
   an opcode unavailable in the target version is a compile error, not a runtime
   surprise.
-- **R7 — single emitter.** TEAL text is written in exactly one place. Only the emitter
-  produces TEAL. No other module — and no ABI/ARC-4 support layer — emits
-  assembly text. Higher-level constructs are lowered into IR and go through the
-  same emitter as everything else.
-- **R8 — verify the IR.** The verifier runs at every IR boundary in debug and test builds:
-  after lowering, and after each pass once passes exist. What it checks grows
-  with the IR — type correctness and single assignment from the start,
-  dominance and CFG well-formedness once there is control flow. Invariants are
-  checked, not assumed.
+- **R7 — single emitter.** TEAL text is written in exactly one place. Only the
+  emitter produces TEAL. No other module — and no ABI/ARC-4 support layer —
+  emits assembly text. Higher-level constructs are lowered into IR and go
+  through the same emitter as everything else.
+- **R8 — verify the IR.** The verifier runs at every IR boundary in debug and
+  test builds: after lowering, and after each pass once passes exist. What it
+  checks grows with the IR — type correctness and single assignment from the
+  start, dominance and CFG well-formedness once there is control flow.
+  Invariants are checked, not assumed.
 - **R9 — no panics.** Malformed source produces diagnostics, never a panic. In
   crates that process untrusted input, `unwrap`/`expect`/`panic!` are permitted
   only for conditions the IR verifier has already established.
