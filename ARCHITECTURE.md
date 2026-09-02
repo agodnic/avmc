@@ -13,11 +13,6 @@ only when a language feature forces it.**
 §2 is the pipeline as it exists. Nothing is added to it speculatively — if a
 stage has no work to do, it does not exist yet.
 
-The thing that makes this safe rather than reckless is §3. A strong oracle
-means the middle of the compiler can be torn out and replaced with confidence
-that no program changed meaning. "Simplify now, generalise later" is a bad plan
-without differential testing and a good one with it.
-
 ---
 
 ## 2. The pipeline
@@ -41,10 +36,6 @@ without differential testing and a good one with it.
         │
    TEAL ──► (external assembler) ──► bytecode
 ```
-
-Six stages, each of which does real work. There is no optimiser, no stack
-scheduler, no scratch allocator, and no constant pooler, because at the current
-language level none of them would have anything to do.
 
 ### 2.1 Frontend
 
