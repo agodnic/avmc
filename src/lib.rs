@@ -2,6 +2,7 @@
 
 pub mod ast;
 pub mod diagnostics;
+pub mod emit;
 pub mod ir;
 pub mod lexer;
 pub mod lower;
