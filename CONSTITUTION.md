@@ -94,14 +94,14 @@ change. It is a specification edit plus a conformance test, landed *before* any
 implementation. This is the rule that prevents the language from being quietly
 redesigned by whoever is implementing the type checker that week.
 
-### 2.3 Implementation: Rust, with a differential-testing oracle
+### 2.3 Implementation: Rust, cross-checked against the real AVM
 
 **The compiler is written in Rust.** Sum types with exhaustive matching for the
 AST and IR, no GC in analysis passes, `insta` for snapshot-testing stage
 boundaries, `proptest` for generative testing of the frontend and the full
 pipeline.
 
-**The differential-testing oracle is the real AVM**, reached in two phases:
+**Differential testing runs against the real AVM**, reached in two phases:
 
 - **v0 — algod over HTTP.** The test harness compiles to TEAL and executes it
   against AlgoKit LocalNet via algod's compile and `simulate` endpoints, which
@@ -114,14 +114,14 @@ pipeline.
   of microseconds, which is what makes large generative campaigns practical.
 
 The sidecar is deferred, not abandoned. It is added when generative-testing
-throughput becomes the binding constraint. The oracle interface in
-`avmc-oracle` is therefore defined as a trait from day one, with the HTTP client
-as its first implementation, so adding the sidecar is a new implementation
-rather than a refactor.
+throughput becomes the binding constraint. The interface to the AVM runner is
+therefore defined as a trait from day one, with the HTTP client as its first
+implementation, so adding the sidecar is a new implementation rather than a
+refactor.
 
-**The oracle is never a reimplementation of the AVM.** An AVM we wrote
-ourselves would share our own misconceptions and would be worthless as an
-independent check. The oracle is always the consensus implementation, wrapped.
+**We never reimplement the AVM to test against.** An AVM we wrote ourselves
+would share our own misconceptions and would be worthless as an independent
+check. What we run against is always the consensus implementation, wrapped.
 
 We rejected writing the whole compiler in Go: it would trade sum types across
 the AST, IR, every pass, and diagnostics — the ~90% of the codebase that gets
@@ -192,32 +192,3 @@ short identifier so review comments can cite it.
 - **R10 — Every diagnostic has a stable code** (`E0001`, `W0001`, …) and an
   entry in the diagnostics index. Codes are never reused for a different
   meaning.
-
-
----
-
-## 5. Amendment
-
-The friction here is deliberate and narrowly scoped. Implementation details
-should move freely; the shape of the compiler and the definition of the
-language should move only on purpose.
-
-**This document.** A pull request that modifies `CONSTITUTION.md` **modifies no
-other file**. It states what is changing and why, and is reviewed on its own
-merits. This is a mechanical rule precisely so that it can be checked
-mechanically — a diff either touches this file alone or it does not touch it at
-all. Bundling a constitutional change into a feature branch is the failure mode
-the rule exists to prevent.
-
-**The language.** Governed by **R4**, and stricter still: an edit to
-`spec/language.md`, then a failing conformance test, then the implementation —
-in that order, and the spec edit is its own pull request.
-
-**Everything else** — the pipeline, stage internals, pass lists, repository
-layout — lives in [ARCHITECTURE.md](ARCHITECTURE.md) and is amended in the same
-pull request as the code that changes it. No ceremony.
-
-**Work in progress** — milestones, open design questions, decisions not yet
-made — lives in the issue tracker, not in either document. A question that
-needs a decision needs an owner and a closing condition, and a bullet in a
-markdown file gives it neither.

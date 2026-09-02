@@ -144,4 +144,5 @@ automatically.
 This is what catches the bug class that matters: TEAL that assembles cleanly,
 passes every snapshot test, and means something subtly different from the
 source. It is the technique that found hundreds of bugs in GCC and LLVM, and it
-is the reason the oracle is the real AVM rather than something we wrote.
+is the reason we cross-check against the real AVM rather than something we
+wrote.
