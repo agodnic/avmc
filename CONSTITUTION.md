@@ -87,8 +87,7 @@ flow. Analysis runs on it. See [ARCHITECTURE.md](ARCHITECTURE.md) §2.2.
 ### 2.2 Source language: our own, designed and frozen
 
 **We design the source language and freeze it early.** Working name: **Ava**
-(file extension `.ava`; the name is provisional and tracked in the
-issue tracker).
+(file extension `.ava`; the name is provisional).
 
 We rejected adopting an existing specified language (a C subset, Lua, Scheme, a
 small ML). Their value is their conformance suites — but those suites

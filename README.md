@@ -34,7 +34,7 @@ amended in the same pull request as the code it describes.
 - the growth path: what gets built when, and the feature that forces each step
 - the repository layout
 
-Milestones and open design questions live in the issue tracker rather than in
+Milestones and open design questions belong in the issue tracker rather than in
 either document.
 
 ## The short version
