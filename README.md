@@ -2,17 +2,15 @@
 
 A compiler targeting the Algorand Virtual Machine (AVM).
 
-`avmc` compiles **Ava** — a small, statically typed, heap-free language designed
-for the AVM's constraints — to TEAL.
+`avmc` compiles a small, statically typed, heap-free language — designed for the
+AVM's constraints, and not yet named — to TEAL.
 
 ## Status
 
 Pre-implementation. The architecture is settled; the code is not written yet.
 
 The current milestone is a thin vertical slice: a variable-free signature-mode
-program compiled end to end and executed against a real AVM. The backend starts
-as a post-order walk and grows only when a language feature forces it — see the
-growth path in [ARCHITECTURE.md](ARCHITECTURE.md) §4.
+program compiled end to end and executed against a real AVM.
 
 ## Start here
 
@@ -24,15 +22,13 @@ writing code. Frozen: amended only by a pull request that touches nothing else.
 - the AVM constraints every decision derives from
 - the three frozen decisions — target, source language, implementation
 - non-goals, stated explicitly
-- the binding rules (`R1`–`R11`) that contributions are reviewed against
+- the binding rules (`R1`–`R10`) that contributions are reviewed against
 
 **[ARCHITECTURE.md](ARCHITECTURE.md)** — how the compiler is built. Living:
 amended in the same pull request as the code it describes.
 
 - the pipeline, stage by stage, and the contracts between stages
 - the correctness strategy, in particular differential testing against a real AVM
-- the growth path: what gets built when, and the feature that forces each step
-- the repository layout
 
 Milestones and open design questions belong in the issue tracker rather than in
 either document.

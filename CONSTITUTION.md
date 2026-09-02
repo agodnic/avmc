@@ -8,8 +8,7 @@ and to treat a conflict between this document and the code as a bug in the
 code.
 
 For how the compiler is actually built — the pipeline, the stage contracts, the
-correctness strategy, the repository layout — see
-**[ARCHITECTURE.md](ARCHITECTURE.md)**.
+correctness strategy — see **[ARCHITECTURE.md](ARCHITECTURE.md)**.
 
 ---
 
@@ -38,9 +37,7 @@ Three consequences drive the whole design:
    structures, recursion of unbounded depth, and garbage collection are not
    merely slow here — they have nowhere to live.
 2. **The compute budget is a correctness property, not a performance concern.**
-   A program that exceeds 700 ops does not run slowly; it fails. Cost is
-   therefore something the compiler must *analyse and reject*, not something a
-   profiler discovers later.
+   A program that exceeds 700 ops does not run slowly; it fails.
 3. **Failure is total.** There is no partial execution to recover from, which
    makes the semantics simpler — and makes a miscompilation maximally
    expensive, since it is discovered on-chain with real value at stake.
@@ -62,8 +59,7 @@ flow. Analysis runs on it. See [ARCHITECTURE.md](ARCHITECTURE.md) §2.2.
 
 ### 2.2 Source language: our own, designed and frozen
 
-**We design the source language and freeze it early.** Working name: **Ava**
-(file extension `.ava`; the name is provisional).
+**We design the source language and freeze it early.** It has no name yet.
 
 We rejected adopting an existing specified language (a C subset, Lua, Scheme, a
 small ML). Their value is their conformance suites — but those suites
@@ -76,7 +72,7 @@ This is not a shortcut. Every serious AVM language — Algorand Python (Puya),
 TEALScript, PyTeal — independently converged on a restricted, first-order,
 heap-free subset. The constraint is real.
 
-**Ava v0 is:**
+**The v0 language is:**
 
 - statically typed, with no inference beyond local `let` bindings;
 - first-order — no closures, no function values;
@@ -90,8 +86,8 @@ heap-free subset. The constraint is real.
 
 We deliberately do **not** adopt Python-like syntax. Algorand Python
 demonstrates the cost: a surface that looks like a familiar language but
-supports a small fraction of it generates permanent confusion. Ava should look
-like what it is — a small language with real constraints.
+supports a small fraction of it generates permanent confusion. The language
+should look like what it is — a small language with real constraints.
 
 **The freeze has teeth.** See rule **R4** in §4: a language change is not a code
 change. It is a specification edit plus a conformance test, landed *before* any
@@ -145,7 +141,8 @@ Stated explicitly so that "should we support X?" has a written answer.
 - **No dynamic code loading or `eval`.**
 - **We are not a TEAL assembler.** We emit TEAL text and delegate assembly to
   the reference implementation.
-- **We are not a general-purpose language.** Ava exists to compile to the AVM.
+- **We are not a general-purpose language.** The language exists to compile to
+  the AVM.
   A feature that cannot be lowered to efficient TEAL does not belong in it.
 - **No hand-written TEAL templates** outside the emitter (rule **R7**).
 
@@ -167,8 +164,8 @@ short identifier so review comments can cite it.
   produces no output that a later stage will consume. We never emit "best
   effort" TEAL. Recovery for the purpose of reporting *more* diagnostics is
   encouraged; recovery that produces artifacts is forbidden.
-- **R4 — The language freeze.** Changing the syntax or static semantics of Ava
-  requires, in this order: (1) an edit to `spec/language.md`, (2) a conformance
+- **R4 — The language freeze.** Changing the syntax or static semantics of the
+  language requires, in this order: (1) an edit to `spec/language.md`, (2) a conformance
   test in `tests/conformance/` that fails, (3) the implementation. A pull
   request that changes language behaviour without touching the spec is rejected
   on sight.
@@ -195,9 +192,6 @@ short identifier so review comments can cite it.
 - **R10 — Every diagnostic has a stable code** (`E0001`, `W0001`, …) and an
   entry in the diagnostics index. Codes are never reused for a different
   meaning.
-- **R11 — Cost bounds are checked, not estimated.** Where the cost analyser
-  reports a bound, differential tests assert that the AVM's measured cost does
-  not exceed it. An analyser that can under-report is a broken analyser.
 
 
 ---
