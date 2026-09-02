@@ -3,11 +3,6 @@
 This document is the governing charter of `avmc`, a compiler targeting the
 Algorand Virtual Machine (AVM).
 
-It exists because the expensive mistakes in a compiler project are not bugs —
-they are *architectural drift*: the language quietly redesigning itself during
-implementation, stages growing back-channels into each other, and codegen that
-is never checked against anything but its own previous output.
-
 **The decisions in §2 and the rules in §4 are frozen.** They change only
 through the process in §5, and that process is the reason this document is
 separate from [ARCHITECTURE.md](ARCHITECTURE.md): everything here is meant to
