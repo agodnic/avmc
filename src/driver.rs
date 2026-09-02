@@ -30,7 +30,7 @@ pub fn render(diagnostic: &Diagnostic, file_name: &str, source: &str) -> String 
 /// The 1-based line and column of `offset` in `source`.
 ///
 /// An offset that is not a char boundary of `source` — a compiler bug — is
-/// reported as the end of input rather than panicking (R7).
+/// reported as the end of input rather than panicking.
 fn position(source: &str, offset: usize) -> (usize, usize) {
     let before = if source.is_char_boundary(offset) {
         source.get(..offset).unwrap_or(source)

@@ -79,6 +79,3 @@ elsewhere carry both.
 - **R6 — no panics.** Malformed source produces diagnostics, never a panic. In
   crates that process untrusted input, `unwrap`/`expect`/`panic!` are permitted
   only for conditions the IR verifier has already established.
-- **R7 — stable diagnostic codes.** Every diagnostic has a stable code
-  (`E0001`, `W0001`, …) and an entry in the diagnostics index. Codes are never
-  reused for a different meaning.

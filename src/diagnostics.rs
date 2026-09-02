@@ -12,7 +12,9 @@ pub struct Span {
 /// A single problem found in the source.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Diagnostic {
-    /// Stable identifier, never reused for a different meaning.
+    /// Stable identifier: `E` for an error or `W` for a warning, then four
+    /// digits. Every code is listed in `docs/diagnostics.md`, and a code is
+    /// never reused for a different meaning.
     pub code: &'static str,
     /// Human-readable description of the problem.
     pub message: String,
