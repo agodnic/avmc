@@ -73,8 +73,8 @@ expression tree in post-order produces exactly this. The verifier (**R7** —
 verify the IR) enforces it, along with type correctness and single assignment.
 
 **Lowering** translates the typed AST to IR and is where all desugaring lives.
-Later, ARC-4 method routing and ABI encoding land here too (**R6** — single
-emitter: as generated IR, never as TEAL templates).
+Later, ARC-4 method routing and ABI encoding land here too, as generated IR
+rather than as TEAL templates.
 
 ### 2.3 Emission
 
@@ -83,8 +83,6 @@ uses follow definitions in order, each instruction emits its opcodes and leaves
 its result on the stack for the next consumer. No `dup`, no `cover`, no
 `uncover`, no scratch traffic, no scheduling algorithm — a post-order traversal
 of an expression tree *is* optimal stack code.
-
-**R6** (single emitter) confines TEAL text to this stage.
 
 ### 2.4 Stage contracts
 

@@ -101,10 +101,6 @@ elsewhere carry both.
   parameter, never inferred from the source and never silently upgraded. Using
   an opcode unavailable in the target version is a compile error, not a runtime
   surprise.
-- **R6 — single emitter.** TEAL text is written in exactly one place. Only the
-  emitter produces TEAL. No other module — and no ABI/ARC-4 support layer —
-  emits assembly text. Higher-level constructs are lowered into IR and go
-  through the same emitter as everything else.
 - **R7 — verify the IR.** The verifier runs at every IR boundary in debug and
   test builds: after lowering, and after each pass once passes exist. What it
   checks grows with the IR — type correctness and single assignment from the
