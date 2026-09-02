@@ -15,15 +15,25 @@ real AVM.
 
 ## Start here
 
-**[CONSTITUTION.md](CONSTITUTION.md)** is the governing document. Read it before
-writing code. It covers:
+Two documents, split by how often they change.
+
+**[CONSTITUTION.md](CONSTITUTION.md)** — the governing charter. Read it before
+writing code. Frozen: amended only by a pull request that touches nothing else.
 
 - the AVM constraints every decision derives from
 - the three frozen decisions — target, source language, implementation
 - non-goals, stated explicitly
 - the binding rules (`R1`–`R11`) that contributions are reviewed against
-- the pipeline architecture and stage contracts
+
+**[ARCHITECTURE.md](ARCHITECTURE.md)** — how the compiler is built. Living:
+amended in the same pull request as the code it describes.
+
+- the pipeline, stage by stage, and the contracts between stages
 - the correctness strategy, in particular differential testing against a real AVM
+- the repository layout
+
+Milestones and open design questions live in the issue tracker rather than in
+either document.
 
 ## The short version
 

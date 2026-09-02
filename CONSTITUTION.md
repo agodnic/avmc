@@ -1,6 +1,6 @@
 # avmc — Constitution
 
-This document is the governing architecture of `avmc`, a compiler targeting the
+This document is the governing charter of `avmc`, a compiler targeting the
 Algorand Virtual Machine (AVM).
 
 It exists because the expensive mistakes in a compiler project are not bugs —
@@ -8,10 +8,16 @@ they are *architectural drift*: the language quietly redesigning itself during
 implementation, stages growing back-channels into each other, and codegen that
 is never checked against anything but its own previous output.
 
-**The decisions in §2 are frozen.** Everything else in this document is binding
-until amended by the process in §9. Contributors — human or agent — are expected
-to read this before writing code, and to treat a conflict between this document
-and the code as a bug in the code.
+**The decisions in §2 and the rules in §4 are frozen.** They change only
+through the process in §5, and that process is the reason this document is
+separate from [ARCHITECTURE.md](ARCHITECTURE.md): everything here is meant to
+sit still, and everything there is meant to move. Contributors — human or agent
+— are expected to read this before writing code, and to treat a conflict
+between this document and the code as a bug in the code.
+
+For how the compiler is actually built — the pipeline, the stage contracts, the
+correctness strategy, the repository layout — see
+**[ARCHITECTURE.md](ARCHITECTURE.md)**.
 
 ---
 
@@ -80,12 +86,13 @@ implementation.
 
 **We define our own IR.** Not LLVM's — a typed, SSA-form CFG designed around
 `uint64`/`[]byte` and the absence of a heap. Optimisation and analysis run on
-it. See §5.
+it. See [ARCHITECTURE.md](ARCHITECTURE.md) §1.2.
 
 ### 2.2 Source language: our own, designed and frozen
 
 **We design the source language and freeze it early.** Working name: **Ava**
-(file extension `.ava`; the name is provisional, see §10).
+(file extension `.ava`; the name is provisional and tracked in the
+issue tracker).
 
 We rejected adopting an existing specified language (a C subset, Lua, Scheme, a
 small ML). Their value is their conformance suites — but those suites
@@ -102,7 +109,8 @@ heap-free subset. The constraint is real.
 
 - statically typed, with no inference beyond local `let` bindings;
 - first-order — no closures, no function values;
-- non-recursive (see §10 for the bounded-recursion question);
+- non-recursive — whether depth-bounded recursion is admissible depends on
+  the AVM's call-stack limit, which is tracked as an open question;
 - built on `uint64`, `bytes`, `bool`, plus structs and fixed-size arrays;
 - explicit about on-chain state: storage is *declared* as a resource, never
   ambient;
@@ -218,289 +226,31 @@ short identifier so review comments can cite it.
   reports a bound, differential tests assert that the AVM's measured cost does
   not exceed it. An analyser that can under-report is a broken analyser.
 
----
-
-## 5. Pipeline architecture
-
-```
-   source text
-        │
-   ┌────▼─────┐
-   │  lexer   │  text ──────────────► tokens + spans
-   ├──────────┤
-   │  parser  │  tokens ────────────► AST
-   ├──────────┤
-   │  resolve │  AST ───────────────► names bound to declarations
-   ├──────────┤
-   │  typeck  │  AST ───────────────► typed AST
-   ├──────────┤
-   │  lower   │  typed AST ─────────► IR  (SSA over a CFG)
-   ├──────────┤
-   │   opt    │  IR ────────────────► IR
-   ├──────────┤
-   │   cost   │  IR ────────────────► cost bounds  (rejects over-budget code)
-   ╞══════════╡
-   │  sched   │  IR ────────────────► stack-scheduled IR      ┐
-   ├──────────┤                                                │ AVM-specific
-   │  regall  │  ──────────────────► scratch slot assignment  │ back half
-   ├──────────┤                                                │
-   │  pool    │  ──────────────────► constant blocks          │
-   ├──────────┤                                                │
-   │  emit    │  ──────────────────► TEAL text                ┘
-   └────┬─────┘
-        │
-   TEAL ──► (external assembler) ──► bytecode
-```
-
-The first half is a conventional compiler frontend. The second half is where
-the actual difficulty of this project lives, and it is specific to the AVM.
-
-### 5.1 Frontend stages
-
-**Lexer.** Hand-written, not generated. Produces a token stream with spans,
-recovering from unknown characters rather than aborting.
-
-**Parser.** Hand-written recursive descent with Pratt-style expression parsing.
-Chosen over a parser generator for error-message quality and error recovery,
-both of which matter more than parser code volume. Produces an AST that
-mirrors the surface syntax closely — desugaring happens in lowering, not here.
-
-**Name resolution.** Binds every identifier to a declaration; reports shadowing
-according to the spec's rules; builds the scope tree consumed by the type
-checker.
-
-**Type checking.** Produces a typed AST in which every expression has a
-resolved type. Types are checked, not inferred, beyond local `let`. This stage
-also enforces the AVM-derived static rules: array indices in range where
-statically known, byte-length bounds, and the absence of constructs the machine
-cannot support.
-
-### 5.2 IR
-
-A typed, SSA-form control-flow graph. Functions contain basic blocks; blocks
-contain instructions and end in a terminator. Block arguments rather than
-phi nodes.
-
-The IR is deliberately *not* LLVM-shaped: there are no `alloca`, `load`, or
-`store` instructions, because there is no memory to address. Storage access is
-an explicit effectful instruction corresponding to an AVM opcode family
-(global state, local state, boxes), which keeps the analysis honest about what
-is a cheap register move and what is an expensive state access.
-
-`spec/ir.md` is the normative definition. The verifier (**R8**) enforces it.
-
-**Lowering** translates the typed AST to IR and is where all desugaring lives:
-control flow to blocks and branches, structs and fixed arrays to their
-component values, and — later — ARC-4 method routing and ABI encoding
-(**R7**: as generated IR, never as TEAL templates).
-
-**Optimisation** is a set of IR→IR passes. The absence of a heap and of
-aliasing makes the classical passes unusually straightforward: constant
-folding, dead-code elimination, common-subexpression elimination, copy
-propagation, function inlining. Each pass is independently testable, and the
-verifier runs after each.
-
-### 5.3 Cost analysis
-
-Computes a worst-case opcode-cost bound per entry point and **rejects programs
-that can exceed the budget** (700 for application mode, 20,000 for signature
-mode).
-
-Straight-line and branching code give exact bounds. Loops make this a bounds
-problem: where a bound is statically inferable it is used; where it is not, the
-loop must carry an explicit annotation acknowledging that the bound is
-unproven, and the compiler reports the program's cost as unbounded rather than
-guessing.
-
-This is the most differentiating capability in the design. A program that
-cannot exceed its budget is a program that cannot fail on-chain for the most
-common non-logic reason. Rule **R11** keeps the analyser honest by checking it
-against the AVM's measured cost on every differential test.
-
-### 5.4 Stack scheduling
-
-Turning SSA values into stack-machine code. A value consumed once, in order,
-can stay on the stack; anything else must be stored to a scratch slot and
-reloaded.
-
-Doing this well — using `dup`, `swap`, `cover`, `uncover`, and `dig` in place
-of naive store/load pairs — is the difference between mediocre and good code
-generation, and it is where the interesting engineering is. Prior art worth
-studying: WebAssembly's "stackification" of a CFG, Koopman's *Stack Computers*,
-and the RVSDG literature on regionalised dataflow.
-
-### 5.5 Scratch allocation
-
-Register allocation, with 256 registers and no cheap spill target. Standard
-approaches (linear scan, graph colouring) apply, with one difference from a
-conventional backend: **running out of slots is a compile error**, not a
-performance cliff, because the only place to spill to is boxes, at a cost that
-would usually blow the opcode budget anyway.
-
-### 5.6 Constant pooling and emission
-
-TEAL's `intcblock`/`bytecblock` mechanism makes constant pooling a genuine size
-optimisation rather than a cleanup: `intc_0` is one byte where `pushint` is
-variable-length, and program size is a hard 2 KB-per-page limit. Pooling
-selects which constants earn a block slot.
-
-Emission then produces TEAL text, and the linking step handles page splitting
-across the approval and clear programs within the size limit.
-
-### 5.7 Stage contracts
-
-Uniform, and enforced by review:
-
-```rust
-pub fn stage(input: Input, diags: &mut Diagnostics) -> Option<Output>;
-```
-
-- Pure (**R1**), so every stage is trivially testable in isolation.
-- `None` means errors were reported and no artifact is produced (**R3**).
-- Every boundary is snapshot-testable, which means a change in any stage
-  produces a reviewable diff at that stage's boundary rather than only in final
-  TEAL.
-- A stage cannot reach into another stage's internals, because the only thing
-  it receives is the previous stage's output type. This is the property that
-  makes the codebase safe to hand to agents working in parallel.
 
 ---
 
-## 6. Correctness strategy
+## 5. Amendment
 
-Four layers, in increasing order of strength.
+The friction here is deliberate and narrowly scoped. Implementation details
+should move freely; the shape of the compiler and the definition of the
+language should move only on purpose.
 
-**Unit tests.** Per-stage, per-pass. Ordinary.
+**This document.** A pull request that modifies `CONSTITUTION.md` **modifies no
+other file**. It states what is changing and why, and is reviewed on its own
+merits. This is a mechanical rule precisely so that it can be checked
+mechanically — a diff either touches this file alone or it does not touch it at
+all. Bundling a constitutional change into a feature branch is the failure mode
+the rule exists to prevent.
 
-**Snapshot tests** (`insta`) at every stage boundary. These catch *changes*.
-They do not catch *wrongness* — an incorrect first emission gets snapshotted
-and then defended forever. This is the limitation that motivates the next
-layer.
+**The language.** Governed by **R4**, and stricter still: an edit to
+`spec/language.md`, then a failing conformance test, then the implementation —
+in that order, and the spec edit is its own pull request.
 
-**Conformance tests** (`tests/conformance/`). The executable half of
-`spec/language.md`. Every language feature has at least one. Under **R4**,
-these are written before the implementation they describe.
+**Everything else** — the pipeline, stage internals, pass lists, repository
+layout — lives in [ARCHITECTURE.md](ARCHITECTURE.md) and is amended in the same
+pull request as the code that changes it. No ceremony.
 
-**Differential tests.** The primary defence against miscompilation:
-
-```
-  random Ava program
-     ├─► reference interpreter over the IR ──────────► result A
-     └─► compile to TEAL ──► execute on real AVM ────► result B
-  assert A == B
-  assert measured_cost <= predicted_bound          (R11)
-```
-
-Two independently derived answers to "what does this program mean". Any
-disagreement is a bug in the compiler or the interpreter — either way, a bug.
-`proptest` generates programs and shrinks failures to minimal reproducers
-automatically.
-
-This is what catches the bug class that matters: TEAL that assembles cleanly,
-passes every snapshot test, and means something subtly different from the
-source — a clobbered scratch slot, operands transposed by a `cover` sequence,
-an overflow check the optimiser removed. It is the technique that found
-hundreds of bugs in GCC and LLVM, and it is the reason the oracle is the real
-AVM rather than something we wrote.
-
----
-
-## 7. Repository layout
-
-```
-crates/
-  avmc-span/        source ids, spans, source map
-  avmc-diag/        diagnostics, codes, rendering
-  avmc-lexer/
-  avmc-ast/
-  avmc-parser/
-  avmc-sema/        name resolution, type checking
-  avmc-ir/          IR types, verifier, printer, reference interpreter
-  avmc-lower/       typed AST -> IR
-  avmc-opt/         IR -> IR passes
-  avmc-cost/        static budget analysis
-  avmc-backend/     stack scheduling, scratch allocation, pooling, TEAL emission
-  avmc-driver/      pipeline orchestration; the only crate with I/O
-  avmc-cli/         the `avmc` binary
-  avmc-oracle/      test-only: the Oracle trait + algod HTTP implementation
-tools/
-  oracle-sidecar/   (future) Go binary linking go-algorand
-spec/
-  language.md       normative Ava grammar and static semantics
-  ir.md             normative IR definition
-tests/
-  conformance/      executable language specification
-  golden/           end-to-end source -> TEAL snapshots
-  differential/     generative cross-checking against the AVM
-```
-
-The crate graph is a DAG matching the pipeline order. A dependency that runs
-backwards along the pipeline is an architecture violation.
-
----
-
-## 8. v0 milestone
-
-**A thin vertical slice through every stage.**
-
-The first milestone compiles a trivial program — a signature-mode program that
-approves based on one `uint64` comparison — end to end: lexer, parser,
-resolution, type checking, lowering to IR, the verifier, cost analysis, stack
-scheduling, scratch allocation, emission, and execution against a real AVM via
-the oracle.
-
-Chosen over "complete the frontend first" deliberately. The unknown risk in
-this project is concentrated in the back half — stack scheduling, scratch
-allocation, cost analysis. A complete type checker sitting on top of unproven
-codegen is a project that has retired none of its risk. The vertical slice
-proves the architecture, and every stage afterwards deepens a component whose
-interfaces are already exercised.
-
-v0 is complete when a `.ava` source file produces TEAL that the reference
-assembler accepts and the AVM executes with the expected result, with the whole
-path covered by a golden test and a differential test.
-
----
-
-## 9. Amendment
-
-**This document.** Changes to §2 (the frozen decisions) or §4 (binding rules)
-require an explicit pull request that changes only this file, states what is
-being changed and why, and is reviewed on its own. They are never made in
-passing as part of a feature branch.
-
-**The language.** Governed by **R4** and stricter: `spec/language.md` first,
-then a failing conformance test, then the implementation.
-
-**Everything else** — layout, stage internals, pass lists — may be amended in
-the ordinary course of work, updating this document in the same pull request
-that changes the code.
-
-The purpose of the friction is narrow. Implementation details should move
-freely; the shape of the compiler and the definition of the language should
-move only deliberately.
-
----
-
-## 10. Open questions
-
-Recorded rather than resolved, so they are decided explicitly.
-
-1. **Language name.** "Ava" is provisional. Fix before the spec stabilises.
-2. **Bounded recursion.** v0 forbids recursion. The AVM supports subroutines
-   via `callsub`/`retsub` with a bounded call stack; whether to allow recursion
-   with a statically proven depth bound depends on that limit, which must be
-   **verified against the pinned `go-algorand` consensus parameters** rather
-   than assumed. Until verified, no depth number appears in the spec.
-3. **Application mode in v0.** The v0 slice targets signature mode as the
-   simpler entry point. Application mode, state access, and ARC-4 routing
-   follow — the pipeline is designed for them (§5.2), but they are not v0.
-4. **Loop bound annotations.** Syntax and inference strength for the cost
-   analyser's loop bounds (§5.3) are undesigned. This is a language-surface
-   question and therefore falls under **R4**.
-5. **Error message conventions.** Diagnostic phrasing, code ranges, and
-   rendering style need a written guide before the diagnostic count grows.
-6. **Consensus parameter pinning.** The limits in §1 are current values. The
-   compiler must record which consensus version and TEAL version it targets,
-   and the numbers should be verified against a pinned `go-algorand` rather
-   than against documentation.
+**Work in progress** — milestones, open design questions, decisions not yet
+made — lives in the issue tracker, not in either document. A question that
+needs a decision needs an owner and a closing condition, and a bullet in a
+markdown file gives it neither.
