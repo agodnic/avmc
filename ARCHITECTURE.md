@@ -62,12 +62,6 @@ A typed, single-assignment **flat instruction list**. Not yet a control-flow
 graph — the language has no control flow, so a CFG would be one block, and a
 one-block CFG is an expression tree wearing a costume.
 
-The IR is deliberately *not* LLVM-shaped: there are no `alloca`, `load`, or
-`store` instructions, because there is no memory to address. Storage access is
-an explicit effectful instruction corresponding to an AVM opcode family
-(global state, local state, boxes), which keeps the analysis honest about what
-is a cheap stack operation and what is an expensive state access.
-
 The IR exists at v0 even though the AST could be emitted from directly, because
 it is the seam that lets the backend grow without the frontend noticing. The
 emitter consumes IR and nothing else, so extending the backend is a change to
