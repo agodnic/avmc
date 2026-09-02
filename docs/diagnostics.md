@@ -10,3 +10,4 @@ Codes are stable: once assigned, a code keeps its meaning (**R8**).
 | `E0004` | ``unknown type `{name}` `` | type checker |
 | `E0005` | `missing return` | type checker |
 | `E0006` | `unreachable statement` | type checker |
+| `E0007` | ``duplicate function `{name}` `` | lowering |
