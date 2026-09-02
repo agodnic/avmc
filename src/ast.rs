@@ -23,7 +23,7 @@ pub struct FuncDecl {
     pub span: Span,
 }
 
-/// An identifier and where it was written (R2).
+/// An identifier and where it was written (R1).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Name {
     /// The identifier text, sliced from the source.
