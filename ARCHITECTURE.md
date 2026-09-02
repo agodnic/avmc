@@ -147,8 +147,7 @@ automatically.
 
 - **v0 — algod over HTTP.** The harness compiles to TEAL and runs it on AlgoKit
   LocalNet via algod's compile and `simulate` endpoints, which return execution
-  result, per-opcode cost, and stack traces. One toolchain, simple CI, adequate
-  for a curated corpus.
+  result, per-opcode cost, and stack traces.
 - **Later — a Go sidecar.** A Go binary linking
   `go-algorand/data/transactions/logic` directly, speaking newline-delimited
   JSON over stdin/stdout: `{teal, mode, args}` in, `{approved, cost, error,
