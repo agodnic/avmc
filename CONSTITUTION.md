@@ -101,14 +101,14 @@ elsewhere carry both.
   parameter, never inferred from the source and never silently upgraded. Using
   an opcode unavailable in the target version is a compile error, not a runtime
   surprise.
-- **R7 — verify the IR.** The verifier runs at every IR boundary in debug and
+- **R6 — verify the IR.** The verifier runs at every IR boundary in debug and
   test builds: after lowering, and after each pass once passes exist. What it
   checks grows with the IR — type correctness and single assignment from the
   start, dominance and CFG well-formedness once there is control flow.
   Invariants are checked, not assumed.
-- **R8 — no panics.** Malformed source produces diagnostics, never a panic. In
+- **R7 — no panics.** Malformed source produces diagnostics, never a panic. In
   crates that process untrusted input, `unwrap`/`expect`/`panic!` are permitted
   only for conditions the IR verifier has already established.
-- **R9 — stable diagnostic codes.** Every diagnostic has a stable code
+- **R8 — stable diagnostic codes.** Every diagnostic has a stable code
   (`E0001`, `W0001`, …) and an entry in the diagnostics index. Codes are never
   reused for a different meaning.

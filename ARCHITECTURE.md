@@ -69,7 +69,7 @@ the IR and the emitter, not to the parser or the type checker.
 
 **The v0 invariant is what makes emission trivial:** every value has **exactly
 one use**, and uses appear in the order values are defined. Lowering an
-expression tree in post-order produces exactly this. The verifier (**R7** —
+expression tree in post-order produces exactly this. The verifier (**R6** —
 verify the IR) enforces it, along with type correctness and single assignment.
 
 **Lowering** translates the typed AST to IR and is where all desugaring lives.
