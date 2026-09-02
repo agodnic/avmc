@@ -11,3 +11,5 @@ Codes are stable: once assigned, a code keeps its meaning (**R8**).
 | `E0005` | `missing return` | type checker |
 | `E0006` | `unreachable statement` | type checker |
 | `E0007` | ``duplicate function `{name}` `` | lowering |
+| `E0008` | ``missing entry point `approval` `` | emitter |
+| `E0009` | ``` `{opcode}` requires TEAL version {min}, target is {target} ``` | emitter |
