@@ -57,10 +57,6 @@ These are the invariants agents and contributors must not violate. Each has a
 number for citation and a short tag naming what it requires; references
 elsewhere carry both.
 
-- **R1 — pure stages.** Stages are pure functions. Every pipeline stage has the
-  shape `fn(Input, &mut Diagnostics) -> Option<Output>`. No file I/O, no
-  network, no environment access, no global mutable state inside a stage. All
-  I/O lives in the driver module and `avmc-cli`.
 - **R2 — spans everywhere.** Spans are threaded end to end. Every token, AST
   node, IR instruction, and emitted opcode carries a source span. A diagnostic
   without a span is a bug.

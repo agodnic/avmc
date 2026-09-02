@@ -92,7 +92,9 @@ Uniform, and enforced by review:
 pub fn stage(input: Input, diags: &mut Diagnostics) -> Option<Output>;
 ```
 
-- Pure (**R1** — pure stages), so every stage is trivially testable in
+- **Stages are pure functions.** No file I/O, no network, no environment
+  access, no global mutable state inside a stage. All I/O lives in the driver
+  module and `avmc-cli`. Purity is what makes every stage trivially testable in
   isolation.
 - `None` means errors were reported and no artifact is produced (**R3** — no
   degraded output).
