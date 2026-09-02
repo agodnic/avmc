@@ -2,7 +2,9 @@
 
 pub mod ast;
 pub mod diagnostics;
+pub mod ir;
 pub mod lexer;
+pub mod lower;
 pub mod parser;
 pub mod typeck;
 pub mod typed_ast;
