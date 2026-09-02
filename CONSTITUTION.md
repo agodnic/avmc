@@ -60,22 +60,10 @@ elsewhere carry both.
 - **R1 — spans everywhere.** Spans are threaded end to end. Every token, AST
   node, IR instruction, and emitted opcode carries a source span. A diagnostic
   without a span is a bug.
-- **R2 — no degraded output.** Errors never silently degrade. A stage that
-  reports an error produces no output that a later stage will consume. We never
-  emit "best effort" TEAL. Recovery for the purpose of reporting *more*
-  diagnostics is encouraged; recovery that produces artifacts is forbidden.
 - **R3 — determinism.** For a fixed compiler version, input, and target TEAL
   version, output is byte-identical. No hash-map iteration order, no
   timestamps, no absolute paths, no parallelism-dependent ordering in emitted
   code.
-- **R4 — explicit TEAL version.** The target version is a required compilation
-  parameter, never inferred from the source and never silently upgraded. Using
-  an opcode unavailable in the target version is a compile error, not a runtime
-  surprise.
-- **R5 — verify the IR.** The verifier runs at every IR boundary in debug and
-  test builds: after lowering, and after each pass once passes exist. What it
-  checks grows with the IR — type correctness and single assignment from the
-  start, dominance and CFG well-formedness once there is control flow.
 - **R6 — no panics.** Malformed source produces diagnostics, never a panic. In
   crates that process untrusted input, `unwrap`/`expect`/`panic!` are permitted
   only for conditions the IR verifier has already established.
