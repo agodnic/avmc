@@ -105,7 +105,6 @@ elsewhere carry both.
   test builds: after lowering, and after each pass once passes exist. What it
   checks grows with the IR — type correctness and single assignment from the
   start, dominance and CFG well-formedness once there is control flow.
-  Invariants are checked, not assumed.
 - **R7 — no panics.** Malformed source produces diagnostics, never a panic. In
   crates that process untrusted input, `unwrap`/`expect`/`panic!` are permitted
   only for conditions the IR verifier has already established.
