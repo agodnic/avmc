@@ -72,8 +72,6 @@ one use**, and uses appear in the order values are defined. Lowering an
 expression tree in post-order produces exactly this. The verifier (**R8** —
 verify the IR) enforces it, along with type correctness and single assignment.
 
-`spec/ir.md` is the normative definition.
-
 **Lowering** translates the typed AST to IR and is where all desugaring lives.
 Later, ARC-4 method routing and ABI encoding land here too (**R7** — single
 emitter: as generated IR, never as TEAL templates).
