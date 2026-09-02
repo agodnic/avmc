@@ -3,12 +3,9 @@
 This document is the governing charter of `avmc`, a compiler targeting the
 Algorand Virtual Machine (AVM).
 
-**The decisions in §2 and the rules in §4 are frozen.** They change only
-through the process in §5, and that process is the reason this document is
-separate from [ARCHITECTURE.md](ARCHITECTURE.md): everything here is meant to
-sit still, and everything there is meant to move. Contributors — human or agent
-— are expected to read this before writing code, and to treat a conflict
-between this document and the code as a bug in the code.
+Contributors — human or agent — are expected to read this before writing code,
+and to treat a conflict between this document and the code as a bug in the
+code.
 
 For how the compiler is actually built — the pipeline, the stage contracts, the
 correctness strategy, the repository layout — see
@@ -57,27 +54,6 @@ Three consequences drive the whole design:
 **We emit TEAL assembly text**, version-pinned with an explicit `#pragma
 version N`, and hand it to the existing Algorand assembler (`goal clerk
 compile` / algod's compile endpoint) to produce bytecode.
-
-**We do not target LLVM IR or WebAssembly.** The usual argument for them — a
-free backend and free differential testing — does not hold for the AVM:
-
-- **LLVM IR** is organised around `load`/`store` against a flat address space
-  with pointers. The AVM has no address space. Running LLVM output would
-  require emulating linear memory over 256 scratch slots or byte-slice
-  concatenation, spending multiple opcodes per synthetic memory access against
-  a 700-opcode budget. There is no AVM backend in LLVM, and writing one is a
-  larger project than this compiler.
-- **WebAssembly** has the same linear-memory mismatch plus an i32-centric type
-  system that does not correspond to `uint64`/`[]byte`. A Wasm→TEAL translator
-  is a research project in its own right.
-
-Neither provides a free backend, because neither has a backend that reaches the
-AVM. What they would provide is a permanent impedance mismatch.
-
-TEAL text is a good target on its merits: it is human-readable, so every
-codegen change is visible in a diff; it is stable and versioned; and the
-reference assembler and interpreter already exist and are the consensus
-implementation.
 
 **We define our own IR.** Not LLVM's — a typed, single-assignment IR designed
 around `uint64`/`[]byte` and the absence of a heap. It begins as a flat

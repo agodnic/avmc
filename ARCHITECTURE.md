@@ -3,34 +3,12 @@
 How `avmc` is built: the compilation pipeline, the contracts between its
 stages, the correctness strategy, the growth path, and the repository layout.
 
-This document is **living**. It is amended in the ordinary course of work, in
-the same pull request that changes the code it describes.
-
-Its companion, **[CONSTITUTION.md](CONSTITUTION.md)**, is not. That document
-holds the AVM constraints every decision here derives from (§1), the frozen
-decisions about target, source language, and implementation (§2), and the
-binding rules **R1**–**R11** (§4) that this document cites throughout. Changing
-those requires a dedicated pull request; changing this one does not.
-
-Read the constitution first. This document assumes it.
+Read [CONSTITUTION.md](CONSTITUTION.md) first. This document assumes it.
 
 ## 1. Design posture
 
 **Start at the simplest thing that is honestly end-to-end, and grow each stage
 only when a language feature forces it.**
-
-An earlier draft of this document specified an optimiser, a stack scheduler, a
-scratch-slot allocator, and a constant pooler before a line of code existed.
-That was over-built. The stated justification — that building them early
-retires the risk concentrated in the back half — does not survive inspection:
-a *trivial* implementation of a hard stage retires nothing about that stage.
-Post-order emission teaches you nothing about real stack scheduling.
-
-What v0 genuinely retires is **integration** risk: whether the whole path
-works, whether the oracle works, whether we can execute emitted TEAL on a real
-AVM and compare results. That is worth having on day one. Algorithmic risk in
-the backend is retired later, when there is a language feature that demands the
-algorithm.
 
 §2 is the pipeline as it exists. §4 is the schedule by which it grows, and the
 feature that forces each step. Nothing is added to §2 speculatively — if a
