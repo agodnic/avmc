@@ -32,10 +32,7 @@ pub fn emit(
 
 /// Finds the entry point, reporting it if there is none.
 fn entry_point<'a>(program: &'a ir::Program, diags: &mut Diagnostics) -> Option<&'a Function> {
-    let entry = program
-        .funcs
-        .iter()
-        .find(|func| func.name.text == ENTRY_POINT);
+    let entry = program.funcs.iter().find(|func| func.name == ENTRY_POINT);
 
     if entry.is_none() {
         diags.push(Diagnostic {

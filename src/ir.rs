@@ -1,7 +1,6 @@
 //! The IR: a flat single-assignment instruction list, and the verifier that
 //! enforces its invariant.
 
-use crate::ast::Name;
 use crate::diagnostics::Span;
 use crate::typed_ast::Type;
 
@@ -34,7 +33,7 @@ pub enum Inst {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Function {
     /// The declared name.
-    pub name: Name,
+    pub name: String,
     /// The return type.
     pub ret: Type,
     /// The instructions, in execution order.
@@ -126,10 +125,7 @@ mod tests {
 
     fn function(insts: Vec<Inst>) -> Function {
         Function {
-            name: Name {
-                text: "approval".to_string(),
-                span: SPAN,
-            },
+            name: "approval".to_string(),
             ret: Type::Uint64,
             insts,
             span: SPAN,
