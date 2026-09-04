@@ -14,6 +14,9 @@ const EXAMPLE: &str = "func approval() uint64 { return 1 }";
 /// The TEAL the example program compiles to for version 10.
 const EXAMPLE_TEAL: &str = "#pragma version 10\npushint 1\nreturn\n";
 
+/// The usage line the binary reports for any bad argument list.
+const USAGE: &str = "usage: avmc <file> --teal-version <N>, with N from 1 to 11\n";
+
 /// A source file that lives for as long as one test, named after it so that
 /// tests running in parallel never share a path.
 struct SourceFile {
@@ -120,7 +123,7 @@ fn rejects_a_missing_version() {
     let output = run(&[file.path()]);
 
     assert_eq!(stdout(&output), "");
-    assert_eq!(stderr(&output), "usage: avmc <file> --teal-version <N>\n");
+    assert_eq!(stderr(&output), USAGE);
     assert_eq!(code(&output), 2);
 }
 
@@ -130,7 +133,37 @@ fn rejects_a_version_that_is_not_a_number() {
     let output = run(&[file.path(), "--teal-version", "abc"]);
 
     assert_eq!(stdout(&output), "");
-    assert_eq!(stderr(&output), "usage: avmc <file> --teal-version <N>\n");
+    assert_eq!(stderr(&output), USAGE);
+    assert_eq!(code(&output), 2);
+}
+
+#[test]
+fn rejects_a_version_below_the_supported_range() {
+    let file = SourceFile::new("rejects_a_version_below_the_supported_range", EXAMPLE);
+    let output = run(&[file.path(), "--teal-version", "0"]);
+
+    assert_eq!(stdout(&output), "");
+    assert_eq!(stderr(&output), USAGE);
+    assert_eq!(code(&output), 2);
+}
+
+#[test]
+fn rejects_a_version_above_the_supported_range() {
+    let file = SourceFile::new("rejects_a_version_above_the_supported_range", EXAMPLE);
+    let output = run(&[file.path(), "--teal-version", "255"]);
+
+    assert_eq!(stdout(&output), "");
+    assert_eq!(stderr(&output), USAGE);
+    assert_eq!(code(&output), 2);
+}
+
+#[test]
+fn rejects_a_version_that_does_not_fit_in_a_byte() {
+    let file = SourceFile::new("rejects_a_version_that_does_not_fit_in_a_byte", EXAMPLE);
+    let output = run(&[file.path(), "--teal-version", "256"]);
+
+    assert_eq!(stdout(&output), "");
+    assert_eq!(stderr(&output), USAGE);
     assert_eq!(code(&output), 2);
 }
 

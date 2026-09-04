@@ -4,8 +4,25 @@ use crate::diagnostics::{Diagnostic, DiagnosticKind, Diagnostics, Span};
 use crate::ir::{self, Function, Inst};
 
 /// The TEAL version the output targets.
+///
+/// A value of this type is always a version the AVM accepts: it can only be
+/// built by [`TealVersion::new`], which bounds it.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct TealVersion(pub u8);
+pub struct TealVersion(u8);
+
+impl TealVersion {
+    /// The oldest TEAL version the AVM accepts.
+    pub const MIN: u8 = 1;
+    /// The newest TEAL version the AVM accepts.
+    pub const MAX: u8 = 11;
+
+    /// `version`, or `None` if it is outside the supported range.
+    pub fn new(version: u8) -> Option<Self> {
+        (Self::MIN..=Self::MAX)
+            .contains(&version)
+            .then_some(Self(version))
+    }
+}
 
 /// The function the program starts at.
 const ENTRY_POINT: &str = "approval";
@@ -138,7 +155,8 @@ mod tests {
         let parsed = parse(source, &tokens, diags).expect("parsing succeeded");
         let checked = check(&parsed, diags).expect("checking succeeded");
         let ir = lower(&checked, diags).expect("lowering succeeded");
-        emit(&ir, TealVersion(version), diags)
+        let version = TealVersion::new(version).expect("a supported version");
+        emit(&ir, version, diags)
     }
 
     /// The span of the `nth` occurrence of `text` in `source`, counting from 0.
@@ -209,6 +227,25 @@ mod tests {
                 span: Span { start: 0, end: 0 },
             }]
         );
+    }
+
+    #[test]
+    fn the_bounds_are_supported_versions() {
+        assert_eq!(
+            TealVersion::new(TealVersion::MIN),
+            Some(TealVersion(TealVersion::MIN))
+        );
+        assert_eq!(
+            TealVersion::new(TealVersion::MAX),
+            Some(TealVersion(TealVersion::MAX))
+        );
+    }
+
+    #[test]
+    fn a_version_outside_the_bounds_is_rejected() {
+        assert_eq!(TealVersion::new(TealVersion::MIN - 1), None);
+        assert_eq!(TealVersion::new(TealVersion::MAX + 1), None);
+        assert_eq!(TealVersion::new(u8::MAX), None);
     }
 
     #[test]

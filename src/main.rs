@@ -12,12 +12,10 @@ const FAILURE: u8 = 2;
 /// Exit code for a source file that does not compile.
 const COMPILE_ERRORS: u8 = 1;
 
-const USAGE: &str = "usage: avmc <file> --teal-version <N>";
-
 fn main() -> ExitCode {
     let args: Vec<String> = std::env::args().skip(1).collect();
     let Some((path, version)) = parse_args(&args) else {
-        report(USAGE);
+        report(&usage());
         return ExitCode::from(FAILURE);
     };
 
@@ -48,13 +46,22 @@ fn main() -> ExitCode {
     }
 }
 
+/// The usage line, naming the TEAL versions the compiler targets.
+fn usage() -> String {
+    format!(
+        "usage: avmc <file> --teal-version <N>, with N from {} to {}",
+        TealVersion::MIN,
+        TealVersion::MAX
+    )
+}
+
 /// The file path and target version, or `None` for any other argument list.
 ///
 /// The path is taken as given: it is never canonicalised and its extension is
 /// never inspected.
 fn parse_args(args: &[String]) -> Option<(String, TealVersion)> {
     let mut path: Option<&String> = None;
-    let mut version: Option<u8> = None;
+    let mut version: Option<TealVersion> = None;
 
     let mut args = args.iter();
     while let Some(arg) = args.next() {
@@ -62,7 +69,9 @@ fn parse_args(args: &[String]) -> Option<(String, TealVersion)> {
             if version.is_some() {
                 return None;
             }
-            version = Some(args.next()?.parse().ok()?);
+            // An out-of-range version is a usage error, like a missing one.
+            let requested: u8 = args.next()?.parse().ok()?;
+            version = Some(TealVersion::new(requested)?);
         } else {
             if path.is_some() {
                 return None;
@@ -71,7 +80,7 @@ fn parse_args(args: &[String]) -> Option<(String, TealVersion)> {
         }
     }
 
-    Some((path?.clone(), TealVersion(version?)))
+    Some((path?.clone(), version?))
 }
 
 /// Writes one line to stderr, ignoring a stderr that cannot be written to.
