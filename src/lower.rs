@@ -16,6 +16,7 @@ pub fn lower(program: &typed_ast::Program, diags: &mut Diagnostics) -> Option<Pr
     #[cfg(debug_assertions)]
     for func in &funcs {
         // Only a compiler bug can reach this.
+        #[expect(clippy::panic, reason = "a verifier failure is a compiler bug")]
         if let Err(message) = crate::ir::verify(func) {
             panic!("{message}");
         }
@@ -83,6 +84,10 @@ fn next_value(insts: &[Inst]) -> ValueId {
         .iter()
         .filter(|inst| matches!(inst, Inst::Const { .. }))
         .count();
+    #[expect(
+        clippy::cast_possible_truncation,
+        reason = "a function cannot define u32::MAX values"
+    )]
     ValueId(defined as u32)
 }
 
