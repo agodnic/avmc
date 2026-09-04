@@ -57,10 +57,9 @@ pub struct Program {
 pub fn verify(func: &Function) -> Result<(), String> {
     verify_return(func)?;
 
-    // The number of values defined and the number used so far. Together they
-    // give rules 1 to 3: the next definition must be `ValueId(defs)`, and the
-    // next use must be `ValueId(uses)`, which was defined only if it is below
-    // `defs`.
+    // The number of values defined and the number used so far: the next
+    // definition must be `ValueId(defs)`, and the next use must be
+    // `ValueId(uses)`, which was defined only if it is below `defs`.
     let mut defs = 0;
     let mut uses = 0;
 
@@ -69,7 +68,7 @@ pub fn verify(func: &Function) -> Result<(), String> {
             Inst::Const { dest, .. } => {
                 if dest.0 != defs {
                     return Err(format!(
-                        "rule 1 (dense single assignment): instruction {index} defines %{}, expected %{defs}",
+                        "dense single assignment: instruction {index} defines %{}, expected %{defs}",
                         dest.0
                     ));
                 }
@@ -78,13 +77,13 @@ pub fn verify(func: &Function) -> Result<(), String> {
             Inst::Return { value, .. } => {
                 if value.0 >= defs {
                     return Err(format!(
-                        "rule 2 (defined before used): instruction {index} uses %{}, which is not yet defined",
+                        "defined before used: instruction {index} uses %{}, which is not yet defined",
                         value.0
                     ));
                 }
                 if value.0 != uses {
                     return Err(format!(
-                        "rule 3 (used exactly once, in definition order): instruction {index} uses %{}, expected %{uses}",
+                        "used exactly once, in definition order: instruction {index} uses %{}, expected %{uses}",
                         value.0
                     ));
                 }
@@ -95,27 +94,25 @@ pub fn verify(func: &Function) -> Result<(), String> {
 
     if uses != defs {
         return Err(format!(
-            "rule 3 (used exactly once, in definition order): {defs} values defined but {uses} used"
+            "used exactly once, in definition order: {defs} values defined but {uses} used"
         ));
     }
     Ok(())
 }
 
-/// Checks rule 4: the last instruction is a `Return`, and no other one is.
+/// Checks that the last instruction is a `Return`, and no other one is.
 fn verify_return(func: &Function) -> Result<(), String> {
     let last = func.insts.len().checked_sub(1);
     for (index, inst) in func.insts.iter().enumerate() {
         if matches!(inst, Inst::Return { .. }) && Some(index) != last {
             return Err(format!(
-                "rule 4 (ends with `Return`): instruction {index} returns but is not the last"
+                "ends with `Return`: instruction {index} returns but is not the last"
             ));
         }
     }
     match func.insts.last() {
         Some(Inst::Return { .. }) => Ok(()),
-        _ => {
-            Err("rule 4 (ends with `Return`): the function does not end with a return".to_string())
-        }
+        _ => Err("ends with `Return`: the function does not end with a return".to_string()),
     }
 }
 
