@@ -1,5 +1,10 @@
 //! End-to-end tests of the `avmc` binary.
 
+// The test helpers here are neither `#[test]` functions nor a `cfg(test)`
+// module, so `clippy.toml` does not exempt them: a panic in test setup is a
+// failing test.
+#![expect(clippy::expect_used, reason = "test setup")]
+
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
 

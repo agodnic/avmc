@@ -6,3 +6,9 @@ license = "MIT"
 
 [lints.rust]
 unsafe_code = "forbid"
+
+[lints.clippy]
+unwrap_used = "warn"
+expect_used = "warn"
+panic = "warn"
+cast_possible_truncation = "warn"
