@@ -1,16 +1,11 @@
 //! Lowering: a typed AST to IR.
 
-use crate::diagnostics::{Diagnostic, DiagnosticKind, Diagnostics};
+use crate::diagnostics::Diagnostics;
 use crate::ir::{Function, Inst, Program, ValueId};
 use crate::typed_ast::{self, Expr, ExprKind, Stmt};
-use std::collections::HashSet;
 
 /// Lowers every function in `program`, in source order.
-///
-/// Reports every duplicate name and returns `None` if it found any.
-pub fn lower(program: &typed_ast::Program, diags: &mut Diagnostics) -> Option<Program> {
-    check_duplicates(program, diags)?;
-
+pub fn lower(program: &typed_ast::Program, _diags: &mut Diagnostics) -> Option<Program> {
     let funcs: Vec<Function> = program.funcs.iter().map(lower_func).collect();
 
     #[cfg(debug_assertions)]
@@ -23,27 +18,6 @@ pub fn lower(program: &typed_ast::Program, diags: &mut Diagnostics) -> Option<Pr
     }
 
     Some(Program { funcs })
-}
-
-/// Reports every declaration whose name was already declared, returning `None`
-/// if there was one.
-fn check_duplicates(program: &typed_ast::Program, diags: &mut Diagnostics) -> Option<()> {
-    let mut seen = HashSet::new();
-    let mut ok = true;
-
-    for func in &program.funcs {
-        if !seen.insert(func.name.text.as_str()) {
-            diags.push(Diagnostic {
-                kind: DiagnosticKind::DuplicateFunction {
-                    name: func.name.text.clone(),
-                },
-                span: func.name.span,
-            });
-            ok = false;
-        }
-    }
-
-    ok.then_some(())
 }
 
 /// Lowers one function. `ValueId`s restart at 0.
@@ -108,15 +82,6 @@ mod tests {
         let program = pipeline(source, &mut diags);
         assert!(diags.is_empty());
         program.expect("lowering succeeded")
-    }
-
-    /// Lexes, parses, checks and lowers `source`, asserting that lowering
-    /// produced nothing, and returning the diagnostics in the order they were
-    /// reported.
-    fn lower_err(source: &str) -> Vec<Diagnostic> {
-        let mut diags = Diagnostics::default();
-        assert_eq!(pipeline(source, &mut diags), None);
-        diags.iter().cloned().collect()
     }
 
     fn pipeline(source: &str, diags: &mut Diagnostics) -> Option<Program> {
@@ -218,42 +183,6 @@ mod tests {
                     },
                 ],
             }
-        );
-    }
-
-    #[test]
-    fn duplicate_name_is_reported_at_the_later_declaration() {
-        let source = "func a() uint64 { return 1 } func a() uint64 { return 2 }";
-        assert_eq!(
-            lower_err(source),
-            vec![Diagnostic {
-                kind: DiagnosticKind::DuplicateFunction {
-                    name: "a".to_string(),
-                },
-                span: span_of(source, "a", 1),
-            }]
-        );
-    }
-
-    #[test]
-    fn every_duplicate_is_reported_in_source_order() {
-        let source = "func a() uint64 { return 1 } func a() uint64 { return 2 } func a() uint64 { return 3 }";
-        assert_eq!(
-            lower_err(source),
-            vec![
-                Diagnostic {
-                    kind: DiagnosticKind::DuplicateFunction {
-                        name: "a".to_string(),
-                    },
-                    span: span_of(source, "a", 1),
-                },
-                Diagnostic {
-                    kind: DiagnosticKind::DuplicateFunction {
-                        name: "a".to_string(),
-                    },
-                    span: span_of(source, "a", 2),
-                },
-            ]
         );
     }
 }

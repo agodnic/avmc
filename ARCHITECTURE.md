@@ -52,7 +52,8 @@ checker.
 **Type checking.** Produces a typed AST in which every expression has a
 resolved type. Types are checked, not inferred, beyond local `let`. This stage
 also enforces the AVM-derived static rules: byte-length bounds and the absence
-of constructs the machine cannot support.
+of constructs the machine cannot support, and rejects duplicate declarations
+until there is a name resolution stage to own that rule.
 
 ### 2.2 IR
 
