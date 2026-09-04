@@ -77,7 +77,7 @@ fn lower_expr(expr: &Expr, insts: &mut Vec<Inst>) -> ValueId {
 }
 
 /// The value the next definition takes: one past the values defined so far,
-/// which keeps definitions dense (the IR's rule 1).
+/// which keeps definitions dense.
 fn next_value(insts: &[Inst]) -> ValueId {
     let defined = insts
         .iter()
