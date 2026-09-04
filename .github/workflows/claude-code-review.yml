@@ -1,0 +1,42 @@
+name: Claude Code Review
+
+on:
+  pull_request:
+    types: [opened, synchronize, ready_for_review, reopened]
+
+# The comments are posted by the Claude GitHub App, not by GITHUB_TOKEN, so
+# nothing here needs write access.
+permissions:
+  contents: read
+  pull-requests: read
+  issues: read
+  id-token: write
+
+jobs:
+  review:
+    name: review the diff
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 1
+
+      - uses: anthropics/claude-code-action@v1
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          plugin_marketplaces: "https://github.com/anthropics/claude-code.git"
+          plugins: "code-review@claude-code-plugins"
+          # --comment is what puts the review on the pull request: an inline
+          # comment per issue found, or one summary comment when it finds none.
+          prompt: "/code-review:code-review --comment ${{ github.repository }}/pull/${{ github.event.pull_request.number }}"
+          # --allowedTools must stay even though the plugin's own frontmatter
+          # names the same tool: the action starts the inline-comment MCP server
+          # only when claude_args names it.
+          #
+          # CLAUDE.md is loaded automatically, ARCHITECTURE.md is not, hence the
+          # pointer. The rules are restated rather than only cited, so that
+          # renumbering ARCHITECTURE.md degrades the prompt instead of emptying
+          # it.
+          claude_args: |
+            --allowedTools "mcp__github_inline_comment__create_inline_comment"
+            --append-system-prompt "Read ARCHITECTURE.md before reviewing, and check the diff against it. Stage contracts: stages are pure functions, with all I/O in the driver and the CLI; a stage that reports an error produces no output a later stage consumes, expressed as None; a stage never reaches into another stage's internals. Invariants: every token, AST node, IR instruction and emitted opcode carries a source span, and a diagnostic without a span is a bug; output is byte-identical for a fixed compiler version, input and target TEAL version, so no hash-map iteration order, timestamps, absolute paths or parallelism-dependent ordering; malformed source produces diagnostics, never a panic, and unwrap/expect/panic! are permitted only for conditions the IR verifier has already established. For IR changes, check the v0 invariant that every value has exactly one use and that uses appear in the order values are defined. The target TEAL version is a required parameter, never inferred and never silently upgraded. Report a violation of any of these as a bug."
