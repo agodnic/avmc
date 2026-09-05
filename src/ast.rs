@@ -61,3 +61,12 @@ pub enum Expr {
         span: Span,
     },
 }
+
+impl Expr {
+    /// Where it was written.
+    pub fn span(&self) -> Span {
+        match self {
+            Expr::IntLit { span, .. } => *span,
+        }
+    }
+}

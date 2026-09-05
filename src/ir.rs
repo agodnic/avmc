@@ -29,6 +29,15 @@ pub enum Inst {
     },
 }
 
+impl Inst {
+    /// The source it came from.
+    pub fn span(&self) -> Span {
+        match self {
+            Inst::Const { span, .. } | Inst::Return { span, .. } => *span,
+        }
+    }
+}
+
 /// A function's body, as instructions.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Function {
