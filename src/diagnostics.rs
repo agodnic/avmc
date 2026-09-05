@@ -156,8 +156,11 @@ mod tests {
     use super::*;
 
     /// One sample of every variant, with the code and message it renders as.
+    ///
+    /// A new variant does not compile until the match below covers it, which
+    /// is the reminder to list a sample for it here.
     fn samples() -> Vec<(DiagnosticKind, &'static str, &'static str)> {
-        vec![
+        let samples = vec![
             (
                 DiagnosticKind::UnexpectedCharacter,
                 "E0001",
@@ -210,7 +213,25 @@ mod tests {
                 "E0009",
                 "`pushint` requires TEAL version 3, target is 2",
             ),
-        ]
+        ];
+
+        // Exhaustive, with no wildcard arm, so that adding a variant to
+        // `DiagnosticKind` stops the tests from compiling.
+        for (kind, _, _) in &samples {
+            match kind {
+                DiagnosticKind::UnexpectedCharacter
+                | DiagnosticKind::UnexpectedToken { .. }
+                | DiagnosticKind::IntegerLiteralOutOfRange
+                | DiagnosticKind::UnknownType { .. }
+                | DiagnosticKind::MissingReturn
+                | DiagnosticKind::UnreachableStatement
+                | DiagnosticKind::DuplicateFunction { .. }
+                | DiagnosticKind::MissingEntryPoint { .. }
+                | DiagnosticKind::OpcodeUnavailable { .. } => {}
+            }
+        }
+
+        samples
     }
 
     #[test]
