@@ -89,9 +89,7 @@ of an expression tree *is* optimal stack code.
 
 **The target TEAL version is a required compilation parameter**, never inferred
 from the source and never silently upgraded. Using an opcode unavailable in the
-target version is a compile error. The parameter is bounded by the versions the
-AVM defines — a version outside that range is a CLI usage error, so emission
-never writes a `#pragma version` line no AVM would accept.
+target version is a compile error.
 
 ### 2.4 Stage contracts
 
