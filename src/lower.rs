@@ -31,7 +31,7 @@ fn lower_func(func: &typed_ast::FuncDecl) -> Function {
     }
 
     Function {
-        name: func.name.clone(),
+        name: func.name.text.clone(),
         ret: func.ret,
         insts,
         span: func.span,
@@ -68,7 +68,6 @@ fn next_value(insts: &[Inst]) -> ValueId {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::ast::Name;
     use crate::diagnostics::Span;
     use crate::lexer::lex;
     use crate::parser::parse;
@@ -104,13 +103,6 @@ mod tests {
         }
     }
 
-    fn name(source: &str, text: &str, nth: usize) -> Name {
-        Name {
-            text: text.to_string(),
-            span: span_of(source, text, nth),
-        }
-    }
-
     #[test]
     fn example_program() {
         let source = "func approval() uint64 { return 1 }";
@@ -118,7 +110,7 @@ mod tests {
             lower_ok(source),
             Program {
                 funcs: vec![Function {
-                    name: name(source, "approval", 0),
+                    name: "approval".to_string(),
                     ret: Type::Uint64,
                     insts: vec![
                         Inst::Const {
@@ -150,7 +142,7 @@ mod tests {
             Program {
                 funcs: vec![
                     Function {
-                        name: name(source, "a", 0),
+                        name: "a".to_string(),
                         ret: Type::Uint64,
                         insts: vec![
                             Inst::Const {
@@ -166,7 +158,7 @@ mod tests {
                         span: span_of(source, "func a() uint64 { return 1 }", 0),
                     },
                     Function {
-                        name: name(source, "b", 0),
+                        name: "b".to_string(),
                         ret: Type::Uint64,
                         insts: vec![
                             Inst::Const {
