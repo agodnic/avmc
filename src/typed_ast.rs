@@ -60,3 +60,10 @@ pub enum ExprKind {
     /// An integer literal.
     IntLit(u64),
 }
+
+impl Expr {
+    /// Where it was written.
+    pub fn span(&self) -> Span {
+        self.span
+    }
+}

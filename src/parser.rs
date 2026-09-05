@@ -63,13 +63,10 @@ impl Parser<'_> {
             .span
             .start;
         let expr = self.expr()?;
-        let Expr::IntLit { span, .. } = expr;
+        let end = expr.span().end;
         Some(Stmt::Return {
             expr,
-            span: Span {
-                start,
-                end: span.end,
-            },
+            span: Span { start, end },
         })
     }
 

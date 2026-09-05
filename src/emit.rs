@@ -75,7 +75,7 @@ fn check_versions(func: &Function, version: TealVersion, diags: &mut Diagnostics
                     min,
                     target: version.0,
                 },
-                span: span(inst),
+                span: inst.span(),
             });
             ok = false;
         }
@@ -109,13 +109,6 @@ fn line(inst: &Inst) -> String {
     match inst {
         Inst::Const { value, .. } => format!("{} {value}", opcode(inst)),
         Inst::Return { .. } => opcode(inst).to_string(),
-    }
-}
-
-/// The source an instruction came from.
-fn span(inst: &Inst) -> Span {
-    match inst {
-        Inst::Const { span, .. } | Inst::Return { span, .. } => *span,
     }
 }
 
