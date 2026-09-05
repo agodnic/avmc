@@ -3,16 +3,17 @@
 use crate::ast;
 use crate::diagnostics::{Diagnostic, DiagnosticKind, Diagnostics};
 use crate::typed_ast::{Expr, ExprKind, FuncDecl, Program, Stmt, Type};
+use std::collections::HashSet;
 
 /// The one type name the language has.
 const UINT64: &str = "uint64";
 
-/// Checks every function in `program`, in source order.
+/// Checks `program`: its declared names, then every function in source order.
 ///
 /// Reports every problem it finds, and returns `None` if it found any.
 pub fn check(program: &ast::Program, diags: &mut Diagnostics) -> Option<Program> {
+    let mut ok = check_duplicates(program, diags);
     let mut funcs = Vec::new();
-    let mut ok = true;
 
     for func in &program.funcs {
         match check_func(func, diags) {
@@ -22,6 +23,27 @@ pub fn check(program: &ast::Program, diags: &mut Diagnostics) -> Option<Program>
     }
 
     ok.then_some(Program { funcs })
+}
+
+/// Reports every declaration whose name was already declared, returning false
+/// if there was one.
+fn check_duplicates(program: &ast::Program, diags: &mut Diagnostics) -> bool {
+    let mut seen = HashSet::new();
+    let mut ok = true;
+
+    for func in &program.funcs {
+        if !seen.insert(func.name.text.as_str()) {
+            diags.push(Diagnostic {
+                kind: DiagnosticKind::DuplicateFunction {
+                    name: func.name.text.clone(),
+                },
+                span: func.name.span,
+            });
+            ok = false;
+        }
+    }
+
+    ok
 }
 
 /// Checks one function. The three rules are independent: a return type that
@@ -242,6 +264,74 @@ mod tests {
                 Diagnostic {
                     kind: DiagnosticKind::MissingReturn,
                     span: span("b"),
+                },
+            ]
+        );
+    }
+
+    #[test]
+    fn duplicate_name_is_reported_at_the_later_declaration() {
+        let source = "func a() uint64 { return 1 } func a() uint64 { return 2 }";
+        let mut span = spans(source);
+        span("a");
+
+        assert_eq!(
+            check_err(source),
+            vec![Diagnostic {
+                kind: DiagnosticKind::DuplicateFunction {
+                    name: "a".to_string(),
+                },
+                span: span("a"),
+            }]
+        );
+    }
+
+    #[test]
+    fn every_duplicate_is_reported_in_source_order() {
+        let source = "func a() uint64 { return 1 } func a() uint64 { return 2 } func a() uint64 { return 3 }";
+        let mut span = spans(source);
+        span("a");
+
+        assert_eq!(
+            check_err(source),
+            vec![
+                Diagnostic {
+                    kind: DiagnosticKind::DuplicateFunction {
+                        name: "a".to_string(),
+                    },
+                    span: span("a"),
+                },
+                Diagnostic {
+                    kind: DiagnosticKind::DuplicateFunction {
+                        name: "a".to_string(),
+                    },
+                    span: span("a"),
+                },
+            ]
+        );
+    }
+
+    #[test]
+    fn a_duplicate_and_a_type_error_are_reported_together() {
+        let source = "func a() uint64 { return 1 } func a() bytes { return 2 }";
+        let mut span = spans(source);
+        span("a");
+        let duplicate = span("a");
+
+        assert_eq!(
+            check_err(source),
+            vec![
+                Diagnostic {
+                    kind: DiagnosticKind::DuplicateFunction {
+                        name: "a".to_string(),
+                    },
+                    span: duplicate,
+                },
+                Diagnostic {
+                    kind: DiagnosticKind::UnknownType {
+                        name: "bytes".to_string(),
+                    },
+                    span: span("bytes"),
                 },
             ]
         );
