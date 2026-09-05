@@ -56,7 +56,8 @@ mod tests {
     /// asserting that nothing was emitted.
     fn compile_err(source: &str, version: u8) -> Vec<DiagnosticKind> {
         let mut diags = Diagnostics::default();
-        assert_eq!(compile(source, TealVersion(version), &mut diags), None);
+        let version = TealVersion::new(version).expect("a supported version");
+        assert_eq!(compile(source, version, &mut diags), None);
         diags.iter().map(|diag| diag.kind.clone()).collect()
     }
 
@@ -80,8 +81,9 @@ mod tests {
     #[test]
     fn example_program_compiles() {
         let mut diags = Diagnostics::default();
+        let version = TealVersion::new(10).expect("a supported version");
         assert_eq!(
-            compile(EXAMPLE, TealVersion(10), &mut diags),
+            compile(EXAMPLE, version, &mut diags),
             Some("#pragma version 10\npushint 1\nreturn\n".to_string())
         );
         assert!(diags.is_empty());
