@@ -118,7 +118,7 @@ pub fn stage(input: Input, diags: &mut Diagnostics) -> Option<Output>;
 
 ## 3. Correctness strategy
 
-Four layers, in increasing order of strength.
+Three layers, in increasing order of strength.
 
 **Unit tests.** Per-stage, per-pass. Ordinary.
 
@@ -129,37 +129,6 @@ layer.
 
 **Conformance tests** (`tests/conformance/`). The executable half of
 `spec/language.md`. Every language feature has at least one.
-
-**Differential tests.** The primary defence against miscompilation:
-
-```
-  random source program
-     ├─► reference interpreter over the IR ──────────► result A
-     └─► compile to TEAL ──► execute on real AVM ────► result B
-  assert A == B
-```
-
-Two independently derived answers to "what does this program mean". Any
-disagreement is a bug in the compiler or the interpreter — either way, a bug.
-`proptest` generates programs and shrinks failures to minimal reproducers
-automatically.
-
-**Reaching the real AVM** happens in two phases:
-
-- **v0 — algod over HTTP.** The harness compiles to TEAL and runs it on AlgoKit
-  LocalNet via algod's compile and `simulate` endpoints, which return execution
-  result, per-opcode cost, and stack traces.
-- **Later — a Go sidecar.** A Go binary linking
-  `go-algorand/data/transactions/logic` directly, speaking newline-delimited
-  JSON over stdin/stdout: `{teal, mode, args}` in, `{approved, cost, error,
-  final_stack}` out. Per-case overhead drops from a network round-trip to tens
-  of microseconds, which is what makes large generative campaigns practical.
-
-This is what catches the bug class that matters: TEAL that assembles cleanly,
-passes every snapshot test, and means something subtly different from the
-source. It is the technique that found hundreds of bugs in GCC and LLVM, and it
-is the reason we cross-check against the real AVM rather than something we
-wrote.
 
 ---
 
