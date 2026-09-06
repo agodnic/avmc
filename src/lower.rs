@@ -57,39 +57,15 @@ fn lower_expr(expr: &Expr, insts: &mut Vec<Inst>, next_value: &mut u32) -> Value
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::diagnostics::Span;
-    use crate::lexer::lex;
-    use crate::parser::parse;
-    use crate::typeck::check;
+    use crate::testing::{lex_parse_check, span_of};
     use crate::typed_ast::Type;
 
-    /// Lexes, parses, checks and lowers `source`, asserting that it produced
-    /// no diagnostics.
+    /// Lowers `source`, asserting that it produced no diagnostics.
     fn lower_ok(source: &str) -> Program {
         let mut diags = Diagnostics::default();
-        let program = pipeline(source, &mut diags);
+        let program = lower(&lex_parse_check(source), &mut diags);
         assert!(diags.is_empty());
         program.expect("lowering succeeded")
-    }
-
-    fn pipeline(source: &str, diags: &mut Diagnostics) -> Option<Program> {
-        let tokens = lex(source, diags).expect("lexing succeeded");
-        let parsed = parse(source, &tokens, diags).expect("parsing succeeded");
-        let checked = check(&parsed, diags).expect("checking succeeded");
-        lower(&checked, diags)
-    }
-
-    /// The span of the `nth` occurrence of `text` in `source`, counting from 0.
-    fn span_of(source: &str, text: &str, nth: usize) -> Span {
-        let start = source
-            .match_indices(text)
-            .nth(nth)
-            .expect("text in source")
-            .0;
-        Span {
-            start,
-            end: start + text.len(),
-        }
     }
 
     #[test]

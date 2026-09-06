@@ -115,15 +115,10 @@ fn line(inst: &Inst) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::lexer::lex;
     use crate::lower::lower;
-    use crate::parser::parse;
-    use crate::typeck::check;
+    use crate::testing::{EXAMPLE, lex_parse_check, span_of};
 
-    /// The example program of the v0 milestone.
-    const EXAMPLE: &str = "func approval() uint64 { return 1 }";
-
-    /// Compiles `source` for `version`, asserting that it produced no
+    /// Emits `source` for `version`, asserting that it produced no
     /// diagnostics.
     fn emit_ok(source: &str, version: u8) -> String {
         let mut diags = Diagnostics::default();
@@ -132,7 +127,7 @@ mod tests {
         teal.expect("emission succeeded")
     }
 
-    /// Compiles `source` for `version`, asserting that it emitted nothing, and
+    /// Emits `source` for `version`, asserting that it emitted nothing, and
     /// returning the diagnostics in the order they were reported.
     fn emit_err(source: &str, version: u8) -> Vec<Diagnostic> {
         let mut diags = Diagnostics::default();
@@ -141,25 +136,9 @@ mod tests {
     }
 
     fn pipeline(source: &str, version: u8, diags: &mut Diagnostics) -> Option<String> {
-        let tokens = lex(source, diags).expect("lexing succeeded");
-        let parsed = parse(source, &tokens, diags).expect("parsing succeeded");
-        let checked = check(&parsed, diags).expect("checking succeeded");
-        let ir = lower(&checked, diags).expect("lowering succeeded");
+        let ir = lower(&lex_parse_check(source), diags).expect("lowering succeeded");
         let version = TealVersion::new(version).expect("a supported version");
         emit(&ir, version, diags)
-    }
-
-    /// The span of the `nth` occurrence of `text` in `source`, counting from 0.
-    fn span_of(source: &str, text: &str, nth: usize) -> Span {
-        let start = source
-            .match_indices(text)
-            .nth(nth)
-            .expect("text in source")
-            .0;
-        Span {
-            start,
-            end: start + text.len(),
-        }
     }
 
     #[test]

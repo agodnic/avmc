@@ -48,9 +48,7 @@ fn position(source: &str, offset: usize) -> (usize, usize) {
 mod tests {
     use super::*;
     use crate::diagnostics::{DiagnosticKind, Span};
-
-    /// The example program of the v0 milestone.
-    const EXAMPLE: &str = "func approval() uint64 { return 1 }";
+    use crate::testing::{EXAMPLE, span_of};
 
     /// The diagnostics reported while compiling `source` for `version`,
     /// asserting that nothing was emitted.
@@ -66,15 +64,6 @@ mod tests {
         Diagnostic {
             kind: DiagnosticKind::MissingEntryPoint { name: "approval" },
             span,
-        }
-    }
-
-    /// The span of the first occurrence of `text` in `source`.
-    fn span_of(source: &str, text: &str) -> Span {
-        let start = source.find(text).expect("text in source");
-        Span {
-            start,
-            end: start + text.len(),
         }
     }
 
@@ -121,7 +110,7 @@ mod tests {
     fn renders_a_position_on_a_later_line() {
         let source = "func f() {\n  return @\n}";
         assert_eq!(
-            render(&diagnostic(span_of(source, "@")), "a.txt", source),
+            render(&diagnostic(span_of(source, "@", 0)), "a.txt", source),
             "a.txt:2:10: error[E0008]: missing entry point `approval`"
         );
     }
@@ -130,7 +119,7 @@ mod tests {
     fn counts_columns_in_chars_not_bytes() {
         let source = "é@";
         assert_eq!(
-            render(&diagnostic(span_of(source, "@")), "a.txt", source),
+            render(&diagnostic(span_of(source, "@", 0)), "a.txt", source),
             "a.txt:1:2: error[E0008]: missing entry point `approval`"
         );
     }

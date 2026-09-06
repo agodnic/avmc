@@ -122,48 +122,23 @@ fn check_expr(expr: &ast::Expr) -> Expr {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::ast::Name;
     use crate::diagnostics::Span;
-    use crate::lexer::lex;
-    use crate::parser::parse;
+    use crate::testing::{lex_parse, name, spans};
 
-    /// Lexes, parses and checks `source`, asserting that it produced no
-    /// diagnostics.
+    /// Checks `source`, asserting that it produced no diagnostics.
     fn check_ok(source: &str) -> Program {
         let mut diags = Diagnostics::default();
-        let tokens = lex(source, &mut diags).expect("lexing succeeded");
-        let parsed = parse(source, &tokens, &mut diags).expect("parsing succeeded");
-        let program = check(&parsed, &mut diags);
+        let program = check(&lex_parse(source), &mut diags);
         assert!(diags.is_empty());
         program.expect("checking succeeded")
     }
 
-    /// Lexes, parses and checks `source`, asserting that checking produced
-    /// nothing, and returning the diagnostics in the order they were reported.
+    /// Checks `source`, asserting that checking produced nothing, and
+    /// returning the diagnostics in the order they were reported.
     fn check_err(source: &str) -> Vec<Diagnostic> {
         let mut diags = Diagnostics::default();
-        let tokens = lex(source, &mut diags).expect("lexing succeeded");
-        let parsed = parse(source, &tokens, &mut diags).expect("parsing succeeded");
-        assert_eq!(check(&parsed, &mut diags), None);
+        assert_eq!(check(&lex_parse(source), &mut diags), None);
         diags.iter().cloned().collect()
-    }
-
-    /// Returns a closure giving the span of the next occurrence of its
-    /// argument, so expected spans are written in source order.
-    fn spans(source: &str) -> impl FnMut(&str) -> Span + '_ {
-        let mut offset = 0;
-        move |text| {
-            let start = source[offset..].find(text).expect("text in source") + offset;
-            offset = start + text.len();
-            Span { start, end: offset }
-        }
-    }
-
-    fn name(text: &str, span: Span) -> Name {
-        Name {
-            text: text.to_string(),
-            span,
-        }
     }
 
     #[test]
