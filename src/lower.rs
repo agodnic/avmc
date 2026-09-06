@@ -12,8 +12,8 @@ pub fn lower(program: &typed_ast::Program, _diags: &mut Diagnostics) -> Option<P
     for func in &funcs {
         // Only a compiler bug can reach this.
         #[expect(clippy::panic, reason = "a verifier failure is a compiler bug")]
-        if let Err(message) = crate::ir::verify(func) {
-            panic!("{message}");
+        if let Err(violation) = crate::ir::verify(func) {
+            panic!("{violation}");
         }
     }
 

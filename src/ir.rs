@@ -58,11 +58,96 @@ pub struct Program {
     pub funcs: Vec<Function>,
 }
 
-/// Checks the v0 IR invariant, returning a short description of the first
-/// violation.
+/// A way a function can fail the v0 IR invariant.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Violation {
+    /// An instruction defines a value out of the dense numbering.
+    SparseDefinition {
+        /// The offending instruction's position.
+        index: usize,
+        /// The value it defines.
+        dest: ValueId,
+        /// The value it should have defined.
+        expected: ValueId,
+    },
+    /// An instruction uses a value no earlier instruction defines.
+    UseBeforeDefinition {
+        /// The offending instruction's position.
+        index: usize,
+        /// The value it uses.
+        value: ValueId,
+    },
+    /// An instruction uses a value out of definition order.
+    UseOutOfOrder {
+        /// The offending instruction's position.
+        index: usize,
+        /// The value it uses.
+        value: ValueId,
+        /// The value it should have used.
+        expected: ValueId,
+    },
+    /// The function defines more values than it uses.
+    UnusedValues {
+        /// How many values it defines.
+        defs: u32,
+        /// How many of them it uses.
+        uses: u32,
+    },
+    /// An instruction returns without being the last one.
+    ReturnNotLast {
+        /// The offending instruction's position.
+        index: usize,
+    },
+    /// The function's last instruction is not a `Return`.
+    MissingReturn,
+}
+
+impl std::fmt::Display for Violation {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Violation::SparseDefinition {
+                index,
+                dest,
+                expected,
+            } => write!(
+                f,
+                "dense single assignment: instruction {index} defines %{}, expected %{}",
+                dest.0, expected.0
+            ),
+            Violation::UseBeforeDefinition { index, value } => write!(
+                f,
+                "defined before used: instruction {index} uses %{}, which is not yet defined",
+                value.0
+            ),
+            Violation::UseOutOfOrder {
+                index,
+                value,
+                expected,
+            } => write!(
+                f,
+                "used exactly once, in definition order: instruction {index} uses %{}, expected %{}",
+                value.0, expected.0
+            ),
+            Violation::UnusedValues { defs, uses } => write!(
+                f,
+                "used exactly once, in definition order: {defs} values defined but {uses} used"
+            ),
+            Violation::ReturnNotLast { index } => write!(
+                f,
+                "ends with `Return`: instruction {index} returns but is not the last"
+            ),
+            Violation::MissingReturn => write!(
+                f,
+                "ends with `Return`: the function does not end with a return"
+            ),
+        }
+    }
+}
+
+/// Checks the v0 IR invariant, returning the first violation.
 ///
 /// Type correctness is vacuous with one type and is not checked.
-pub fn verify(func: &Function) -> Result<(), String> {
+pub fn verify(func: &Function) -> Result<(), Violation> {
     verify_return(func)?;
 
     // The number of values defined and the number used so far: the next
@@ -75,25 +160,27 @@ pub fn verify(func: &Function) -> Result<(), String> {
         match inst {
             Inst::Const { dest, .. } => {
                 if dest.0 != defs {
-                    return Err(format!(
-                        "dense single assignment: instruction {index} defines %{}, expected %{defs}",
-                        dest.0
-                    ));
+                    return Err(Violation::SparseDefinition {
+                        index,
+                        dest: *dest,
+                        expected: ValueId(defs),
+                    });
                 }
                 defs += 1;
             }
             Inst::Return { value, .. } => {
                 if value.0 >= defs {
-                    return Err(format!(
-                        "defined before used: instruction {index} uses %{}, which is not yet defined",
-                        value.0
-                    ));
+                    return Err(Violation::UseBeforeDefinition {
+                        index,
+                        value: *value,
+                    });
                 }
                 if value.0 != uses {
-                    return Err(format!(
-                        "used exactly once, in definition order: instruction {index} uses %{}, expected %{uses}",
-                        value.0
-                    ));
+                    return Err(Violation::UseOutOfOrder {
+                        index,
+                        value: *value,
+                        expected: ValueId(uses),
+                    });
                 }
                 uses += 1;
             }
@@ -101,26 +188,22 @@ pub fn verify(func: &Function) -> Result<(), String> {
     }
 
     if uses != defs {
-        return Err(format!(
-            "used exactly once, in definition order: {defs} values defined but {uses} used"
-        ));
+        return Err(Violation::UnusedValues { defs, uses });
     }
     Ok(())
 }
 
 /// Checks that the last instruction is a `Return`, and no other one is.
-fn verify_return(func: &Function) -> Result<(), String> {
+fn verify_return(func: &Function) -> Result<(), Violation> {
     let last = func.insts.len().checked_sub(1);
     for (index, inst) in func.insts.iter().enumerate() {
         if matches!(inst, Inst::Return { .. }) && Some(index) != last {
-            return Err(format!(
-                "ends with `Return`: instruction {index} returns but is not the last"
-            ));
+            return Err(Violation::ReturnNotLast { index });
         }
     }
     match func.insts.last() {
         Some(Inst::Return { .. }) => Ok(()),
-        _ => Err("ends with `Return`: the function does not end with a return".to_string()),
+        _ => Err(Violation::MissingReturn),
     }
 }
 
@@ -158,31 +241,77 @@ mod tests {
 
     #[test]
     fn const_then_return_is_valid() {
-        assert!(verify(&function(vec![constant(0, 1), ret(0)])).is_ok());
+        assert_eq!(verify(&function(vec![constant(0, 1), ret(0)])), Ok(()));
+    }
+
+    #[test]
+    fn use_out_of_order_is_rejected() {
+        assert_eq!(
+            verify(&function(vec![constant(0, 1), constant(1, 2), ret(1)])),
+            Err(Violation::UseOutOfOrder {
+                index: 2,
+                value: ValueId(1),
+                expected: ValueId(0),
+            })
+        );
     }
 
     #[test]
     fn unused_value_is_rejected() {
-        assert!(verify(&function(vec![constant(0, 1), constant(1, 2), ret(1)])).is_err());
+        assert_eq!(
+            verify(&function(vec![constant(0, 1), constant(1, 2), ret(0)])),
+            Err(Violation::UnusedValues { defs: 2, uses: 1 })
+        );
     }
 
     #[test]
     fn sparse_definition_is_rejected() {
-        assert!(verify(&function(vec![constant(1, 1), ret(1)])).is_err());
+        assert_eq!(
+            verify(&function(vec![constant(1, 1), ret(1)])),
+            Err(Violation::SparseDefinition {
+                index: 0,
+                dest: ValueId(1),
+                expected: ValueId(0),
+            })
+        );
     }
 
     #[test]
-    fn use_before_definition_is_rejected() {
-        assert!(verify(&function(vec![ret(0), constant(0, 1)])).is_err());
+    fn returning_an_undefined_value_is_rejected() {
+        assert_eq!(
+            verify(&function(vec![ret(0)])),
+            Err(Violation::UseBeforeDefinition {
+                index: 0,
+                value: ValueId(0),
+            })
+        );
     }
 
     #[test]
     fn missing_return_is_rejected() {
-        assert!(verify(&function(vec![constant(0, 1)])).is_err());
+        assert_eq!(
+            verify(&function(vec![constant(0, 1)])),
+            Err(Violation::MissingReturn)
+        );
     }
 
     #[test]
     fn return_that_is_not_last_is_rejected() {
-        assert!(verify(&function(vec![constant(0, 1), ret(0), constant(1, 2)])).is_err());
+        assert_eq!(
+            verify(&function(vec![constant(0, 1), ret(0), constant(1, 2)])),
+            Err(Violation::ReturnNotLast { index: 1 })
+        );
+    }
+
+    #[test]
+    fn violations_describe_themselves() {
+        assert_eq!(
+            Violation::UseBeforeDefinition {
+                index: 3,
+                value: ValueId(2),
+            }
+            .to_string(),
+            "defined before used: instruction 3 uses %2, which is not yet defined"
+        );
     }
 }
