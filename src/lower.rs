@@ -23,10 +23,12 @@ pub fn lower(program: &typed_ast::Program, _diags: &mut Diagnostics) -> Option<P
 /// Lowers one function. `ValueId`s restart at 0.
 fn lower_func(func: &typed_ast::FuncDecl) -> Function {
     let mut insts = Vec::new();
+    // The number of values defined so far, which keeps definitions dense.
+    let mut next_value = 0;
 
     for stmt in &func.body {
         let Stmt::Return { expr, span } = stmt;
-        let value = lower_expr(expr, &mut insts);
+        let value = lower_expr(expr, &mut insts, &mut next_value);
         insts.push(Inst::Return { value, span: *span });
     }
 
@@ -39,30 +41,17 @@ fn lower_func(func: &typed_ast::FuncDecl) -> Function {
 }
 
 /// Lowers one expression in post-order, appending its instructions to `insts`
-/// and yielding the value it produces.
-fn lower_expr(expr: &Expr, insts: &mut Vec<Inst>) -> ValueId {
+/// and yielding the value it produces. `next_value` is advanced past it.
+fn lower_expr(expr: &Expr, insts: &mut Vec<Inst>, next_value: &mut u32) -> ValueId {
     let ExprKind::IntLit(value) = expr.kind;
-    let dest = next_value(insts);
+    let dest = ValueId(*next_value);
+    *next_value += 1;
     insts.push(Inst::Const {
         dest,
         value,
         span: expr.span,
     });
     dest
-}
-
-/// The value the next definition takes: one past the values defined so far,
-/// which keeps definitions dense.
-fn next_value(insts: &[Inst]) -> ValueId {
-    let defined = insts
-        .iter()
-        .filter(|inst| matches!(inst, Inst::Const { .. }))
-        .count();
-    #[expect(
-        clippy::cast_possible_truncation,
-        reason = "a function cannot define u32::MAX values"
-    )]
-    ValueId(defined as u32)
 }
 
 #[cfg(test)]
