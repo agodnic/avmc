@@ -150,6 +150,7 @@ fn describe(kind: TokenKind) -> &'static str {
 mod tests {
     use super::*;
     use crate::lexer::lex;
+    use crate::testing::{name, spans};
 
     /// Lexes and parses `source`, asserting that it produced no diagnostics.
     fn parse_ok(source: &str) -> Program {
@@ -170,24 +171,6 @@ mod tests {
         let diagnostic = reported.next().expect("one diagnostic").clone();
         assert!(reported.next().is_none());
         diagnostic
-    }
-
-    /// Returns a closure giving the span of the next occurrence of its
-    /// argument, so expected spans are written in source order.
-    fn spans(source: &str) -> impl FnMut(&str) -> Span + '_ {
-        let mut offset = 0;
-        move |text| {
-            let start = source[offset..].find(text).expect("text in source") + offset;
-            offset = start + text.len();
-            Span { start, end: offset }
-        }
-    }
-
-    fn name(text: &str, span: Span) -> Name {
-        Name {
-            text: text.to_string(),
-            span,
-        }
     }
 
     #[test]
