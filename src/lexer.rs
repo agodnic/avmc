@@ -23,6 +23,14 @@ pub enum TokenKind {
     LBrace,
     /// `}`
     RBrace,
+    /// `+`
+    Plus,
+    /// `-`
+    Minus,
+    /// `*`
+    Star,
+    /// `/`
+    Slash,
 }
 
 /// A token: a kind and the source range it covers.
@@ -55,6 +63,10 @@ pub fn lex(source: &str, diags: &mut Diagnostics) -> Option<Vec<Token>> {
             ')' => tokens.push(token(TokenKind::RParen, start, single)),
             '{' => tokens.push(token(TokenKind::LBrace, start, single)),
             '}' => tokens.push(token(TokenKind::RBrace, start, single)),
+            '+' => tokens.push(token(TokenKind::Plus, start, single)),
+            '-' => tokens.push(token(TokenKind::Minus, start, single)),
+            '*' => tokens.push(token(TokenKind::Star, start, single)),
+            '/' => tokens.push(token(TokenKind::Slash, start, single)),
             _ if is_ident_start(c) => {
                 let end = consume_while(&mut chars, source.len(), is_ident_continue);
                 let kind = match source.get(start..end) {
@@ -197,6 +209,77 @@ mod tests {
                 token(TokenKind::IntLit, 0, 1),
                 token(TokenKind::IntLit, 2, 3)
             ]
+        );
+    }
+
+    #[test]
+    fn lexes_an_arithmetic_program() {
+        let source = "func approval() uint64 {\n  return (1 + 2) * 3 - 4 / 5\n}\n";
+        let expected = spans(
+            source,
+            &[
+                (TokenKind::Func, "func"),
+                (TokenKind::Ident, "approval"),
+                (TokenKind::LParen, "("),
+                (TokenKind::RParen, ")"),
+                (TokenKind::Ident, "uint64"),
+                (TokenKind::LBrace, "{"),
+                (TokenKind::Return, "return"),
+                (TokenKind::LParen, "("),
+                (TokenKind::IntLit, "1"),
+                (TokenKind::Plus, "+"),
+                (TokenKind::IntLit, "2"),
+                (TokenKind::RParen, ")"),
+                (TokenKind::Star, "*"),
+                (TokenKind::IntLit, "3"),
+                (TokenKind::Minus, "-"),
+                (TokenKind::IntLit, "4"),
+                (TokenKind::Slash, "/"),
+                (TokenKind::IntLit, "5"),
+                (TokenKind::RBrace, "}"),
+            ],
+        );
+        assert_eq!(lex_ok(source), expected);
+    }
+
+    #[test]
+    fn operators_need_no_surrounding_whitespace() {
+        assert_eq!(
+            lex_ok("1+2*3-4/5"),
+            vec![
+                token(TokenKind::IntLit, 0, 1),
+                token(TokenKind::Plus, 1, 2),
+                token(TokenKind::IntLit, 2, 3),
+                token(TokenKind::Star, 3, 4),
+                token(TokenKind::IntLit, 4, 5),
+                token(TokenKind::Minus, 5, 6),
+                token(TokenKind::IntLit, 6, 7),
+                token(TokenKind::Slash, 7, 8),
+                token(TokenKind::IntLit, 8, 9),
+            ]
+        );
+    }
+
+    #[test]
+    fn a_minus_is_never_part_of_a_literal() {
+        assert_eq!(
+            lex_ok("-1"),
+            vec![
+                token(TokenKind::Minus, 0, 1),
+                token(TokenKind::IntLit, 1, 2)
+            ]
+        );
+    }
+
+    #[test]
+    fn repeated_operators_are_separate_tokens() {
+        assert_eq!(
+            lex_ok("--"),
+            vec![token(TokenKind::Minus, 0, 1), token(TokenKind::Minus, 1, 2)]
+        );
+        assert_eq!(
+            lex_ok("//"),
+            vec![token(TokenKind::Slash, 0, 1), token(TokenKind::Slash, 1, 2)]
         );
     }
 
