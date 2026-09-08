@@ -143,6 +143,10 @@ fn describe(kind: TokenKind) -> &'static str {
         TokenKind::RParen => "`)`",
         TokenKind::LBrace => "`{`",
         TokenKind::RBrace => "`}`",
+        TokenKind::Plus => "`+`",
+        TokenKind::Minus => "`-`",
+        TokenKind::Star => "`*`",
+        TokenKind::Slash => "`/`",
     }
 }
 
@@ -271,6 +275,22 @@ mod tests {
                     found: "an identifier",
                 },
                 span: Span { start: 8, end: 14 },
+            }
+        );
+    }
+
+    #[test]
+    fn an_operator_is_not_an_expression() {
+        let source = "func f() uint64 { return + }";
+        let mut span = spans(source);
+        assert_eq!(
+            parse_err(source),
+            Diagnostic {
+                kind: DiagnosticKind::UnexpectedToken {
+                    expected: "an integer literal",
+                    found: "`+`",
+                },
+                span: span("+"),
             }
         );
     }
