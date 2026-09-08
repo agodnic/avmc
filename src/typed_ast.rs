@@ -1,7 +1,7 @@
 //! The typed AST: the type checker's output, an AST in which every expression
 //! has a resolved type.
 
-use crate::ast::Name;
+use crate::ast::{BinaryOp, Name};
 use crate::diagnostics::Span;
 
 /// A resolved type.
@@ -59,6 +59,15 @@ pub struct Expr {
 pub enum ExprKind {
     /// An integer literal.
     IntLit(u64),
+    /// A binary operation.
+    Binary {
+        /// The operator it applies.
+        op: BinaryOp,
+        /// The left operand.
+        lhs: Box<Expr>,
+        /// The right operand.
+        rhs: Box<Expr>,
+    },
 }
 
 impl Expr {

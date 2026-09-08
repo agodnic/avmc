@@ -49,8 +49,6 @@ pub enum DiagnosticKind {
         left: &'static str,
         right: &'static str,
     },
-    /// Temporary: it goes away once arithmetic is lowered and emitted.
-    UnsupportedExpression,
 }
 
 impl DiagnosticKind {
@@ -67,7 +65,6 @@ impl DiagnosticKind {
             Self::MissingEntryPoint { .. } => 8,
             Self::OpcodeUnavailable { .. } => 9,
             Self::AmbiguousPrecedence { .. } => 10,
-            Self::UnsupportedExpression => 11,
         };
         Code {
             severity: Severity::Error,
@@ -102,7 +99,6 @@ impl fmt::Display for DiagnosticKind {
             Self::AmbiguousPrecedence { left, right } => {
                 write!(f, "{left} and {right} need parentheses to disambiguate")
             }
-            Self::UnsupportedExpression => write!(f, "arithmetic is not supported yet"),
         }
     }
 }
@@ -234,11 +230,6 @@ mod tests {
                 "E0010",
                 "`%` and `+` need parentheses to disambiguate",
             ),
-            (
-                DiagnosticKind::UnsupportedExpression,
-                "E0011",
-                "arithmetic is not supported yet",
-            ),
         ];
 
         // Exhaustive, with no wildcard arm, so that adding a variant to
@@ -254,8 +245,7 @@ mod tests {
                 | DiagnosticKind::DuplicateFunction { .. }
                 | DiagnosticKind::MissingEntryPoint { .. }
                 | DiagnosticKind::OpcodeUnavailable { .. }
-                | DiagnosticKind::AmbiguousPrecedence { .. }
-                | DiagnosticKind::UnsupportedExpression => {}
+                | DiagnosticKind::AmbiguousPrecedence { .. } => {}
             }
         }
 

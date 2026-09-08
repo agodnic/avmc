@@ -73,6 +73,32 @@ fn compiles_a_file_to_teal() {
 }
 
 #[test]
+fn compiles_arithmetic_to_teal() {
+    let file = SourceFile::new(
+        "compiles_arithmetic_to_teal",
+        "func approval() uint64 {\n  return (1 + 2) * 3 - 4 / 5\n}\n",
+    );
+    let output = run(&[file.path(), "--teal-version", "10"]);
+
+    assert_eq!(
+        stdout(&output),
+        "#pragma version 10\n\
+         pushint 1\n\
+         pushint 2\n\
+         +\n\
+         pushint 3\n\
+         *\n\
+         pushint 4\n\
+         pushint 5\n\
+         /\n\
+         -\n\
+         return\n"
+    );
+    assert_eq!(stderr(&output), "");
+    assert_eq!(code(&output), 0);
+}
+
+#[test]
 fn accepts_the_flag_before_the_path() {
     let file = SourceFile::new("accepts_the_flag_before_the_path", EXAMPLE);
     let output = run(&["--teal-version", "10", file.path()]);

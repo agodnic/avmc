@@ -1,6 +1,7 @@
 //! The IR: a flat single-assignment instruction list, and the verifier that
 //! enforces its invariant.
 
+use crate::ast::BinaryOp;
 use crate::diagnostics::Span;
 use crate::typed_ast::Type;
 
@@ -20,6 +21,19 @@ pub enum Inst {
         /// The literal it came from.
         span: Span,
     },
+    /// Defines `dest` as `lhs op rhs`.
+    Binary {
+        /// The value it defines.
+        dest: ValueId,
+        /// The operator it applies.
+        op: BinaryOp,
+        /// The left operand, consumed first.
+        lhs: ValueId,
+        /// The right operand, consumed second.
+        rhs: ValueId,
+        /// The expression it came from.
+        span: Span,
+    },
     /// Returns `value` from the enclosing function.
     Return {
         /// The value it returns.
@@ -33,7 +47,9 @@ impl Inst {
     /// The source it came from.
     pub fn span(&self) -> Span {
         match self {
-            Inst::Const { span, .. } | Inst::Return { span, .. } => *span,
+            Inst::Const { span, .. } | Inst::Binary { span, .. } | Inst::Return { span, .. } => {
+                *span
+            }
         }
     }
 }
@@ -70,28 +86,31 @@ pub enum Violation {
         /// The value it should have defined.
         expected: ValueId,
     },
-    /// An instruction uses a value no earlier instruction defines.
-    UseBeforeDefinition {
-        /// The offending instruction's position.
-        index: usize,
-        /// The value it uses.
-        value: ValueId,
-    },
-    /// An instruction uses a value out of definition order.
+    /// An instruction names an operand that is not the one on top of the
+    /// stack.
     UseOutOfOrder {
         /// The offending instruction's position.
         index: usize,
+        /// Which operand it is, counting from 0.
+        position: usize,
         /// The value it uses.
         value: ValueId,
         /// The value it should have used.
         expected: ValueId,
     },
-    /// The function defines more values than it uses.
-    UnusedValues {
-        /// How many values it defines.
-        defs: u32,
-        /// How many of them it uses.
-        uses: u32,
+    /// An instruction names more operands than there are live values.
+    StackUnderflow {
+        /// The offending instruction's position.
+        index: usize,
+        /// How many operands it names.
+        needed: usize,
+        /// How many values are live.
+        available: usize,
+    },
+    /// The function ends with values that nothing consumed.
+    ValuesLeftOnStack {
+        /// How many of them there are.
+        count: usize,
     },
     /// An instruction returns without being the last one.
     ReturnNotLast {
@@ -114,23 +133,29 @@ impl std::fmt::Display for Violation {
                 "dense single assignment: instruction {index} defines %{}, expected %{}",
                 dest.0, expected.0
             ),
-            Violation::UseBeforeDefinition { index, value } => write!(
-                f,
-                "defined before used: instruction {index} uses %{}, which is not yet defined",
-                value.0
-            ),
             Violation::UseOutOfOrder {
                 index,
+                position,
                 value,
                 expected,
             } => write!(
                 f,
-                "used exactly once, in definition order: instruction {index} uses %{}, expected %{}",
+                "consumed in stack order: instruction {index} uses %{} as operand {position}, \
+                 expected %{}",
                 value.0, expected.0
             ),
-            Violation::UnusedValues { defs, uses } => write!(
+            Violation::StackUnderflow {
+                index,
+                needed,
+                available,
+            } => write!(
                 f,
-                "used exactly once, in definition order: {defs} values defined but {uses} used"
+                "consumed in stack order: instruction {index} needs {needed} operands but \
+                 {available} values are live"
+            ),
+            Violation::ValuesLeftOnStack { count } => write!(
+                f,
+                "consumed in stack order: {count} values are left unconsumed"
             ),
             Violation::ReturnNotLast { index } => write!(
                 f,
@@ -150,46 +175,66 @@ impl std::fmt::Display for Violation {
 pub fn verify(func: &Function) -> Result<(), Violation> {
     verify_return(func)?;
 
-    // The number of values defined and the number used so far: the next
-    // definition must be `ValueId(defs)`, and the next use must be
-    // `ValueId(uses)`, which was defined only if it is below `defs`.
+    // The values defined and not yet consumed, most recent last.
+    let mut stack: Vec<ValueId> = Vec::new();
+    // The number of values defined so far: the next definition must be
+    // `ValueId(defs)`.
     let mut defs = 0;
-    let mut uses = 0;
 
     for (index, inst) in func.insts.iter().enumerate() {
-        match inst {
-            Inst::Const { dest, .. } => {
-                if dest.0 != defs {
-                    return Err(Violation::SparseDefinition {
-                        index,
-                        dest: *dest,
-                        expected: ValueId(defs),
-                    });
-                }
-                defs += 1;
+        let dest = match inst {
+            Inst::Const { dest, .. } => dest,
+            Inst::Binary { dest, lhs, rhs, .. } => {
+                consume(&mut stack, index, &[*lhs, *rhs])?;
+                dest
             }
             Inst::Return { value, .. } => {
-                if value.0 >= defs {
-                    return Err(Violation::UseBeforeDefinition {
-                        index,
-                        value: *value,
-                    });
-                }
-                if value.0 != uses {
-                    return Err(Violation::UseOutOfOrder {
-                        index,
-                        value: *value,
-                        expected: ValueId(uses),
-                    });
-                }
-                uses += 1;
+                consume(&mut stack, index, &[*value])?;
+                continue;
             }
+        };
+
+        if dest.0 != defs {
+            return Err(Violation::SparseDefinition {
+                index,
+                dest: *dest,
+                expected: ValueId(defs),
+            });
+        }
+        defs += 1;
+        stack.push(*dest);
+    }
+
+    if !stack.is_empty() {
+        return Err(Violation::ValuesLeftOnStack { count: stack.len() });
+    }
+    Ok(())
+}
+
+/// Consumes `operands` off `stack`, checking that they are the values on top
+/// of it, in order.
+fn consume(stack: &mut Vec<ValueId>, index: usize, operands: &[ValueId]) -> Result<(), Violation> {
+    let available = stack.len();
+    let top = available
+        .checked_sub(operands.len())
+        .ok_or(Violation::StackUnderflow {
+            index,
+            needed: operands.len(),
+            available,
+        })?;
+
+    for (position, (operand, expected)) in operands.iter().zip(stack.iter().skip(top)).enumerate() {
+        if operand != expected {
+            return Err(Violation::UseOutOfOrder {
+                index,
+                position,
+                value: *operand,
+                expected: *expected,
+            });
         }
     }
 
-    if uses != defs {
-        return Err(Violation::UnusedValues { defs, uses });
-    }
+    stack.truncate(top);
     Ok(())
 }
 
@@ -239,17 +284,62 @@ mod tests {
         }
     }
 
+    fn binary(dest: u32, op: BinaryOp, lhs: u32, rhs: u32) -> Inst {
+        Inst::Binary {
+            dest: ValueId(dest),
+            op,
+            lhs: ValueId(lhs),
+            rhs: ValueId(rhs),
+            span: SPAN,
+        }
+    }
+
     #[test]
     fn const_then_return_is_valid() {
         assert_eq!(verify(&function(vec![constant(0, 1), ret(0)])), Ok(()));
     }
 
     #[test]
-    fn use_out_of_order_is_rejected() {
+    fn a_binary_over_two_constants_is_valid() {
         assert_eq!(
-            verify(&function(vec![constant(0, 1), constant(1, 2), ret(1)])),
+            verify(&function(vec![
+                constant(0, 1),
+                constant(1, 2),
+                binary(2, BinaryOp::Add, 0, 1),
+                ret(2),
+            ])),
+            Ok(())
+        );
+    }
+
+    #[test]
+    fn a_right_leaning_tree_is_valid() {
+        // `1 + 2 * 3`, which the definition-order invariant used to reject.
+        assert_eq!(
+            verify(&function(vec![
+                constant(0, 1),
+                constant(1, 2),
+                constant(2, 3),
+                binary(3, BinaryOp::Mul, 1, 2),
+                binary(4, BinaryOp::Add, 0, 3),
+                ret(4),
+            ])),
+            Ok(())
+        );
+    }
+
+    #[test]
+    fn swapped_operands_are_rejected() {
+        assert_eq!(
+            verify(&function(vec![
+                constant(0, 1),
+                constant(1, 2),
+                binary(2, BinaryOp::Sub, 1, 0),
+                ret(2),
+            ])),
             Err(Violation::UseOutOfOrder {
                 index: 2,
+                position: 0,
                 value: ValueId(1),
                 expected: ValueId(0),
             })
@@ -257,10 +347,39 @@ mod tests {
     }
 
     #[test]
-    fn unused_value_is_rejected() {
+    fn a_binary_without_enough_live_values_is_rejected() {
+        assert_eq!(
+            verify(&function(vec![
+                constant(0, 1),
+                binary(1, BinaryOp::Add, 0, 0),
+                ret(1),
+            ])),
+            Err(Violation::StackUnderflow {
+                index: 1,
+                needed: 2,
+                available: 1,
+            })
+        );
+    }
+
+    #[test]
+    fn a_value_left_on_the_stack_is_rejected() {
+        assert_eq!(
+            verify(&function(vec![constant(0, 1), constant(1, 2), ret(1)])),
+            Err(Violation::ValuesLeftOnStack { count: 1 })
+        );
+    }
+
+    #[test]
+    fn using_a_value_that_is_not_on_top_is_rejected() {
         assert_eq!(
             verify(&function(vec![constant(0, 1), constant(1, 2), ret(0)])),
-            Err(Violation::UnusedValues { defs: 2, uses: 1 })
+            Err(Violation::UseOutOfOrder {
+                index: 2,
+                position: 0,
+                value: ValueId(0),
+                expected: ValueId(1),
+            })
         );
     }
 
@@ -280,9 +399,10 @@ mod tests {
     fn returning_an_undefined_value_is_rejected() {
         assert_eq!(
             verify(&function(vec![ret(0)])),
-            Err(Violation::UseBeforeDefinition {
+            Err(Violation::StackUnderflow {
                 index: 0,
-                value: ValueId(0),
+                needed: 1,
+                available: 0,
             })
         );
     }
@@ -306,12 +426,27 @@ mod tests {
     #[test]
     fn violations_describe_themselves() {
         assert_eq!(
-            Violation::UseBeforeDefinition {
+            Violation::UseOutOfOrder {
                 index: 3,
-                value: ValueId(2),
+                position: 0,
+                value: ValueId(1),
+                expected: ValueId(0),
             }
             .to_string(),
-            "defined before used: instruction 3 uses %2, which is not yet defined"
+            "consumed in stack order: instruction 3 uses %1 as operand 0, expected %0"
+        );
+        assert_eq!(
+            Violation::StackUnderflow {
+                index: 1,
+                needed: 2,
+                available: 1,
+            }
+            .to_string(),
+            "consumed in stack order: instruction 1 needs 2 operands but 1 values are live"
+        );
+        assert_eq!(
+            Violation::ValuesLeftOnStack { count: 1 }.to_string(),
+            "consumed in stack order: 1 values are left unconsumed"
         );
     }
 }

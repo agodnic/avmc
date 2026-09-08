@@ -1,5 +1,6 @@
 //! Emission: IR to TEAL text, in a single linear pass.
 
+use crate::ast::BinaryOp;
 use crate::diagnostics::{Diagnostic, DiagnosticKind, Diagnostics, Span};
 use crate::ir::{self, Function, Inst};
 
@@ -88,6 +89,7 @@ fn check_versions(func: &Function, version: TealVersion, diags: &mut Diagnostics
 fn min_version(inst: &Inst) -> u8 {
     match inst {
         Inst::Const { .. } => 3,
+        Inst::Binary { .. } => 1,
         Inst::Return { .. } => 2,
     }
 }
@@ -96,19 +98,25 @@ fn min_version(inst: &Inst) -> u8 {
 fn opcode(inst: &Inst) -> &'static str {
     match inst {
         Inst::Const { .. } => "pushint",
+        Inst::Binary { op, .. } => match op {
+            BinaryOp::Add => "+",
+            BinaryOp::Sub => "-",
+            BinaryOp::Mul => "*",
+            BinaryOp::Div => "/",
+            BinaryOp::Mod => "%",
+        },
         Inst::Return { .. } => "return",
     }
 }
 
 /// The line an instruction emits, without its terminator.
 ///
-/// `ValueId`s are not consulted: every value has exactly one use, and uses
-/// follow definitions in order, so each operand is already on top of the
-/// stack for its consumer.
+/// `ValueId`s are not consulted: every instruction consumes its operands from
+/// the top of the stack, where the instructions that defined them left them.
 fn line(inst: &Inst) -> String {
     match inst {
         Inst::Const { value, .. } => format!("{} {value}", opcode(inst)),
-        Inst::Return { .. } => opcode(inst).to_string(),
+        Inst::Binary { .. } | Inst::Return { .. } => opcode(inst).to_string(),
     }
 }
 
@@ -162,6 +170,32 @@ mod tests {
         assert_eq!(
             emit_ok("func approval() uint64 { return 18446744073709551615 }", 10),
             "#pragma version 10\npushint 18446744073709551615\nreturn\n"
+        );
+    }
+
+    #[test]
+    fn arithmetic() {
+        assert_eq!(
+            emit_ok("func approval() uint64 { return (1 + 2) * 3 - 4 / 5 }", 10),
+            "#pragma version 10\n\
+             pushint 1\n\
+             pushint 2\n\
+             +\n\
+             pushint 3\n\
+             *\n\
+             pushint 4\n\
+             pushint 5\n\
+             /\n\
+             -\n\
+             return\n"
+        );
+    }
+
+    #[test]
+    fn the_remainder_opcode() {
+        assert_eq!(
+            emit_ok("func approval() uint64 { return 7 % 4 }", 10),
+            "#pragma version 10\npushint 7\npushint 4\n%\nreturn\n"
         );
     }
 
