@@ -50,7 +50,7 @@ pub enum Stmt {
     },
 }
 
-/// An expression.
+/// An expression. Parentheses are not a node: they only widen a span.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Expr {
     /// An integer literal.
@@ -60,13 +60,47 @@ pub enum Expr {
         /// Where it was written.
         span: Span,
     },
+    /// Two operands joined by a binary operator.
+    Binary {
+        /// The operator.
+        op: BinaryOp,
+        /// The left operand.
+        lhs: Box<Expr>,
+        /// The right operand.
+        rhs: Box<Expr>,
+        /// From the first byte of `lhs` through the last byte of `rhs`.
+        span: Span,
+    },
 }
 
 impl Expr {
     /// Where it was written.
     pub fn span(&self) -> Span {
         match self {
-            Expr::IntLit { span, .. } => *span,
+            Expr::IntLit { span, .. } | Expr::Binary { span, .. } => *span,
         }
     }
+
+    /// The same expression, written at `span`.
+    pub fn with_span(self, span: Span) -> Expr {
+        match self {
+            Expr::IntLit { value, .. } => Expr::IntLit { value, span },
+            Expr::Binary { op, lhs, rhs, .. } => Expr::Binary { op, lhs, rhs, span },
+        }
+    }
+}
+
+/// A binary arithmetic operator.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BinaryOp {
+    /// `+`
+    Add,
+    /// `-`
+    Sub,
+    /// `*`
+    Mul,
+    /// `/`
+    Div,
+    /// `%`
+    Mod,
 }

@@ -31,6 +31,8 @@ pub enum TokenKind {
     Star,
     /// `/`
     Slash,
+    /// `%`
+    Percent,
 }
 
 /// A token: a kind and the source range it covers.
@@ -67,6 +69,7 @@ pub fn lex(source: &str, diags: &mut Diagnostics) -> Option<Vec<Token>> {
             '-' => tokens.push(token(TokenKind::Minus, start, single)),
             '*' => tokens.push(token(TokenKind::Star, start, single)),
             '/' => tokens.push(token(TokenKind::Slash, start, single)),
+            '%' => tokens.push(token(TokenKind::Percent, start, single)),
             _ if is_ident_start(c) => {
                 let end = consume_while(&mut chars, source.len(), is_ident_continue);
                 let kind = match source.get(start..end) {
@@ -280,6 +283,19 @@ mod tests {
         assert_eq!(
             lex_ok("//"),
             vec![token(TokenKind::Slash, 0, 1), token(TokenKind::Slash, 1, 2)]
+        );
+    }
+
+    #[test]
+    fn a_percent_is_a_token() {
+        assert_eq!(lex_ok("%"), vec![token(TokenKind::Percent, 0, 1)]);
+        assert_eq!(
+            lex_ok("1%2"),
+            vec![
+                token(TokenKind::IntLit, 0, 1),
+                token(TokenKind::Percent, 1, 2),
+                token(TokenKind::IntLit, 2, 3),
+            ]
         );
     }
 

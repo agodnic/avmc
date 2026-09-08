@@ -80,16 +80,17 @@ fn check_body(func: &ast::FuncDecl, diags: &mut Diagnostics) -> Option<Vec<Stmt>
     let mut stmts = Vec::new();
     let mut returned = false;
     let mut unreachable = None;
+    let mut ok = true;
 
     for stmt in &func.body {
         let ast::Stmt::Return { expr, span } = stmt;
         if returned && unreachable.is_none() {
             unreachable = Some(*span);
         }
-        stmts.push(Stmt::Return {
-            expr: check_expr(expr),
-            span: *span,
-        });
+        match check_expr(expr, diags) {
+            Some(expr) => stmts.push(Stmt::Return { expr, span: *span }),
+            None => ok = false,
+        }
         returned = true;
     }
 
@@ -107,15 +108,23 @@ fn check_body(func: &ast::FuncDecl, diags: &mut Diagnostics) -> Option<Vec<Stmt>
         });
         return None;
     }
-    Some(stmts)
+    ok.then_some(stmts)
 }
 
-fn check_expr(expr: &ast::Expr) -> Expr {
-    let ast::Expr::IntLit { value, span } = expr;
-    Expr {
-        kind: ExprKind::IntLit(*value),
-        ty: Type::Uint64,
-        span: *span,
+fn check_expr(expr: &ast::Expr, diags: &mut Diagnostics) -> Option<Expr> {
+    match expr {
+        ast::Expr::IntLit { value, span } => Some(Expr {
+            kind: ExprKind::IntLit(*value),
+            ty: Type::Uint64,
+            span: *span,
+        }),
+        ast::Expr::Binary { span, .. } => {
+            diags.push(Diagnostic {
+                kind: DiagnosticKind::UnsupportedExpression,
+                span: *span,
+            });
+            None
+        }
     }
 }
 
@@ -218,6 +227,18 @@ mod tests {
             vec![Diagnostic {
                 kind: DiagnosticKind::UnreachableStatement,
                 span: spans(source)("return 2"),
+            }]
+        );
+    }
+
+    #[test]
+    fn arithmetic_is_not_supported_yet() {
+        let source = "func approval() uint64 { return 1 + 1 }";
+        assert_eq!(
+            check_err(source),
+            vec![Diagnostic {
+                kind: DiagnosticKind::UnsupportedExpression,
+                span: spans(source)("1 + 1"),
             }]
         );
     }

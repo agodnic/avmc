@@ -44,6 +44,13 @@ pub enum DiagnosticKind {
         min: u8,
         target: u8,
     },
+    /// `left` and `right` describe the two operators, backticks included.
+    AmbiguousPrecedence {
+        left: &'static str,
+        right: &'static str,
+    },
+    /// Temporary: it goes away once arithmetic is lowered and emitted.
+    UnsupportedExpression,
 }
 
 impl DiagnosticKind {
@@ -59,6 +66,8 @@ impl DiagnosticKind {
             Self::DuplicateFunction { .. } => 7,
             Self::MissingEntryPoint { .. } => 8,
             Self::OpcodeUnavailable { .. } => 9,
+            Self::AmbiguousPrecedence { .. } => 10,
+            Self::UnsupportedExpression => 11,
         };
         Code {
             severity: Severity::Error,
@@ -90,6 +99,10 @@ impl fmt::Display for DiagnosticKind {
                     "`{opcode}` requires TEAL version {min}, target is {target}"
                 )
             }
+            Self::AmbiguousPrecedence { left, right } => {
+                write!(f, "{left} and {right} need parentheses to disambiguate")
+            }
+            Self::UnsupportedExpression => write!(f, "arithmetic is not supported yet"),
         }
     }
 }
@@ -213,6 +226,19 @@ mod tests {
                 "E0009",
                 "`pushint` requires TEAL version 3, target is 2",
             ),
+            (
+                DiagnosticKind::AmbiguousPrecedence {
+                    left: "`%`",
+                    right: "`+`",
+                },
+                "E0010",
+                "`%` and `+` need parentheses to disambiguate",
+            ),
+            (
+                DiagnosticKind::UnsupportedExpression,
+                "E0011",
+                "arithmetic is not supported yet",
+            ),
         ];
 
         // Exhaustive, with no wildcard arm, so that adding a variant to
@@ -227,7 +253,9 @@ mod tests {
                 | DiagnosticKind::UnreachableStatement
                 | DiagnosticKind::DuplicateFunction { .. }
                 | DiagnosticKind::MissingEntryPoint { .. }
-                | DiagnosticKind::OpcodeUnavailable { .. } => {}
+                | DiagnosticKind::OpcodeUnavailable { .. }
+                | DiagnosticKind::AmbiguousPrecedence { .. }
+                | DiagnosticKind::UnsupportedExpression => {}
             }
         }
 
