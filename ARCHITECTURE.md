@@ -70,8 +70,9 @@ emitter consumes IR and nothing else, so extending the backend is a change to
 the IR and the emitter, not to the parser or the type checker.
 
 **The v0 invariant is what makes emission trivial:** every value has **exactly
-one use**, and uses appear in the order values are defined. Lowering an
-expression tree in post-order produces exactly this.
+one use**, and an instruction's operands are the values most recently defined
+and not yet consumed, in operand order — stack order. Lowering an expression
+tree in post-order produces exactly this.
 
 **The verifier** enforces that invariant, along with type correctness and
 single assignment. It runs at every IR boundary in debug and test builds: after
@@ -86,10 +87,11 @@ rather than as TEAL templates.
 ### 2.3 Emission
 
 A single linear pass over the IR. Because every value has exactly one use and
-uses follow definitions in order, each instruction emits its opcodes and leaves
-its result on the stack for the next consumer. No `dup`, no `cover`, no
-`uncover`, no scratch traffic, no scheduling algorithm — a post-order traversal
-of an expression tree *is* optimal stack code.
+every instruction consumes its operands from the top of the stack, each
+instruction emits its opcodes and leaves its result on the stack for the next
+consumer. No `dup`, no `cover`, no `uncover`, no scratch traffic, no scheduling
+algorithm — a post-order traversal of an expression tree *is* optimal stack
+code.
 
 **The target TEAL version is a required compilation parameter**, never inferred
 from the source and never silently upgraded. Using an opcode unavailable in the

@@ -80,17 +80,16 @@ fn check_body(func: &ast::FuncDecl, diags: &mut Diagnostics) -> Option<Vec<Stmt>
     let mut stmts = Vec::new();
     let mut returned = false;
     let mut unreachable = None;
-    let mut ok = true;
 
     for stmt in &func.body {
         let ast::Stmt::Return { expr, span } = stmt;
         if returned && unreachable.is_none() {
             unreachable = Some(*span);
         }
-        match check_expr(expr, diags) {
-            Some(expr) => stmts.push(Stmt::Return { expr, span: *span }),
-            None => ok = false,
-        }
+        stmts.push(Stmt::Return {
+            expr: check_expr(expr),
+            span: *span,
+        });
         returned = true;
     }
 
@@ -108,23 +107,26 @@ fn check_body(func: &ast::FuncDecl, diags: &mut Diagnostics) -> Option<Vec<Stmt>
         });
         return None;
     }
-    ok.then_some(stmts)
+    Some(stmts)
 }
 
-fn check_expr(expr: &ast::Expr, diags: &mut Diagnostics) -> Option<Expr> {
-    match expr {
-        ast::Expr::IntLit { value, span } => Some(Expr {
-            kind: ExprKind::IntLit(*value),
-            ty: Type::Uint64,
-            span: *span,
-        }),
-        ast::Expr::Binary { span, .. } => {
-            diags.push(Diagnostic {
-                kind: DiagnosticKind::UnsupportedExpression,
-                span: *span,
-            });
-            None
-        }
+/// Checks one expression. With one type there is nothing that can fail.
+fn check_expr(expr: &ast::Expr) -> Expr {
+    let (kind, span) = match expr {
+        ast::Expr::IntLit { value, span } => (ExprKind::IntLit(*value), *span),
+        ast::Expr::Binary { op, lhs, rhs, span } => (
+            ExprKind::Binary {
+                op: *op,
+                lhs: Box::new(check_expr(lhs)),
+                rhs: Box::new(check_expr(rhs)),
+            },
+            *span,
+        ),
+    };
+    Expr {
+        kind,
+        ty: Type::Uint64,
+        span,
     }
 }
 
@@ -132,7 +134,7 @@ fn check_expr(expr: &ast::Expr, diags: &mut Diagnostics) -> Option<Expr> {
 mod tests {
     use super::*;
     use crate::diagnostics::Span;
-    use crate::testing::{lex_parse, name, spans};
+    use crate::testing::{lex_parse, name, span_of, spans};
 
     /// Checks `source`, asserting that it produced no diagnostics.
     fn check_ok(source: &str) -> Program {
@@ -232,13 +234,42 @@ mod tests {
     }
 
     #[test]
-    fn arithmetic_is_not_supported_yet() {
-        let source = "func approval() uint64 { return 1 + 1 }";
+    fn checks_arithmetic() {
+        let source = "func approval() uint64 { return 1 + 2 * 3 }";
+        let uint64 = |kind, span| Expr {
+            kind,
+            ty: Type::Uint64,
+            span,
+        };
+        let literal = |value: u64, nth| {
+            uint64(
+                ExprKind::IntLit(value),
+                span_of(source, &value.to_string(), nth),
+            )
+        };
+
+        let product = uint64(
+            ExprKind::Binary {
+                op: ast::BinaryOp::Mul,
+                lhs: Box::new(literal(2, 0)),
+                rhs: Box::new(literal(3, 0)),
+            },
+            span_of(source, "2 * 3", 0),
+        );
+        let sum = uint64(
+            ExprKind::Binary {
+                op: ast::BinaryOp::Add,
+                lhs: Box::new(literal(1, 0)),
+                rhs: Box::new(product),
+            },
+            span_of(source, "1 + 2 * 3", 0),
+        );
+
         assert_eq!(
-            check_err(source),
-            vec![Diagnostic {
-                kind: DiagnosticKind::UnsupportedExpression,
-                span: spans(source)("1 + 1"),
+            check_ok(source).funcs[0].body,
+            vec![Stmt::Return {
+                expr: sum,
+                span: span_of(source, "return 1 + 2 * 3", 0),
             }]
         );
     }
