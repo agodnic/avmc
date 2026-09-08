@@ -8,6 +8,7 @@ pub mod ir;
 pub mod lexer;
 pub mod lower;
 pub mod parser;
+pub mod precedence;
 #[cfg(test)]
 pub(crate) mod testing;
 pub mod typeck;

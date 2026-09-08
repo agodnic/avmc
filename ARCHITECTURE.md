@@ -40,8 +40,11 @@ stage has no work to do, it does not exist yet.
 **Lexer.** Hand-written. Produces a token stream with spans,
 recovering from unknown characters rather than aborting.
 
-**Parser.** Hand-written recursive descent with Pratt-style expression parsing.
-Chosen over a parser generator for error-message quality and error recovery,
+**Parser.** Hand-written recursive descent. Expression precedence is a
+**partial order** over operator groups rather than a numeric ladder: adjacent
+operators whose groups the language does not order are a compile error asking
+for parentheses, so no expression is silently grouped in a way its author did
+not intend. Chosen over a parser generator for error-message quality and error recovery,
 both of which matter more than parser code volume. Produces an AST that
 mirrors the surface syntax closely — desugaring happens in lowering, not here.
 
