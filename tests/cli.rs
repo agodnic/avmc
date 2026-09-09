@@ -12,7 +12,8 @@ use std::process::{Command, Output};
 const EXAMPLE: &str = "func approval() uint64 { return 1 }";
 
 /// The TEAL the example program compiles to for version 10.
-const EXAMPLE_TEAL: &str = "#pragma version 10\npushint 1\nreturn\n";
+const EXAMPLE_TEAL: &str =
+    "#pragma version 10\ncallsub approval\nreturn\napproval:\nproto 0 1\npushint 1\nretsub\n";
 
 /// The usage line the binary reports for any bad argument list.
 const USAGE: &str = "usage: avmc <file> --teal-version <N>, with N from 1 to 11\n";
@@ -83,6 +84,10 @@ fn compiles_arithmetic_to_teal() {
     assert_eq!(
         stdout(&output),
         "#pragma version 10\n\
+         callsub approval\n\
+         return\n\
+         approval:\n\
+         proto 0 1\n\
          pushint 1\n\
          pushint 2\n\
          +\n\
@@ -92,7 +97,7 @@ fn compiles_arithmetic_to_teal() {
          pushint 5\n\
          /\n\
          -\n\
-         return\n"
+         retsub\n"
     );
     assert_eq!(stderr(&output), "");
     assert_eq!(code(&output), 0);

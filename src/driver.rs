@@ -73,7 +73,10 @@ mod tests {
         let version = TealVersion::new(10).expect("a supported version");
         assert_eq!(
             compile(EXAMPLE, version, &mut diags),
-            Some("#pragma version 10\npushint 1\nreturn\n".to_string())
+            Some(
+                "#pragma version 10\ncallsub approval\nreturn\napproval:\nproto 0 1\npushint 1\nretsub\n"
+                    .to_string()
+            )
         );
         assert!(diags.is_empty());
     }
@@ -90,11 +93,28 @@ mod tests {
     fn emission_reports_an_unsupported_version() {
         assert_eq!(
             compile_err(EXAMPLE, 2),
-            [DiagnosticKind::OpcodeUnavailable {
-                opcode: "pushint",
-                min: 3,
-                target: 2,
-            }]
+            [
+                DiagnosticKind::OpcodeUnavailable {
+                    opcode: "callsub",
+                    min: 4,
+                    target: 2,
+                },
+                DiagnosticKind::OpcodeUnavailable {
+                    opcode: "proto",
+                    min: 8,
+                    target: 2,
+                },
+                DiagnosticKind::OpcodeUnavailable {
+                    opcode: "pushint",
+                    min: 3,
+                    target: 2,
+                },
+                DiagnosticKind::OpcodeUnavailable {
+                    opcode: "retsub",
+                    min: 4,
+                    target: 2,
+                },
+            ]
         );
     }
 

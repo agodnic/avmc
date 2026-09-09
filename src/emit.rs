@@ -28,7 +28,12 @@ impl TealVersion {
 /// The function the program starts at.
 const ENTRY_POINT: &str = "approval";
 
-/// Emits the TEAL text of `program`'s entry point.
+/// The opcodes every program uses regardless of its instructions, with the
+/// version each first appeared in, in emission order.
+const FIXED: [(&str, u8); 3] = [("callsub", 4), ("return", 2), ("proto", 8)];
+
+/// Emits the TEAL text of `program`: a call to its entry point, then the
+/// entry point's subroutine.
 ///
 /// Any other function is dead code — nothing can call it yet — and is not
 /// emitted.
@@ -40,12 +45,22 @@ pub fn emit(
     let entry = entry_point(program, diags)?;
     check_versions(entry, version, diags)?;
 
-    let mut teal = format!("#pragma version {}\n", version.0);
-    for inst in &entry.insts {
+    let mut teal = format!(
+        "#pragma version {}\ncallsub {ENTRY_POINT}\nreturn\n",
+        version.0
+    );
+    teal.push_str(&function(entry));
+    Some(teal)
+}
+
+/// The subroutine for `func`: its label, its frame, and its body.
+fn function(func: &Function) -> String {
+    let mut teal = format!("{}:\nproto 0 1\n", func.name);
+    for inst in &func.insts {
         teal.push_str(&line(inst));
         teal.push('\n');
     }
-    Some(teal)
+    teal
 }
 
 /// Finds the entry point, reporting it if there is none.
@@ -62,21 +77,28 @@ fn entry_point<'a>(program: &'a ir::Program, diags: &mut Diagnostics) -> Option<
     entry
 }
 
-/// Reports every instruction whose opcode is newer than the target version,
-/// returning `None` if there was one.
+/// Reports every opcode newer than the target version, returning `None` if
+/// there was one.
+///
+/// The fixed opcodes come first, at the span of the whole function, then the
+/// instructions in order.
 fn check_versions(func: &Function, version: TealVersion, diags: &mut Diagnostics) -> Option<()> {
-    let mut ok = true;
+    let fixed = FIXED.iter().map(|&(opcode, min)| (opcode, min, func.span));
+    let insts = func
+        .insts
+        .iter()
+        .map(|inst| (opcode(inst), min_version(inst), inst.span()));
 
-    for inst in &func.insts {
-        let min = min_version(inst);
+    let mut ok = true;
+    for (opcode, min, span) in fixed.chain(insts) {
         if min > version.0 {
             diags.push(Diagnostic {
                 kind: DiagnosticKind::OpcodeUnavailable {
-                    opcode: opcode(inst),
+                    opcode,
                     min,
                     target: version.0,
                 },
-                span: inst.span(),
+                span,
             });
             ok = false;
         }
@@ -90,7 +112,7 @@ fn min_version(inst: &Inst) -> u8 {
     match inst {
         Inst::Const { .. } => 3,
         Inst::Binary { .. } => 1,
-        Inst::Return { .. } => 2,
+        Inst::Return { .. } => 4,
     }
 }
 
@@ -105,7 +127,7 @@ fn opcode(inst: &Inst) -> &'static str {
             BinaryOp::Div => "/",
             BinaryOp::Mod => "%",
         },
-        Inst::Return { .. } => "return",
+        Inst::Return { .. } => "retsub",
     }
 }
 
@@ -153,7 +175,7 @@ mod tests {
     fn example_program() {
         assert_eq!(
             emit_ok(EXAMPLE, 10),
-            "#pragma version 10\npushint 1\nreturn\n"
+            "#pragma version 10\ncallsub approval\nreturn\napproval:\nproto 0 1\npushint 1\nretsub\n"
         );
     }
 
@@ -161,7 +183,7 @@ mod tests {
     fn zero() {
         assert_eq!(
             emit_ok("func approval() uint64 { return 0 }", 10),
-            "#pragma version 10\npushint 0\nreturn\n"
+            "#pragma version 10\ncallsub approval\nreturn\napproval:\nproto 0 1\npushint 0\nretsub\n"
         );
     }
 
@@ -169,7 +191,7 @@ mod tests {
     fn largest_uint64() {
         assert_eq!(
             emit_ok("func approval() uint64 { return 18446744073709551615 }", 10),
-            "#pragma version 10\npushint 18446744073709551615\nreturn\n"
+            "#pragma version 10\ncallsub approval\nreturn\napproval:\nproto 0 1\npushint 18446744073709551615\nretsub\n"
         );
     }
 
@@ -178,6 +200,10 @@ mod tests {
         assert_eq!(
             emit_ok("func approval() uint64 { return (1 + 2) * 3 - 4 / 5 }", 10),
             "#pragma version 10\n\
+             callsub approval\n\
+             return\n\
+             approval:\n\
+             proto 0 1\n\
              pushint 1\n\
              pushint 2\n\
              +\n\
@@ -187,7 +213,7 @@ mod tests {
              pushint 5\n\
              /\n\
              -\n\
-             return\n"
+             retsub\n"
         );
     }
 
@@ -195,7 +221,7 @@ mod tests {
     fn the_remainder_opcode() {
         assert_eq!(
             emit_ok("func approval() uint64 { return 7 % 4 }", 10),
-            "#pragma version 10\npushint 7\npushint 4\n%\nreturn\n"
+            "#pragma version 10\ncallsub approval\nreturn\napproval:\nproto 0 1\npushint 7\npushint 4\n%\nretsub\n"
         );
     }
 
@@ -206,7 +232,7 @@ mod tests {
                 "func f() uint64 { return 2 } func approval() uint64 { return 1 }",
                 10
             ),
-            "#pragma version 10\npushint 1\nreturn\n"
+            "#pragma version 10\ncallsub approval\nreturn\napproval:\nproto 0 1\npushint 1\nretsub\n"
         );
     }
 
@@ -254,22 +280,44 @@ mod tests {
     #[test]
     fn the_target_version_is_the_one_requested() {
         assert_eq!(
-            emit_ok(EXAMPLE, 3),
-            "#pragma version 3\npushint 1\nreturn\n"
+            emit_ok(EXAMPLE, 8),
+            "#pragma version 8\ncallsub approval\nreturn\napproval:\nproto 0 1\npushint 1\nretsub\n"
         );
     }
 
     #[test]
     fn opcode_newer_than_the_target() {
+        let unavailable = |opcode, min, span| Diagnostic {
+            kind: DiagnosticKind::OpcodeUnavailable {
+                opcode,
+                min,
+                target: 2,
+            },
+            span,
+        };
+        let whole = span_of(EXAMPLE, EXAMPLE, 0);
         assert_eq!(
             emit_err(EXAMPLE, 2),
+            vec![
+                unavailable("callsub", 4, whole),
+                unavailable("proto", 8, whole),
+                unavailable("pushint", 3, span_of(EXAMPLE, "1", 0)),
+                unavailable("retsub", 4, span_of(EXAMPLE, "return 1", 0)),
+            ]
+        );
+    }
+
+    #[test]
+    fn the_frame_needs_version_8() {
+        assert_eq!(
+            emit_err(EXAMPLE, 7),
             vec![Diagnostic {
                 kind: DiagnosticKind::OpcodeUnavailable {
-                    opcode: "pushint",
-                    min: 3,
-                    target: 2,
+                    opcode: "proto",
+                    min: 8,
+                    target: 7,
                 },
-                span: span_of(EXAMPLE, "1", 0),
+                span: span_of(EXAMPLE, EXAMPLE, 0),
             }]
         );
     }
