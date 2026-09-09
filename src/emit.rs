@@ -3,6 +3,7 @@
 use crate::ast::BinaryOp;
 use crate::diagnostics::{Diagnostic, DiagnosticKind, Diagnostics, Span};
 use crate::ir::{self, Function, Inst};
+use crate::typed_ast::Type;
 
 /// The TEAL version the output targets.
 ///
@@ -56,11 +57,25 @@ pub fn emit(
 /// The subroutine for `func`: its label, its frame, and its body.
 fn function(func: &Function) -> String {
     let mut teal = format!("{}:\nproto 0 1\n", func.name);
+    for ty in &func.locals {
+        teal.push_str(placeholder(*ty));
+        teal.push('\n');
+    }
     for inst in &func.insts {
         teal.push_str(&line(inst));
         teal.push('\n');
     }
     teal
+}
+
+/// The line that allocates a frame slot of type `ty`.
+///
+/// Placeholders are not version-checked: `proto` precedes them and requires a
+/// newer version than any of them.
+fn placeholder(ty: Type) -> &'static str {
+    match ty {
+        Type::Uint64 => "pushint 0",
+    }
 }
 
 /// Finds the entry point, reporting it if there is none.
@@ -112,6 +127,7 @@ fn min_version(inst: &Inst) -> u8 {
     match inst {
         Inst::Const { .. } => 3,
         Inst::Binary { .. } => 1,
+        Inst::Store { .. } | Inst::Load { .. } => 8,
         Inst::Return { .. } => 4,
     }
 }
@@ -127,6 +143,8 @@ fn opcode(inst: &Inst) -> &'static str {
             BinaryOp::Div => "/",
             BinaryOp::Mod => "%",
         },
+        Inst::Store { .. } => "frame_bury",
+        Inst::Load { .. } => "frame_dig",
         Inst::Return { .. } => "retsub",
     }
 }
@@ -138,6 +156,9 @@ fn opcode(inst: &Inst) -> &'static str {
 fn line(inst: &Inst) -> String {
     match inst {
         Inst::Const { value, .. } => format!("{} {value}", opcode(inst)),
+        Inst::Store { local, .. } | Inst::Load { local, .. } => {
+            format!("{} {}", opcode(inst), local.0)
+        }
         Inst::Binary { .. } | Inst::Return { .. } => opcode(inst).to_string(),
     }
 }
@@ -145,8 +166,13 @@ fn line(inst: &Inst) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::ir::ValueId;
     use crate::lower::lower;
     use crate::testing::{EXAMPLE, lex_parse_check, span_of};
+    use crate::typed_ast::LocalId;
+
+    /// The span every hand-built instruction carries.
+    const ZERO: Span = Span { start: 0, end: 0 };
 
     /// Emits `source` for `version`, asserting that it produced no
     /// diagnostics.
@@ -169,6 +195,169 @@ mod tests {
         let ir = lower(&lex_parse_check(source), diags).expect("lowering succeeded");
         let version = TealVersion::new(version).expect("a supported version");
         emit(&ir, version, diags)
+    }
+
+    /// Emits a hand-built program for `version`: one function named
+    /// `approval` with `locals` slots of `Type::Uint64` and `insts`, at the
+    /// zero span throughout. `emit_ok` and `emit_err` go through source,
+    /// which cannot produce a frame yet.
+    fn hand_built(
+        locals: usize,
+        insts: Vec<Inst>,
+        version: u8,
+        diags: &mut Diagnostics,
+    ) -> Option<String> {
+        let program = ir::Program {
+            funcs: vec![Function {
+                name: ENTRY_POINT.to_string(),
+                ret: Type::Uint64,
+                locals: vec![Type::Uint64; locals],
+                insts,
+                span: ZERO,
+            }],
+        };
+        let version = TealVersion::new(version).expect("a supported version");
+        emit(&program, version, diags)
+    }
+
+    /// Emits a hand-built program, asserting that it produced no diagnostics.
+    fn hand_built_ok(locals: usize, insts: Vec<Inst>, version: u8) -> String {
+        let mut diags = Diagnostics::default();
+        let teal = hand_built(locals, insts, version, &mut diags);
+        assert!(diags.is_empty());
+        teal.expect("emission succeeded")
+    }
+
+    /// Emits a hand-built program, asserting that it emitted nothing, and
+    /// returning the diagnostics in the order they were reported.
+    fn hand_built_err(locals: usize, insts: Vec<Inst>, version: u8) -> Vec<Diagnostic> {
+        let mut diags = Diagnostics::default();
+        assert_eq!(hand_built(locals, insts, version, &mut diags), None);
+        diags.iter().cloned().collect()
+    }
+
+    fn constant(dest: u32, value: u64) -> Inst {
+        Inst::Const {
+            dest: ValueId(dest),
+            value,
+            span: ZERO,
+        }
+    }
+
+    fn binary(dest: u32, op: BinaryOp, lhs: u32, rhs: u32) -> Inst {
+        Inst::Binary {
+            dest: ValueId(dest),
+            op,
+            lhs: ValueId(lhs),
+            rhs: ValueId(rhs),
+            span: ZERO,
+        }
+    }
+
+    fn store(local: u8, value: u32) -> Inst {
+        Inst::Store {
+            local: LocalId(local),
+            value: ValueId(value),
+            span: ZERO,
+        }
+    }
+
+    fn load(dest: u32, local: u8) -> Inst {
+        Inst::Load {
+            dest: ValueId(dest),
+            local: LocalId(local),
+            span: ZERO,
+        }
+    }
+
+    fn ret(value: u32) -> Inst {
+        Inst::Return {
+            value: ValueId(value),
+            span: ZERO,
+        }
+    }
+
+    /// `var x uint64 = 1; return x`, as the next slice will lower it.
+    fn one_slot() -> Vec<Inst> {
+        vec![constant(0, 1), store(0, 0), load(1, 0), ret(1)]
+    }
+
+    #[test]
+    fn a_frame_slot_is_allocated_and_addressed() {
+        assert_eq!(
+            hand_built_ok(1, one_slot(), 10),
+            "#pragma version 10\n\
+             callsub approval\n\
+             return\n\
+             approval:\n\
+             proto 0 1\n\
+             pushint 0\n\
+             pushint 1\n\
+             frame_bury 0\n\
+             frame_dig 0\n\
+             retsub\n"
+        );
+    }
+
+    #[test]
+    fn two_frame_slots() {
+        // `var x uint64 = 1 + 2; var y uint64 = x * 3; return y - x`.
+        let insts = vec![
+            constant(0, 1),
+            constant(1, 2),
+            binary(2, BinaryOp::Add, 0, 1),
+            store(0, 2),
+            load(3, 0),
+            constant(4, 3),
+            binary(5, BinaryOp::Mul, 3, 4),
+            store(1, 5),
+            load(6, 1),
+            load(7, 0),
+            binary(8, BinaryOp::Sub, 6, 7),
+            ret(8),
+        ];
+        assert_eq!(
+            hand_built_ok(2, insts, 10),
+            "#pragma version 10\n\
+             callsub approval\n\
+             return\n\
+             approval:\n\
+             proto 0 1\n\
+             pushint 0\n\
+             pushint 0\n\
+             pushint 1\n\
+             pushint 2\n\
+             +\n\
+             frame_bury 0\n\
+             frame_dig 0\n\
+             pushint 3\n\
+             *\n\
+             frame_bury 1\n\
+             frame_dig 1\n\
+             frame_dig 0\n\
+             -\n\
+             retsub\n"
+        );
+    }
+
+    #[test]
+    fn the_frame_instructions_need_version_8() {
+        let unavailable = |opcode| Diagnostic {
+            kind: DiagnosticKind::OpcodeUnavailable {
+                opcode,
+                min: 8,
+                target: 7,
+            },
+            span: ZERO,
+        };
+        assert_eq!(
+            hand_built_err(1, one_slot(), 7),
+            vec![
+                unavailable("proto"),
+                unavailable("frame_bury"),
+                unavailable("frame_dig"),
+            ]
+        );
     }
 
     #[test]
