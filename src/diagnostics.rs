@@ -72,13 +72,11 @@ impl DiagnosticKind {
             Self::UnreachableStatement => 6,
             Self::DuplicateFunction { .. } => 7,
             Self::MissingEntryPoint { .. } => 8,
-            // 9 was retired and stays retired.
-            Self::AmbiguousPrecedence { .. } => 10,
-            // 11 was retired and stays retired.
-            Self::UndefinedVariable { .. } => 12,
-            Self::DuplicateVariable { .. } => 13,
-            Self::TooManyVariables { .. } => 14,
-            Self::TypeMismatch { .. } => 15,
+            Self::AmbiguousPrecedence { .. } => 9,
+            Self::UndefinedVariable { .. } => 10,
+            Self::DuplicateVariable { .. } => 11,
+            Self::TooManyVariables { .. } => 12,
+            Self::TypeMismatch { .. } => 13,
         };
         Code {
             severity: Severity::Error,
@@ -233,26 +231,26 @@ mod tests {
                     left: "`%`",
                     right: "`+`",
                 },
-                "E0010",
+                "E0009",
                 "`%` and `+` need parentheses to disambiguate",
             ),
             (
                 DiagnosticKind::UndefinedVariable {
                     name: "x".to_string(),
                 },
-                "E0012",
+                "E0010",
                 "undefined variable `x`",
             ),
             (
                 DiagnosticKind::DuplicateVariable {
                     name: "x".to_string(),
                 },
-                "E0013",
+                "E0011",
                 "duplicate variable `x`",
             ),
             (
                 DiagnosticKind::TooManyVariables { max: 128 },
-                "E0014",
+                "E0012",
                 "a function may declare at most 128 variables",
             ),
             (
@@ -260,7 +258,7 @@ mod tests {
                     expected: Type::Bool,
                     found: Type::Uint64,
                 },
-                "E0015",
+                "E0013",
                 "mismatched types: expected `bool`, found `uint64`",
             ),
         ];

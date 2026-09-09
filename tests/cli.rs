@@ -181,7 +181,7 @@ fn reports_a_boolean_in_arithmetic() {
     assert_eq!(
         stderr(&output),
         format!(
-            "{}:2:10: error[E0015]: mismatched types: expected `uint64`, found `bool`\n",
+            "{}:2:10: error[E0013]: mismatched types: expected `uint64`, found `bool`\n",
             file.path()
         )
     );
@@ -200,7 +200,7 @@ fn reports_an_undefined_variable() {
     assert_eq!(
         stderr(&output),
         format!(
-            "{}:2:10: error[E0012]: undefined variable `x`\n",
+            "{}:2:10: error[E0010]: undefined variable `x`\n",
             file.path()
         )
     );
@@ -219,7 +219,7 @@ fn reports_a_type_mismatch() {
     assert_eq!(
         stderr(&output),
         format!(
-            "{}:2:10: error[E0015]: mismatched types: expected `bool`, found `uint64`\n",
+            "{}:2:10: error[E0013]: mismatched types: expected `bool`, found `uint64`\n",
             file.path()
         )
     );
