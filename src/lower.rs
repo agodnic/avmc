@@ -74,6 +74,16 @@ fn lower_expr(expr: &Expr, insts: &mut Vec<Inst>, next_value: &mut u32) -> Value
             });
             dest
         }
+        ExprKind::BoolLit(value) => {
+            let dest = next_value_id(next_value);
+            insts.push(Inst::Const {
+                dest,
+                ty: Type::Bool,
+                value: u64::from(*value),
+                span: expr.span,
+            });
+            dest
+        }
         ExprKind::Var(local) => {
             let dest = next_value_id(next_value);
             insts.push(Inst::Load {
@@ -266,6 +276,103 @@ mod tests {
                     span: span_of(source, "return (1 + 2) * 3 - 4 / 5", 0),
                 },
             ]
+        );
+    }
+
+    #[test]
+    fn a_boolean_literal_lowers_to_a_bool_constant() {
+        let source = "func approval() bool { return true }";
+        assert_eq!(
+            lower_ok(source).funcs[0],
+            Function {
+                name: "approval".to_string(),
+                ret: Type::Bool,
+                locals: vec![],
+                insts: vec![
+                    Inst::Const {
+                        dest: ValueId(0),
+                        ty: Type::Bool,
+                        value: 1,
+                        span: span_of(source, "true", 0),
+                    },
+                    Inst::Return {
+                        value: ValueId(0),
+                        span: span_of(source, "return true", 0),
+                    },
+                ],
+                span: span_of(source, source, 0),
+            }
+        );
+
+        let source = "func approval() bool { return false }";
+        assert_eq!(
+            lower_ok(source).funcs[0].insts[0],
+            Inst::Const {
+                dest: ValueId(0),
+                ty: Type::Bool,
+                value: 0,
+                span: span_of(source, "false", 0),
+            }
+        );
+    }
+
+    #[test]
+    fn the_booleans_program_lowers_to_the_frame() {
+        let source = "func approval() bool {\n  var ok bool = true\n  return ok\n}\n";
+        let mut span = spans(source);
+
+        span("func");
+        span("approval");
+        span("bool");
+
+        let var_start = span("var").start;
+        span("ok");
+        span("bool");
+        let literal = span("true");
+
+        let return_start = span("return").start;
+        let loaded = span("ok");
+
+        assert_eq!(
+            lower_ok(source).funcs[0],
+            Function {
+                name: "approval".to_string(),
+                ret: Type::Bool,
+                locals: vec![Type::Bool],
+                insts: vec![
+                    Inst::Const {
+                        dest: ValueId(0),
+                        ty: Type::Bool,
+                        value: 1,
+                        span: literal,
+                    },
+                    Inst::Store {
+                        local: LocalId(0),
+                        value: ValueId(0),
+                        span: Span {
+                            start: var_start,
+                            end: literal.end,
+                        },
+                    },
+                    Inst::Load {
+                        dest: ValueId(1),
+                        local: LocalId(0),
+                        span: loaded,
+                    },
+                    Inst::Return {
+                        value: ValueId(1),
+                        span: Span {
+                            start: return_start,
+                            end: loaded.end,
+                        },
+                    },
+                ],
+                span: span_of(
+                    source,
+                    "func approval() bool {\n  var ok bool = true\n  return ok\n}",
+                    0
+                ),
+            }
         );
     }
 

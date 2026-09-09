@@ -71,6 +71,13 @@ pub enum Expr {
         /// Where it was written.
         span: Span,
     },
+    /// A boolean literal.
+    BoolLit {
+        /// Its value.
+        value: bool,
+        /// Where it was written.
+        span: Span,
+    },
     /// Two operands joined by a binary operator.
     Binary {
         /// The operator.
@@ -95,7 +102,10 @@ impl Expr {
     /// Where it was written.
     pub fn span(&self) -> Span {
         match self {
-            Expr::IntLit { span, .. } | Expr::Binary { span, .. } | Expr::Var { span, .. } => *span,
+            Expr::IntLit { span, .. }
+            | Expr::BoolLit { span, .. }
+            | Expr::Binary { span, .. }
+            | Expr::Var { span, .. } => *span,
         }
     }
 
@@ -103,6 +113,7 @@ impl Expr {
     pub fn with_span(self, span: Span) -> Expr {
         match self {
             Expr::IntLit { value, .. } => Expr::IntLit { value, span },
+            Expr::BoolLit { value, .. } => Expr::BoolLit { value, span },
             Expr::Binary { op, lhs, rhs, .. } => Expr::Binary { op, lhs, rhs, span },
             Expr::Var { name, .. } => Expr::Var { name, span },
         }

@@ -20,7 +20,7 @@ pub fn parse(source: &str, tokens: &[Token], diags: &mut Diagnostics) -> Option<
 }
 
 /// What the grammar allows where an operand is expected.
-const OPERAND: &str = "an integer literal, an identifier, or `(`";
+const OPERAND: &str = "a literal, an identifier, or `(`";
 
 struct Parser<'a> {
     source: &'a str,
@@ -141,13 +141,21 @@ impl Parser<'_> {
         Some(lhs)
     }
 
-    /// An integer literal, a variable, or a parenthesized expression.
+    /// A literal, a variable, or a parenthesized expression.
     fn operand(&mut self) -> Option<Expr> {
         if self.peek_kind() == Some(TokenKind::LParen) {
             let start = self.expect(TokenKind::LParen, OPERAND)?.span.start;
             let inner = self.expr(None)?;
             let end = self.expect(TokenKind::RParen, "`)`")?.span.end;
             return Some(inner.with_span(Span { start, end }));
+        }
+
+        if let Some(kind @ (TokenKind::True | TokenKind::False)) = self.peek_kind() {
+            let span = self.expect(kind, OPERAND)?.span;
+            return Some(Expr::BoolLit {
+                value: kind == TokenKind::True,
+                span,
+            });
         }
 
         if self.peek_kind() == Some(TokenKind::Ident) {
@@ -229,6 +237,8 @@ fn describe(kind: TokenKind) -> &'static str {
         TokenKind::Func => "`func`",
         TokenKind::Return => "`return`",
         TokenKind::Var => "`var`",
+        TokenKind::True => "`true`",
+        TokenKind::False => "`false`",
         TokenKind::Ident => "an identifier",
         TokenKind::IntLit => "an integer literal",
         TokenKind::LParen => "`(`",
@@ -623,7 +633,7 @@ mod tests {
             parse_err(&source),
             Diagnostic {
                 kind: DiagnosticKind::UnexpectedToken {
-                    expected: "an integer literal, an identifier, or `(`",
+                    expected: "a literal, an identifier, or `(`",
                     found: "`+`",
                 },
                 span: span("+"),
@@ -641,10 +651,89 @@ mod tests {
             parse_err(&source),
             Diagnostic {
                 kind: DiagnosticKind::UnexpectedToken {
-                    expected: "an integer literal, an identifier, or `(`",
+                    expected: "a literal, an identifier, or `(`",
                     found: "`)`",
                 },
                 span: span(")"),
+            }
+        );
+    }
+
+    #[test]
+    fn parses_a_boolean_literal() {
+        let source = "func f() bool { return true }";
+        let literal = span_of(source, "true", 0);
+
+        assert_eq!(
+            parse_ok(source).funcs[0].body,
+            vec![Stmt::Return {
+                expr: Expr::BoolLit {
+                    value: true,
+                    span: literal,
+                },
+                span: span_of(source, "return true", 0),
+            }]
+        );
+    }
+
+    #[test]
+    fn parentheses_widen_a_boolean_literal() {
+        let source = wrap("(false)");
+
+        assert_eq!(
+            returned(&source),
+            Expr::BoolLit {
+                value: false,
+                span: span_of(&source, "(false)", 0),
+            }
+        );
+    }
+
+    #[test]
+    fn a_boolean_literal_is_an_operand_of_arithmetic() {
+        let source = wrap("true + 1");
+        let mut span = spans(&source);
+        span("(");
+        span(")");
+        let literal = span("true");
+        span("+");
+        let one = span("1");
+
+        // The parser does not type: this is the type checker's to reject.
+        assert_eq!(
+            returned(&source),
+            Expr::Binary {
+                op: BinaryOp::Add,
+                lhs: Box::new(Expr::BoolLit {
+                    value: true,
+                    span: literal,
+                }),
+                rhs: Box::new(Expr::IntLit {
+                    value: 1,
+                    span: one
+                }),
+                span: Span {
+                    start: literal.start,
+                    end: one.end,
+                },
+            }
+        );
+    }
+
+    #[test]
+    fn a_missing_operand_names_every_literal() {
+        let source = "func f() uint64 { return }";
+        let mut span = spans(source);
+        span("{");
+
+        assert_eq!(
+            parse_err(source),
+            Diagnostic {
+                kind: DiagnosticKind::UnexpectedToken {
+                    expected: "a literal, an identifier, or `(`",
+                    found: "`}`",
+                },
+                span: span("}"),
             }
         );
     }
@@ -1068,7 +1157,7 @@ mod tests {
             parse_err(source),
             Diagnostic {
                 kind: DiagnosticKind::UnexpectedToken {
-                    expected: "an integer literal, an identifier, or `(`",
+                    expected: "a literal, an identifier, or `(`",
                     found: "end of input",
                 },
                 span: Span {

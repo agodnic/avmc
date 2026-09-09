@@ -101,6 +101,8 @@ pub struct Expr {
 pub enum ExprKind {
     /// An integer literal.
     IntLit(u64),
+    /// A boolean literal.
+    BoolLit(bool),
     /// A binary operation.
     Binary {
         /// The operator it applies.
