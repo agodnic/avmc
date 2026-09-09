@@ -1,5 +1,6 @@
 //! Spans and diagnostics, shared by every compiler stage.
 
+use crate::typed_ast::Type;
 use std::fmt;
 
 /// A half-open range of byte offsets into the source text.
@@ -58,6 +59,10 @@ pub enum DiagnosticKind {
     TooManyVariables {
         max: usize,
     },
+    TypeMismatch {
+        expected: Type,
+        found: Type,
+    },
 }
 
 impl DiagnosticKind {
@@ -78,6 +83,7 @@ impl DiagnosticKind {
             Self::UndefinedVariable { .. } => 12,
             Self::DuplicateVariable { .. } => 13,
             Self::TooManyVariables { .. } => 14,
+            Self::TypeMismatch { .. } => 15,
         };
         Code {
             severity: Severity::Error,
@@ -116,6 +122,12 @@ impl fmt::Display for DiagnosticKind {
             Self::DuplicateVariable { name } => write!(f, "duplicate variable `{name}`"),
             Self::TooManyVariables { max } => {
                 write!(f, "a function may declare at most {max} variables")
+            }
+            Self::TypeMismatch { expected, found } => {
+                write!(
+                    f,
+                    "mismatched types: expected `{expected}`, found `{found}`"
+                )
             }
         }
     }
@@ -267,6 +279,14 @@ mod tests {
                 "E0014",
                 "a function may declare at most 128 variables",
             ),
+            (
+                DiagnosticKind::TypeMismatch {
+                    expected: Type::Bool,
+                    found: Type::Uint64,
+                },
+                "E0015",
+                "mismatched types: expected `bool`, found `uint64`",
+            ),
         ];
 
         // Exhaustive, with no wildcard arm, so that adding a variant to
@@ -285,7 +305,8 @@ mod tests {
                 | DiagnosticKind::AmbiguousPrecedence { .. }
                 | DiagnosticKind::UndefinedVariable { .. }
                 | DiagnosticKind::DuplicateVariable { .. }
-                | DiagnosticKind::TooManyVariables { .. } => {}
+                | DiagnosticKind::TooManyVariables { .. }
+                | DiagnosticKind::TypeMismatch { .. } => {}
             }
         }
 

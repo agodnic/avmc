@@ -5,9 +5,6 @@ use crate::diagnostics::{Diagnostic, DiagnosticKind, Diagnostics};
 use crate::typed_ast::{Expr, ExprKind, FuncDecl, LocalId, Program, Stmt, Type};
 use std::collections::HashSet;
 
-/// The one type name the language has.
-const UINT64: &str = "uint64";
-
 /// Checks `program`: its declared names, then every function in source order.
 ///
 /// Reports every problem it finds, and returns `None` if it found any.
@@ -50,7 +47,7 @@ fn check_duplicates(program: &ast::Program, diags: &mut Diagnostics) -> bool {
 /// does not resolve still leaves the body checked.
 fn check_func(func: &ast::FuncDecl, diags: &mut Diagnostics) -> Option<FuncDecl> {
     let ret = resolve_type(&func.ret, diags);
-    let body = check_body(func, diags);
+    let body = check_body(func, ret, diags);
 
     Some(FuncDecl {
         name: func.name.clone(),
@@ -62,22 +59,29 @@ fn check_func(func: &ast::FuncDecl, diags: &mut Diagnostics) -> Option<FuncDecl>
 
 /// Resolves a written type name, reporting it if it names no type.
 fn resolve_type(ret: &ast::TypeRef, diags: &mut Diagnostics) -> Option<Type> {
-    if ret.name.text == UINT64 {
-        return Some(Type::Uint64);
+    match ret.name.text.as_str() {
+        "uint64" => Some(Type::Uint64),
+        "bool" => Some(Type::Bool),
+        name => {
+            diags.push(Diagnostic {
+                kind: DiagnosticKind::UnknownType {
+                    name: name.to_string(),
+                },
+                span: ret.name.span,
+            });
+            None
+        }
     }
-    diags.push(Diagnostic {
-        kind: DiagnosticKind::UnknownType {
-            name: ret.name.text.clone(),
-        },
-        span: ret.name.span,
-    });
-    None
 }
 
 /// Checks a function body: every statement in it, in a scope of its own. The
 /// body must end with a `return`, and nothing may follow one — of which only
 /// the first is reported.
-fn check_body(func: &ast::FuncDecl, diags: &mut Diagnostics) -> Option<Vec<Stmt>> {
+fn check_body(
+    func: &ast::FuncDecl,
+    ret: Option<Type>,
+    diags: &mut Diagnostics,
+) -> Option<Vec<Stmt>> {
     let mut stmts = Vec::new();
     // The variables declared so far, in order: a name's index is its slot.
     let mut locals = Vec::new();
@@ -90,7 +94,7 @@ fn check_body(func: &ast::FuncDecl, diags: &mut Diagnostics) -> Option<Vec<Stmt>
         if returned && unreachable.is_none() {
             unreachable = Some(*span);
         }
-        match check_stmt(stmt, &mut locals, diags) {
+        match check_stmt(stmt, ret, &mut locals, diags) {
             Some(stmt) => stmts.push(stmt),
             None => ok = false,
         }
@@ -114,13 +118,15 @@ fn check_body(func: &ast::FuncDecl, diags: &mut Diagnostics) -> Option<Vec<Stmt>
     ok.then_some(stmts)
 }
 
-/// Checks one statement, adding what it declares to `locals`.
+/// Checks one statement, adding what it declares to `locals`. `ret` is the
+/// enclosing function's return type, which a `return` must match.
 ///
 /// A declaration's initializer, type and name are independent: each is
 /// checked, and reported, whether or not another failed.
 fn check_stmt<'a>(
     stmt: &'a ast::Stmt,
-    locals: &mut Vec<&'a str>,
+    ret: Option<Type>,
+    locals: &mut Vec<(&'a str, Option<Type>)>,
     diags: &mut Diagnostics,
 ) -> Option<Stmt> {
     match stmt {
@@ -133,7 +139,12 @@ fn check_stmt<'a>(
             // The initializer cannot see the name being declared.
             let init = check_expr(init, locals, diags);
             let ty = resolve_type(ty, diags);
-            let local = declare(name, locals, diags);
+            let agrees = check_type(init.as_ref(), ty, diags);
+            // The name is declared with its written type even when the
+            // initializer disagreed, so that later uses check against the
+            // declaration.
+            let local = declare(name, ty, locals, diags);
+            agrees.then_some(())?;
             Some(Stmt::Var {
                 local: local?,
                 ty: ty?,
@@ -141,26 +152,48 @@ fn check_stmt<'a>(
                 span: *span,
             })
         }
-        ast::Stmt::Return { expr, span } => Some(Stmt::Return {
-            expr: check_expr(expr, locals, diags)?,
-            span: *span,
-        }),
+        ast::Stmt::Return { expr, span } => {
+            let expr = check_expr(expr, locals, diags)?;
+            check_type(Some(&expr), ret, diags).then_some(())?;
+            Some(Stmt::Return { expr, span: *span })
+        }
     }
+}
+
+/// Reports `expr` if it has a type other than `expected`, returning false if
+/// it did. An expression or an expectation that did not resolve reports
+/// nothing: the problem is already reported.
+fn check_type(expr: Option<&Expr>, expected: Option<Type>, diags: &mut Diagnostics) -> bool {
+    let (Some(expr), Some(expected)) = (expr, expected) else {
+        return true;
+    };
+    if expr.ty == expected {
+        return true;
+    }
+    diags.push(Diagnostic {
+        kind: DiagnosticKind::TypeMismatch {
+            expected,
+            found: expr.ty,
+        },
+        span: expr.span,
+    });
+    false
 }
 
 /// Declares `name`, reporting it if the scope already holds it or has no room
 /// for it. A name that is reported is not declared.
 fn declare<'a>(
     name: &'a ast::Name,
-    locals: &mut Vec<&'a str>,
+    ty: Option<Type>,
+    locals: &mut Vec<(&'a str, Option<Type>)>,
     diags: &mut Diagnostics,
 ) -> Option<LocalId> {
-    let kind = if locals.contains(&name.text.as_str()) {
+    let kind = if locals.iter().any(|(declared, _)| *declared == name.text) {
         DiagnosticKind::DuplicateVariable {
             name: name.text.clone(),
         }
     } else if let Some(local) = LocalId::new(locals.len()) {
-        locals.push(&name.text);
+        locals.push((&name.text, ty));
         return Some(local);
     } else {
         DiagnosticKind::TooManyVariables {
@@ -175,11 +208,15 @@ fn declare<'a>(
     None
 }
 
-/// Checks one expression. A name that resolves to no variable is the one
-/// thing that can fail.
-fn check_expr(expr: &ast::Expr, locals: &[&str], diags: &mut Diagnostics) -> Option<Expr> {
-    let (kind, span) = match expr {
-        ast::Expr::IntLit { value, span } => (ExprKind::IntLit(*value), *span),
+/// Checks one expression, giving it its type. A name that resolves to no
+/// variable is the one thing that can fail.
+fn check_expr(
+    expr: &ast::Expr,
+    locals: &[(&str, Option<Type>)],
+    diags: &mut Diagnostics,
+) -> Option<Expr> {
+    let (kind, ty, span) = match expr {
+        ast::Expr::IntLit { value, span } => (ExprKind::IntLit(*value), Type::Uint64, *span),
         ast::Expr::Binary { op, lhs, rhs, span } => {
             // Both operands are checked, so both report.
             let lhs = check_expr(lhs, locals, diags);
@@ -190,34 +227,40 @@ fn check_expr(expr: &ast::Expr, locals: &[&str], diags: &mut Diagnostics) -> Opt
                     lhs: Box::new(lhs?),
                     rhs: Box::new(rhs?),
                 },
+                Type::Uint64,
                 *span,
             )
         }
-        ast::Expr::Var { name, span } => (ExprKind::Var(resolve_var(name, locals, diags)?), *span),
+        ast::Expr::Var { name, span } => {
+            let (local, ty) = resolve_var(name, locals, diags)?;
+            (ExprKind::Var(local), ty, *span)
+        }
     };
-    Some(Expr {
-        kind,
-        ty: Type::Uint64,
-        span,
-    })
+    Some(Expr { kind, ty, span })
 }
 
-/// Resolves a name to its frame slot, reporting it if it names no variable.
-fn resolve_var(name: &ast::Name, locals: &[&str], diags: &mut Diagnostics) -> Option<LocalId> {
-    let local = locals
+/// Resolves a name to its frame slot and type, reporting it if it names no
+/// variable. A variable whose declared type did not resolve is `None` without
+/// a report: the declaration reported it.
+fn resolve_var(
+    name: &ast::Name,
+    locals: &[(&str, Option<Type>)],
+    diags: &mut Diagnostics,
+) -> Option<(LocalId, Type)> {
+    let Some((index, (_, ty))) = locals
         .iter()
-        .position(|declared| *declared == name.text)
-        .and_then(LocalId::new);
-
-    if local.is_none() {
+        .enumerate()
+        .find(|(_, (declared, _))| *declared == name.text)
+    else {
         diags.push(Diagnostic {
             kind: DiagnosticKind::UndefinedVariable {
                 name: name.text.clone(),
             },
             span: name.span,
         });
-    }
-    local
+        return None;
+    };
+    Some((LocalId::new(index)?, (*ty)?))
 }
 
 #[cfg(test)]
@@ -696,6 +739,142 @@ mod tests {
                 },
             ]
         );
+    }
+
+    #[test]
+    fn a_returned_literal_must_have_the_return_type() {
+        let source = "func approval() bool { return 1 }";
+        assert_eq!(
+            check_err(source),
+            vec![Diagnostic {
+                kind: DiagnosticKind::TypeMismatch {
+                    expected: Type::Bool,
+                    found: Type::Uint64,
+                },
+                span: span_of(source, "1", 0),
+            }]
+        );
+    }
+
+    #[test]
+    fn a_returned_variable_must_have_the_return_type() {
+        let source = "func approval() bool { var x uint64 = 1 return x }";
+        let mut span = spans(source);
+        span("x");
+
+        assert_eq!(
+            check_err(source),
+            vec![Diagnostic {
+                kind: DiagnosticKind::TypeMismatch {
+                    expected: Type::Bool,
+                    found: Type::Uint64,
+                },
+                span: span("x"),
+            }]
+        );
+    }
+
+    #[test]
+    fn a_failed_initializer_leaves_the_name_declared_as_written() {
+        let source = wrap("var x bool = 1 return x");
+        let mut span = spans(&source);
+        span("x");
+        let one = span("1");
+
+        assert_eq!(
+            check_err(&source),
+            vec![
+                Diagnostic {
+                    kind: DiagnosticKind::TypeMismatch {
+                        expected: Type::Bool,
+                        found: Type::Uint64,
+                    },
+                    span: one,
+                },
+                Diagnostic {
+                    kind: DiagnosticKind::TypeMismatch {
+                        expected: Type::Uint64,
+                        found: Type::Bool,
+                    },
+                    span: span("x"),
+                },
+            ]
+        );
+    }
+
+    #[test]
+    fn a_declaration_agreeing_with_the_return_type_reports_only_its_initializer() {
+        let source = "func approval() bool { var x bool = 1 return x }";
+        assert_eq!(
+            check_err(source),
+            vec![Diagnostic {
+                kind: DiagnosticKind::TypeMismatch {
+                    expected: Type::Bool,
+                    found: Type::Uint64,
+                },
+                span: span_of(source, "1", 0),
+            }]
+        );
+    }
+
+    #[test]
+    fn an_initializer_must_have_the_declared_type() {
+        let source = wrap("var x uint64 = 1 var y bool = x return x");
+        let mut span = spans(&source);
+        span("x");
+        span("1");
+        span("y");
+
+        assert_eq!(
+            check_err(&source),
+            vec![Diagnostic {
+                kind: DiagnosticKind::TypeMismatch {
+                    expected: Type::Bool,
+                    found: Type::Uint64,
+                },
+                span: span("x"),
+            }]
+        );
+    }
+
+    #[test]
+    fn a_use_of_an_untyped_name_is_silent_inside_a_binary() {
+        let source = wrap("var x bytes = 1 var y uint64 = x + 1 return y");
+        assert_eq!(
+            check_err(&source),
+            vec![Diagnostic {
+                kind: DiagnosticKind::UnknownType {
+                    name: "bytes".to_string(),
+                },
+                span: span_of(&source, "bytes", 0),
+            }]
+        );
+    }
+
+    #[test]
+    fn bool_is_a_type_only_where_a_type_is_expected() {
+        let source = wrap("var bool uint64 = 1 return bool");
+        let body = &check_ok(&source).funcs[0].body;
+
+        assert!(matches!(
+            body[0],
+            Stmt::Var {
+                local: LocalId(0),
+                ty: Type::Uint64,
+                ..
+            }
+        ));
+        assert!(matches!(
+            body[1],
+            Stmt::Return {
+                expr: Expr {
+                    kind: ExprKind::Var(LocalId(0)),
+                    ty: Type::Uint64,
+                    ..
+                },
+                ..
+            }
+        ));
     }
 
     #[test]
