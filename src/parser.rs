@@ -1,9 +1,9 @@
 //! The parser: tokens to an AST by recursive descent.
 
-use crate::ast::{BinaryOp, Expr, FuncDecl, Name, Program, Stmt, TypeRef};
+use crate::ast::{BinaryOp, Expr, FuncDecl, Name, Program, Stmt, TypeRef, UnaryOp};
 use crate::diagnostics::{Diagnostic, DiagnosticKind, Diagnostics, Span};
 use crate::lexer::{Token, TokenKind};
-use crate::precedence::{Priority, group, priority};
+use crate::precedence::{Group, Priority, group, priority, unary_group};
 
 /// Parses the token stream `lex` produced for `source`.
 ///
@@ -20,7 +20,7 @@ pub fn parse(source: &str, tokens: &[Token], diags: &mut Diagnostics) -> Option<
 }
 
 /// What the grammar allows where an operand is expected.
-const OPERAND: &str = "a literal, an identifier, or `(`";
+const OPERAND: &str = "a literal, an identifier, `!`, or `(`";
 
 struct Parser<'a> {
     source: &'a str,
@@ -104,13 +104,13 @@ impl Parser<'_> {
     // trade is deliberate and is not being revisited yet: do not add a bound,
     // and do not report this as a bug.
     fn expr(&mut self, ambient: Option<Token>) -> Option<Expr> {
-        let mut lhs = self.operand()?;
+        let mut lhs = self.operand(ambient)?;
         // The caller only ever passes a token it consumed as an operator.
-        let enclosing = ambient.and_then(|token| Some((token, binary_op(token.kind)?)));
+        let enclosing = ambient.and_then(|token| Some((token, operator_group(token.kind)?)));
 
         while let Some((token, op)) = self.peek_binary_op() {
-            if let Some((left, left_op)) = enclosing {
-                match priority(group(left_op), group(op)) {
+            if let Some((left, left_group)) = enclosing {
+                match priority(left_group, group(op)) {
                     // The enclosing operator takes the operand just parsed.
                     Priority::Left => break,
                     Priority::Ambiguous => {
@@ -141,8 +141,13 @@ impl Parser<'_> {
         Some(lhs)
     }
 
-    /// A literal, a variable, or a parenthesized expression.
-    fn operand(&mut self) -> Option<Expr> {
+    /// A literal, a variable, a parenthesized expression, or `!` applied to
+    /// one. `ambient` is the enclosing operator, as in `expr`.
+    fn operand(&mut self, ambient: Option<Token>) -> Option<Expr> {
+        if let Some(&bang) = self.peek().filter(|token| token.kind == TokenKind::Bang) {
+            return self.not(bang, ambient);
+        }
+
         if self.peek_kind() == Some(TokenKind::LParen) {
             let start = self.expect(TokenKind::LParen, OPERAND)?.span.start;
             let inner = self.expr(None)?;
@@ -171,6 +176,37 @@ impl Parser<'_> {
             // parsing can fail here.
             Err(_) => self.report(DiagnosticKind::IntegerLiteralOutOfRange, span),
         }
+    }
+
+    /// `!` applied to an operand, `bang` being the operator token, which is
+    /// still to be consumed.
+    fn not(&mut self, bang: Token, ambient: Option<Token>) -> Option<Expr> {
+        // An enclosing operator the graph does not order against `!` is the
+        // whole point of a partial order: the source must parenthesize.
+        let enclosing = ambient.and_then(|token| Some((token, operator_group(token.kind)?)));
+        if let Some((left, left_group)) = enclosing
+            && priority(left_group, unary_group(UnaryOp::Not)) == Priority::Ambiguous
+        {
+            let kind = DiagnosticKind::AmbiguousPrecedence {
+                left: describe(left.kind),
+                right: describe(bang.kind),
+            };
+            return self.report(kind, bang.span);
+        }
+
+        self.next += 1;
+        // Parsing the operand with `!` enclosing it is what places the
+        // operators that follow it.
+        let operand = self.expr(Some(bang))?;
+        let span = Span {
+            start: bang.span.start,
+            end: operand.span().end,
+        };
+        Some(Expr::Unary {
+            op: UnaryOp::Not,
+            operand: Box::new(operand),
+            span,
+        })
     }
 
     fn name(&mut self) -> Option<Name> {
@@ -263,6 +299,14 @@ fn describe(kind: TokenKind) -> &'static str {
     }
 }
 
+/// The precedence group of an operator token, if it is one.
+fn operator_group(kind: TokenKind) -> Option<Group> {
+    match kind {
+        TokenKind::Bang => Some(unary_group(UnaryOp::Not)),
+        kind => binary_op(kind).map(group),
+    }
+}
+
 /// The operator a token denotes, if it denotes one.
 fn binary_op(kind: TokenKind) -> Option<BinaryOp> {
     match kind {
@@ -277,6 +321,8 @@ fn binary_op(kind: TokenKind) -> Option<BinaryOp> {
         TokenKind::LtEq => Some(BinaryOp::Le),
         TokenKind::Gt => Some(BinaryOp::Gt),
         TokenKind::GtEq => Some(BinaryOp::Ge),
+        TokenKind::AmpAmp => Some(BinaryOp::And),
+        TokenKind::PipePipe => Some(BinaryOp::Or),
         TokenKind::Func
         | TokenKind::Return
         | TokenKind::Var
@@ -289,9 +335,7 @@ fn binary_op(kind: TokenKind) -> Option<BinaryOp> {
         | TokenKind::LBrace
         | TokenKind::RBrace
         | TokenKind::Equals
-        | TokenKind::Bang
-        | TokenKind::AmpAmp
-        | TokenKind::PipePipe => None,
+        | TokenKind::Bang => None,
     }
 }
 
@@ -361,6 +405,27 @@ mod tests {
     /// The example program of the variables milestone.
     const VARIABLES: &str = "func approval() uint64 {\n  var x uint64 = 1 + 2\n  \
                              var y uint64 = x * 3\n  return y - x\n}\n";
+
+    /// The variable `text`, written at `span`.
+    fn var(text: &str, span: Span) -> Expr {
+        Expr::Var {
+            name: name(text, span),
+            span,
+        }
+    }
+
+    /// `op operand`, the operator being the byte just before the operand.
+    fn unary(op: UnaryOp, operand: Expr) -> Expr {
+        let span = Span {
+            start: operand.span().start - 1,
+            end: operand.span().end,
+        };
+        Expr::Unary {
+            op,
+            operand: Box::new(operand),
+            span,
+        }
+    }
 
     /// `lhs op rhs`, spanning from one operand to the other.
     fn binary(op: BinaryOp, lhs: Expr, rhs: Expr) -> Expr {
@@ -662,7 +727,7 @@ mod tests {
             parse_err(&source),
             Diagnostic {
                 kind: DiagnosticKind::UnexpectedToken {
-                    expected: "a literal, an identifier, or `(`",
+                    expected: OPERAND,
                     found: "`+`",
                 },
                 span: span("+"),
@@ -687,17 +752,34 @@ mod tests {
     }
 
     #[test]
-    fn a_bang_is_not_an_operand() {
+    fn a_bang_needs_an_operand() {
         let source = "func f() uint64 { return ! }";
+        let mut span = spans(source);
+        span("{");
+        assert_eq!(
+            parse_err(source),
+            Diagnostic {
+                kind: DiagnosticKind::UnexpectedToken {
+                    expected: OPERAND,
+                    found: "`}`",
+                },
+                span: span("}"),
+            }
+        );
+    }
+
+    #[test]
+    fn a_logical_operator_is_not_an_operand() {
+        let source = "func f() uint64 { return && true }";
         let mut span = spans(source);
         assert_eq!(
             parse_err(source),
             Diagnostic {
                 kind: DiagnosticKind::UnexpectedToken {
                     expected: OPERAND,
-                    found: "`!`",
+                    found: "`&&`",
                 },
-                span: span("!"),
+                span: span("&&"),
             }
         );
     }
@@ -712,7 +794,7 @@ mod tests {
             parse_err(&source),
             Diagnostic {
                 kind: DiagnosticKind::UnexpectedToken {
-                    expected: "a literal, an identifier, or `(`",
+                    expected: OPERAND,
                     found: "`)`",
                 },
                 span: span(")"),
@@ -791,7 +873,7 @@ mod tests {
             parse_err(source),
             Diagnostic {
                 kind: DiagnosticKind::UnexpectedToken {
-                    expected: "a literal, an identifier, or `(`",
+                    expected: OPERAND,
                     found: "`}`",
                 },
                 span: span("}"),
@@ -1221,7 +1303,7 @@ mod tests {
             parse_err(source),
             Diagnostic {
                 kind: DiagnosticKind::UnexpectedToken {
-                    expected: "a literal, an identifier, or `(`",
+                    expected: OPERAND,
                     found: "end of input",
                 },
                 span: Span {
@@ -1454,5 +1536,286 @@ mod tests {
                 },
             )
         );
+    }
+
+    #[test]
+    fn negates_a_boolean_literal() {
+        let source = wrap("!true");
+        let literal = span_of(&source, "true", 0);
+
+        assert_eq!(
+            returned(&source),
+            unary(
+                UnaryOp::Not,
+                Expr::BoolLit {
+                    value: true,
+                    span: literal,
+                },
+            )
+        );
+    }
+
+    #[test]
+    fn negates_a_variable() {
+        let source = wrap("!x");
+        let x = span_of(&source, "x", 0);
+
+        assert_eq!(
+            returned(&source),
+            unary(
+                UnaryOp::Not,
+                Expr::Var {
+                    name: name("x", x),
+                    span: x,
+                },
+            )
+        );
+    }
+
+    #[test]
+    fn negates_a_parenthesized_expression() {
+        let source = wrap("!(1 < 2)");
+        let mut span = spans(&source);
+        span("(");
+        span(")");
+        let open = span("(");
+        let one = span("1");
+        let two = span("2");
+        let close = span(")");
+
+        assert_eq!(
+            returned(&source),
+            unary(
+                UnaryOp::Not,
+                Expr::Binary {
+                    op: BinaryOp::Lt,
+                    lhs: Box::new(Expr::IntLit {
+                        value: 1,
+                        span: one,
+                    }),
+                    rhs: Box::new(Expr::IntLit {
+                        value: 2,
+                        span: two,
+                    }),
+                    span: Span {
+                        start: open.start,
+                        end: close.end,
+                    },
+                },
+            )
+        );
+    }
+
+    #[test]
+    fn parses_both_logical_operators() {
+        for (expr, op) in [
+            ("true && false", BinaryOp::And),
+            ("true || false", BinaryOp::Or),
+        ] {
+            let source = wrap(expr);
+            let mut span = spans(&source);
+            let yes = span("true");
+            let no = span("false");
+
+            assert_eq!(
+                returned(&source),
+                binary(
+                    op,
+                    Expr::BoolLit {
+                        value: true,
+                        span: yes,
+                    },
+                    Expr::BoolLit {
+                        value: false,
+                        span: no,
+                    },
+                ),
+                "{source}"
+            );
+        }
+    }
+
+    #[test]
+    fn negation_binds_tighter_than_logic() {
+        let source = wrap("!x && y");
+        let mut span = spans(&source);
+        span("(");
+        span(")");
+        let x = span("x");
+        let y = span("y");
+
+        assert_eq!(
+            returned(&source),
+            binary(BinaryOp::And, unary(UnaryOp::Not, var("x", x)), var("y", y),)
+        );
+
+        let source = wrap("x || !y");
+        let mut span = spans(&source);
+        span("(");
+        span(")");
+        let x = span("x");
+        let y = span("y");
+
+        assert_eq!(
+            returned(&source),
+            binary(BinaryOp::Or, var("x", x), unary(UnaryOp::Not, var("y", y)))
+        );
+
+        let source = wrap("x && !y && z");
+        let mut span = spans(&source);
+        span("(");
+        span(")");
+        let x = span("x");
+        let y = span("y");
+        let z = span("z");
+
+        assert_eq!(
+            returned(&source),
+            binary(
+                BinaryOp::And,
+                binary(BinaryOp::And, var("x", x), unary(UnaryOp::Not, var("y", y))),
+                var("z", z),
+            )
+        );
+    }
+
+    #[test]
+    fn logic_is_left_associative() {
+        for (expr, op) in [
+            ("x && y && z", BinaryOp::And),
+            ("x || y || z", BinaryOp::Or),
+        ] {
+            let source = wrap(expr);
+            let mut span = spans(&source);
+            span("(");
+            span(")");
+            let x = span("x");
+            let y = span("y");
+            let z = span("z");
+
+            assert_eq!(
+                returned(&source),
+                binary(op, binary(op, var("x", x), var("y", y)), var("z", z),),
+                "{source}"
+            );
+        }
+    }
+
+    #[test]
+    fn logic_binds_looser_than_comparison() {
+        let source = wrap("1 < 2 && 3 < 4");
+        let mut span = spans(&source);
+        span("(");
+        span(")");
+        let one = span("1");
+        let two = span("2");
+        let three = span("3");
+        let four = span("4");
+
+        let int = |value, span| Expr::IntLit { value, span };
+        assert_eq!(
+            returned(&source),
+            binary(
+                BinaryOp::And,
+                binary(BinaryOp::Lt, int(1, one), int(2, two)),
+                binary(BinaryOp::Lt, int(3, three), int(4, four)),
+            )
+        );
+    }
+
+    #[test]
+    fn logic_binds_looser_than_arithmetic_and_comparison_together() {
+        let source = wrap("1 + 2 == 3 || false");
+        let mut span = spans(&source);
+        span("(");
+        span(")");
+        let one = span("1");
+        let two = span("2");
+        let three = span("3");
+        let literal = span("false");
+
+        let int = |value, span| Expr::IntLit { value, span };
+        assert_eq!(
+            returned(&source),
+            binary(
+                BinaryOp::Or,
+                binary(
+                    BinaryOp::Eq,
+                    binary(BinaryOp::Add, int(1, one), int(2, two)),
+                    int(3, three),
+                ),
+                Expr::BoolLit {
+                    value: false,
+                    span: literal,
+                },
+            )
+        );
+    }
+
+    #[test]
+    fn parentheses_make_logic_an_operand_of_logic() {
+        let source = wrap("(true && false) || true");
+        let mut span = spans(&source);
+        span("(");
+        span(")");
+        let open = span("(");
+        let yes = span("true");
+        let no = span("false");
+        let close = span(")");
+        let last = span("true");
+
+        assert_eq!(
+            returned(&source),
+            binary(
+                BinaryOp::Or,
+                Expr::Binary {
+                    op: BinaryOp::And,
+                    lhs: Box::new(Expr::BoolLit {
+                        value: true,
+                        span: yes,
+                    }),
+                    rhs: Box::new(Expr::BoolLit {
+                        value: false,
+                        span: no,
+                    }),
+                    span: Span {
+                        start: open.start,
+                        end: close.end,
+                    },
+                },
+                Expr::BoolLit {
+                    value: true,
+                    span: last,
+                },
+            )
+        );
+    }
+
+    #[test]
+    fn negation_and_logic_report_what_they_do_not_order() {
+        // The expression, the two operators as they are described, and which
+        // occurrence of the second one's text the parser could not place.
+        let cases = [
+            ("!!true", "`!`", "`!`", 1),
+            ("!1 == 2", "`!`", "`==`", 0),
+            ("1 == !2", "`==`", "`!`", 0),
+            ("!1 + 2", "`!`", "`+`", 0),
+            ("1 + !2", "`+`", "`!`", 0),
+            ("true && false || true", "`&&`", "`||`", 0),
+            ("true || false && true", "`||`", "`&&`", 0),
+        ];
+
+        for (expr, left, right, nth) in cases {
+            let source = wrap(expr);
+            let text = right.trim_matches('`');
+            assert_eq!(
+                parse_err(&source),
+                Diagnostic {
+                    kind: DiagnosticKind::AmbiguousPrecedence { left, right },
+                    span: span_of(&source, text, nth),
+                },
+                "{source}"
+            );
+        }
     }
 }

@@ -242,6 +242,18 @@ fn check_expr(
                 *span,
             )
         }
+        ast::Expr::Unary { op, operand, span } => {
+            let operand = check_expr(operand, locals, diags);
+            check_type(operand.as_ref(), Some(Type::Bool), diags).then_some(())?;
+            (
+                ExprKind::Unary {
+                    op: *op,
+                    operand: Box::new(operand?),
+                },
+                Type::Bool,
+                *span,
+            )
+        }
         ast::Expr::Var { name, span } => {
             let (local, ty) = resolve_var(name, locals, diags)?;
             (ExprKind::Var(local), ty, *span)
@@ -1274,6 +1286,130 @@ mod tests {
     #[test]
     fn an_unresolved_left_operand_leaves_the_right_one_unchecked() {
         let source = "func approval() bool { return x == 1 }";
+        assert_eq!(
+            check_err(source),
+            vec![Diagnostic {
+                kind: DiagnosticKind::UndefinedVariable {
+                    name: "x".to_string(),
+                },
+                span: span_of(source, "x", 0),
+            }]
+        );
+    }
+
+    #[test]
+    fn a_negation_is_a_bool() {
+        let source = "func approval() bool { return !true }";
+        let literal = span_of(source, "true", 0);
+        let negation = span_of(source, "!true", 0);
+
+        assert_eq!(
+            returned(source),
+            Expr {
+                kind: ExprKind::Unary {
+                    op: ast::UnaryOp::Not,
+                    operand: Box::new(Expr {
+                        kind: ExprKind::BoolLit(true),
+                        ty: Type::Bool,
+                        span: literal,
+                    }),
+                },
+                ty: Type::Bool,
+                span: negation,
+            }
+        );
+    }
+
+    #[test]
+    fn logic_takes_booleans() {
+        for (source, op) in [
+            (
+                "func approval() bool { return true && false }",
+                ast::BinaryOp::And,
+            ),
+            (
+                "func approval() bool { return true || false }",
+                ast::BinaryOp::Or,
+            ),
+        ] {
+            let mut span = spans(source);
+            span("bool");
+            let yes = span("true");
+            let no = span("false");
+
+            assert_eq!(
+                returned(source),
+                Expr {
+                    kind: ExprKind::Binary {
+                        op,
+                        lhs: Box::new(Expr {
+                            kind: ExprKind::BoolLit(true),
+                            ty: Type::Bool,
+                            span: yes,
+                        }),
+                        rhs: Box::new(Expr {
+                            kind: ExprKind::BoolLit(false),
+                            ty: Type::Bool,
+                            span: no,
+                        }),
+                    },
+                    ty: Type::Bool,
+                    span: Span {
+                        start: yes.start,
+                        end: no.end,
+                    },
+                },
+                "{source}"
+            );
+        }
+    }
+
+    #[test]
+    fn an_operand_of_logic_that_is_not_a_bool_is_reported() {
+        // The source, and the integer literals reported in it, in order.
+        let cases = [
+            ("func approval() bool { return !1 }", vec![("1", 0)]),
+            ("func approval() bool { return 1 && true }", vec![("1", 0)]),
+            ("func approval() bool { return true || 1 }", vec![("1", 0)]),
+            (
+                "func approval() bool { return 1 || 2 }",
+                vec![("1", 0), ("2", 0)],
+            ),
+        ];
+
+        for (source, reported) in cases {
+            let expected: Vec<Diagnostic> = reported
+                .into_iter()
+                .map(|(text, nth)| Diagnostic {
+                    kind: DiagnosticKind::TypeMismatch {
+                        expected: Type::Bool,
+                        found: Type::Uint64,
+                    },
+                    span: span_of(source, text, nth),
+                })
+                .collect();
+            assert_eq!(check_err(source), expected, "{source}");
+        }
+    }
+
+    #[test]
+    fn a_negation_returned_from_a_uint64_function_is_reported() {
+        let source = "func approval() uint64 { return !true }";
+        assert_eq!(
+            check_err(source),
+            vec![Diagnostic {
+                kind: DiagnosticKind::TypeMismatch {
+                    expected: Type::Uint64,
+                    found: Type::Bool,
+                },
+                span: span_of(source, "!true", 0),
+            }]
+        );
+    }
+
+    #[test]
+    fn a_negation_of_an_undefined_name_reports_only_the_name() {
+        let source = "func approval() bool { return !x }";
         assert_eq!(
             check_err(source),
             vec![Diagnostic {

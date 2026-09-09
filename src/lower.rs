@@ -93,6 +93,17 @@ fn lower_expr(expr: &Expr, insts: &mut Vec<Inst>, next_value: &mut u32) -> Value
             });
             dest
         }
+        ExprKind::Unary { op, operand } => {
+            let operand = lower_expr(operand, insts, next_value);
+            let dest = next_value_id(next_value);
+            insts.push(Inst::Unary {
+                dest,
+                op: *op,
+                operand,
+                span: expr.span,
+            });
+            dest
+        }
         ExprKind::Binary { op, lhs, rhs } => {
             let lhs = lower_expr(lhs, insts, next_value);
             let rhs = lower_expr(rhs, insts, next_value);
@@ -119,7 +130,7 @@ fn next_value_id(next_value: &mut u32) -> ValueId {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::ast::BinaryOp;
+    use crate::ast::{BinaryOp, UnaryOp};
     use crate::diagnostics::Span;
     use crate::testing::{lex_parse_check, span_of, spans};
     use crate::typed_ast::LocalId;
@@ -582,6 +593,65 @@ mod tests {
                 Inst::Return {
                     value: ValueId(2),
                     span: span_of(source, "return 1 < 2", 0),
+                },
+            ]
+        );
+    }
+
+    #[test]
+    fn negation_lowers_after_its_operand() {
+        let source = "func approval() bool { return !true }";
+        assert_eq!(
+            lower_ok(source).funcs[0].insts,
+            vec![
+                Inst::Const {
+                    dest: ValueId(0),
+                    ty: Type::Bool,
+                    value: 1,
+                    span: span_of(source, "true", 0),
+                },
+                Inst::Unary {
+                    dest: ValueId(1),
+                    op: UnaryOp::Not,
+                    operand: ValueId(0),
+                    span: span_of(source, "!true", 0),
+                },
+                Inst::Return {
+                    value: ValueId(1),
+                    span: span_of(source, "return !true", 0),
+                },
+            ]
+        );
+    }
+
+    #[test]
+    fn logic_lowers_in_post_order() {
+        let source = "func approval() bool { return true && false }";
+        assert_eq!(
+            lower_ok(source).funcs[0].insts,
+            vec![
+                Inst::Const {
+                    dest: ValueId(0),
+                    ty: Type::Bool,
+                    value: 1,
+                    span: span_of(source, "true", 0),
+                },
+                Inst::Const {
+                    dest: ValueId(1),
+                    ty: Type::Bool,
+                    value: 0,
+                    span: span_of(source, "false", 0),
+                },
+                Inst::Binary {
+                    dest: ValueId(2),
+                    op: BinaryOp::And,
+                    lhs: ValueId(0),
+                    rhs: ValueId(1),
+                    span: span_of(source, "true && false", 0),
+                },
+                Inst::Return {
+                    value: ValueId(2),
+                    span: span_of(source, "return true && false", 0),
                 },
             ]
         );

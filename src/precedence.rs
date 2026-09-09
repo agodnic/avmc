@@ -3,7 +3,7 @@
 //! Two operators the order does not relate are a compile error rather than a
 //! silent grouping, so this module knows nothing about tokens or parsing.
 
-use crate::ast::BinaryOp;
+use crate::ast::{BinaryOp, UnaryOp};
 
 /// A node in the precedence graph. Operators in one group share a precedence.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -16,11 +16,12 @@ pub enum Group {
     Modulo,
     /// `==`, `!=`, `<`, `<=`, `>`, and `>=`.
     Comparison,
-    /// The operators no slice has placed yet: the logical ones. Unordered
-    /// against every group, including itself, so that an unplaced operator
-    /// can only ever be an ambiguity the source must parenthesize, never a
-    /// silent grouping.
-    Unplaced,
+    /// `!`.
+    Not,
+    /// `&&`.
+    And,
+    /// `||`.
+    Or,
 }
 
 /// Which of two adjacent operators binds tighter.
@@ -43,7 +44,15 @@ pub fn group(op: BinaryOp) -> Group {
         BinaryOp::Eq | BinaryOp::Ne | BinaryOp::Lt | BinaryOp::Le | BinaryOp::Gt | BinaryOp::Ge => {
             Group::Comparison
         }
-        BinaryOp::And | BinaryOp::Or => Group::Unplaced,
+        BinaryOp::And => Group::And,
+        BinaryOp::Or => Group::Or,
+    }
+}
+
+/// The group a prefix operator belongs to.
+pub fn unary_group(op: UnaryOp) -> Group {
+    match op {
+        UnaryOp::Not => Group::Not,
     }
 }
 
@@ -60,27 +69,51 @@ pub fn priority(left: Group, right: Group) -> Priority {
         (Group::Additive, Group::Multiplicative) => Priority::Right,
         (Group::Additive, Group::Modulo) => Priority::Ambiguous,
         (Group::Additive, Group::Comparison) => Priority::Left,
-        (Group::Additive, Group::Unplaced) => Priority::Ambiguous,
+        (Group::Additive, Group::Not) => Priority::Ambiguous,
+        (Group::Additive, Group::And) => Priority::Left,
+        (Group::Additive, Group::Or) => Priority::Left,
         (Group::Multiplicative, Group::Additive) => Priority::Left,
         (Group::Multiplicative, Group::Multiplicative) => Priority::Left,
         (Group::Multiplicative, Group::Modulo) => Priority::Ambiguous,
         (Group::Multiplicative, Group::Comparison) => Priority::Left,
-        (Group::Multiplicative, Group::Unplaced) => Priority::Ambiguous,
+        (Group::Multiplicative, Group::Not) => Priority::Ambiguous,
+        (Group::Multiplicative, Group::And) => Priority::Left,
+        (Group::Multiplicative, Group::Or) => Priority::Left,
         (Group::Modulo, Group::Additive) => Priority::Ambiguous,
         (Group::Modulo, Group::Multiplicative) => Priority::Ambiguous,
         (Group::Modulo, Group::Modulo) => Priority::Ambiguous,
         (Group::Modulo, Group::Comparison) => Priority::Left,
-        (Group::Modulo, Group::Unplaced) => Priority::Ambiguous,
+        (Group::Modulo, Group::Not) => Priority::Ambiguous,
+        (Group::Modulo, Group::And) => Priority::Left,
+        (Group::Modulo, Group::Or) => Priority::Left,
         (Group::Comparison, Group::Additive) => Priority::Right,
         (Group::Comparison, Group::Multiplicative) => Priority::Right,
         (Group::Comparison, Group::Modulo) => Priority::Right,
         (Group::Comparison, Group::Comparison) => Priority::Ambiguous,
-        (Group::Comparison, Group::Unplaced) => Priority::Ambiguous,
-        (Group::Unplaced, Group::Additive) => Priority::Ambiguous,
-        (Group::Unplaced, Group::Multiplicative) => Priority::Ambiguous,
-        (Group::Unplaced, Group::Modulo) => Priority::Ambiguous,
-        (Group::Unplaced, Group::Comparison) => Priority::Ambiguous,
-        (Group::Unplaced, Group::Unplaced) => Priority::Ambiguous,
+        (Group::Comparison, Group::Not) => Priority::Ambiguous,
+        (Group::Comparison, Group::And) => Priority::Left,
+        (Group::Comparison, Group::Or) => Priority::Left,
+        (Group::Not, Group::Additive) => Priority::Ambiguous,
+        (Group::Not, Group::Multiplicative) => Priority::Ambiguous,
+        (Group::Not, Group::Modulo) => Priority::Ambiguous,
+        (Group::Not, Group::Comparison) => Priority::Ambiguous,
+        (Group::Not, Group::Not) => Priority::Ambiguous,
+        (Group::Not, Group::And) => Priority::Left,
+        (Group::Not, Group::Or) => Priority::Left,
+        (Group::And, Group::Additive) => Priority::Right,
+        (Group::And, Group::Multiplicative) => Priority::Right,
+        (Group::And, Group::Modulo) => Priority::Right,
+        (Group::And, Group::Comparison) => Priority::Right,
+        (Group::And, Group::Not) => Priority::Right,
+        (Group::And, Group::And) => Priority::Left,
+        (Group::And, Group::Or) => Priority::Ambiguous,
+        (Group::Or, Group::Additive) => Priority::Right,
+        (Group::Or, Group::Multiplicative) => Priority::Right,
+        (Group::Or, Group::Modulo) => Priority::Right,
+        (Group::Or, Group::Comparison) => Priority::Right,
+        (Group::Or, Group::Not) => Priority::Right,
+        (Group::Or, Group::And) => Priority::Ambiguous,
+        (Group::Or, Group::Or) => Priority::Left,
     }
 }
 
@@ -88,12 +121,14 @@ pub fn priority(left: Group, right: Group) -> Priority {
 mod tests {
     use super::*;
 
-    const GROUPS: [Group; 5] = [
+    const GROUPS: [Group; 7] = [
         Group::Additive,
         Group::Multiplicative,
         Group::Modulo,
         Group::Comparison,
-        Group::Unplaced,
+        Group::Not,
+        Group::And,
+        Group::Or,
     ];
 
     #[test]
@@ -113,41 +148,65 @@ mod tests {
         ] {
             assert_eq!(group(op), Group::Comparison, "{op:?}");
         }
-        for op in [BinaryOp::And, BinaryOp::Or] {
-            assert_eq!(group(op), Group::Unplaced, "{op:?}");
-        }
+        assert_eq!(group(BinaryOp::And), Group::And);
+        assert_eq!(group(BinaryOp::Or), Group::Or);
+        assert_eq!(unary_group(UnaryOp::Not), Group::Not);
     }
 
     #[test]
     fn the_table_is_what_the_design_says() {
-        use Group::{Additive, Comparison, Modulo, Multiplicative, Unplaced};
+        use Group::{Additive, And, Comparison, Modulo, Multiplicative, Not, Or};
         use Priority::{Ambiguous, Left, Right};
 
         assert_eq!(priority(Additive, Additive), Left);
         assert_eq!(priority(Additive, Multiplicative), Right);
         assert_eq!(priority(Additive, Modulo), Ambiguous);
         assert_eq!(priority(Additive, Comparison), Left);
-        assert_eq!(priority(Additive, Unplaced), Ambiguous);
+        assert_eq!(priority(Additive, Not), Ambiguous);
+        assert_eq!(priority(Additive, And), Left);
+        assert_eq!(priority(Additive, Or), Left);
         assert_eq!(priority(Multiplicative, Additive), Left);
         assert_eq!(priority(Multiplicative, Multiplicative), Left);
         assert_eq!(priority(Multiplicative, Modulo), Ambiguous);
         assert_eq!(priority(Multiplicative, Comparison), Left);
-        assert_eq!(priority(Multiplicative, Unplaced), Ambiguous);
+        assert_eq!(priority(Multiplicative, Not), Ambiguous);
+        assert_eq!(priority(Multiplicative, And), Left);
+        assert_eq!(priority(Multiplicative, Or), Left);
         assert_eq!(priority(Modulo, Additive), Ambiguous);
         assert_eq!(priority(Modulo, Multiplicative), Ambiguous);
         assert_eq!(priority(Modulo, Modulo), Ambiguous);
         assert_eq!(priority(Modulo, Comparison), Left);
-        assert_eq!(priority(Modulo, Unplaced), Ambiguous);
+        assert_eq!(priority(Modulo, Not), Ambiguous);
+        assert_eq!(priority(Modulo, And), Left);
+        assert_eq!(priority(Modulo, Or), Left);
         assert_eq!(priority(Comparison, Additive), Right);
         assert_eq!(priority(Comparison, Multiplicative), Right);
         assert_eq!(priority(Comparison, Modulo), Right);
         assert_eq!(priority(Comparison, Comparison), Ambiguous);
-        assert_eq!(priority(Comparison, Unplaced), Ambiguous);
-        assert_eq!(priority(Unplaced, Additive), Ambiguous);
-        assert_eq!(priority(Unplaced, Multiplicative), Ambiguous);
-        assert_eq!(priority(Unplaced, Modulo), Ambiguous);
-        assert_eq!(priority(Unplaced, Comparison), Ambiguous);
-        assert_eq!(priority(Unplaced, Unplaced), Ambiguous);
+        assert_eq!(priority(Comparison, Not), Ambiguous);
+        assert_eq!(priority(Comparison, And), Left);
+        assert_eq!(priority(Comparison, Or), Left);
+        assert_eq!(priority(Not, Additive), Ambiguous);
+        assert_eq!(priority(Not, Multiplicative), Ambiguous);
+        assert_eq!(priority(Not, Modulo), Ambiguous);
+        assert_eq!(priority(Not, Comparison), Ambiguous);
+        assert_eq!(priority(Not, Not), Ambiguous);
+        assert_eq!(priority(Not, And), Left);
+        assert_eq!(priority(Not, Or), Left);
+        assert_eq!(priority(And, Additive), Right);
+        assert_eq!(priority(And, Multiplicative), Right);
+        assert_eq!(priority(And, Modulo), Right);
+        assert_eq!(priority(And, Comparison), Right);
+        assert_eq!(priority(And, Not), Right);
+        assert_eq!(priority(And, And), Left);
+        assert_eq!(priority(And, Or), Ambiguous);
+        assert_eq!(priority(Or, Additive), Right);
+        assert_eq!(priority(Or, Multiplicative), Right);
+        assert_eq!(priority(Or, Modulo), Right);
+        assert_eq!(priority(Or, Comparison), Right);
+        assert_eq!(priority(Or, Not), Right);
+        assert_eq!(priority(Or, And), Ambiguous);
+        assert_eq!(priority(Or, Or), Left);
     }
 
     #[test]
@@ -173,6 +232,13 @@ mod tests {
                     );
                 }
             }
+        }
+    }
+
+    #[test]
+    fn nothing_binds_tighter_than_the_operand_of_a_prefix_operator() {
+        for left in GROUPS {
+            assert_ne!(priority(left, Group::Not), Priority::Left, "{left:?}");
         }
     }
 }
