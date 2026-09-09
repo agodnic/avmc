@@ -1,7 +1,7 @@
 //! The typed AST: the type checker's output, an AST in which every expression
 //! has a resolved type.
 
-use crate::ast::{BinaryOp, Name};
+use crate::ast::{BinaryOp, Name, UnaryOp};
 use crate::diagnostics::Span;
 
 /// A resolved type.
@@ -146,6 +146,13 @@ pub enum ExprKind {
         lhs: Box<Expr>,
         /// The right operand.
         rhs: Box<Expr>,
+    },
+    /// A prefix operation.
+    Unary {
+        /// The operator it applies.
+        op: UnaryOp,
+        /// The operand.
+        operand: Box<Expr>,
     },
     /// A variable, by frame slot.
     Var(LocalId),

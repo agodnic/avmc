@@ -89,6 +89,15 @@ pub enum Expr {
         /// From the first byte of `lhs` through the last byte of `rhs`.
         span: Span,
     },
+    /// A prefix operator applied to an operand.
+    Unary {
+        /// The operator.
+        op: UnaryOp,
+        /// The operand.
+        operand: Box<Expr>,
+        /// From the operator through the last byte of `operand`.
+        span: Span,
+    },
     /// A variable, by name.
     Var {
         /// The name it was written as.
@@ -105,6 +114,7 @@ impl Expr {
             Expr::IntLit { span, .. }
             | Expr::BoolLit { span, .. }
             | Expr::Binary { span, .. }
+            | Expr::Unary { span, .. }
             | Expr::Var { span, .. } => *span,
         }
     }
@@ -115,6 +125,7 @@ impl Expr {
             Expr::IntLit { value, .. } => Expr::IntLit { value, span },
             Expr::BoolLit { value, .. } => Expr::BoolLit { value, span },
             Expr::Binary { op, lhs, rhs, .. } => Expr::Binary { op, lhs, rhs, span },
+            Expr::Unary { op, operand, .. } => Expr::Unary { op, operand, span },
             Expr::Var { name, .. } => Expr::Var { name, span },
         }
     }

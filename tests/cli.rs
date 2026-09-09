@@ -381,3 +381,50 @@ fn compiles_a_comparison_to_teal() {
     assert_eq!(stderr(&output), "");
     assert_eq!(code(&output), 0);
 }
+
+#[test]
+fn compiles_logical_operators_to_teal() {
+    let file = SourceFile::new(
+        "compiles_logical_operators_to_teal",
+        "func approval() bool {\n  \
+           var x uint64 = 1 + 2\n  \
+           var odd bool = x % 2 == 1\n  \
+           return !(x > 5) && (odd || x == 4)\n\
+         }\n",
+    );
+    let output = run(&[file.path(), "--teal-version", "10"]);
+
+    assert_eq!(
+        stdout(&output),
+        "#pragma version 10\n\
+         callsub approval\n\
+         return\n\
+         approval:\n\
+         proto 0 1\n\
+         pushint 0\n\
+         pushint 0\n\
+         pushint 1\n\
+         pushint 2\n\
+         +\n\
+         frame_bury 0\n\
+         frame_dig 0\n\
+         pushint 2\n\
+         %\n\
+         pushint 1\n\
+         ==\n\
+         frame_bury 1\n\
+         frame_dig 0\n\
+         pushint 5\n\
+         >\n\
+         !\n\
+         frame_dig 1\n\
+         frame_dig 0\n\
+         pushint 4\n\
+         ==\n\
+         ||\n\
+         &&\n\
+         retsub\n"
+    );
+    assert_eq!(stderr(&output), "");
+    assert_eq!(code(&output), 0);
+}
