@@ -161,6 +161,25 @@ fn reports_an_undefined_variable() {
 }
 
 #[test]
+fn reports_a_type_mismatch() {
+    let file = SourceFile::new(
+        "reports_a_type_mismatch",
+        "func approval() bool {\n  return 1\n}\n",
+    );
+    let output = run(&[file.path(), "--teal-version", "10"]);
+
+    assert_eq!(stdout(&output), "");
+    assert_eq!(
+        stderr(&output),
+        format!(
+            "{}:2:10: error[E0015]: mismatched types: expected `bool`, found `uint64`\n",
+            file.path()
+        )
+    );
+    assert_eq!(code(&output), 1);
+}
+
+#[test]
 fn accepts_the_flag_before_the_path() {
     let file = SourceFile::new("accepts_the_flag_before_the_path", EXAMPLE);
     let output = run(&["--teal-version", "10", file.path()]);
