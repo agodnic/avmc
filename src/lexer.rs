@@ -74,8 +74,8 @@ pub struct Token {
 
 /// Tokenises `source`.
 ///
-/// Returns `None` if any diagnostic was reported. Lexing still continues
-/// past an error, so one run reports every unexpected character.
+/// Stops at the first error and returns `None`: where a token ends after
+/// an error is not known, so nothing lexed past it is trustworthy.
 pub fn lex(source: &str, diags: &mut Diagnostics) -> Option<Vec<Token>> {
     let mut tokens = Vec::new();
     let mut chars = source.char_indices().peekable();
@@ -115,11 +115,17 @@ pub fn lex(source: &str, diags: &mut Diagnostics) -> Option<Vec<Token>> {
             // `&` and `|` are tokens only in pairs.
             '&' => match consume_if(&mut chars, '&') {
                 Some(end) => tokens.push(token(TokenKind::AmpAmp, start, end)),
-                None => diags.push(unexpected_character(start, single)),
+                None => {
+                    diags.push(unexpected_character(start, single));
+                    return None;
+                }
             },
             '|' => match consume_if(&mut chars, '|') {
                 Some(end) => tokens.push(token(TokenKind::PipePipe, start, end)),
-                None => diags.push(unexpected_character(start, single)),
+                None => {
+                    diags.push(unexpected_character(start, single));
+                    return None;
+                }
             },
             _ if is_ident_start(c) => {
                 let end = consume_while(&mut chars, source.len(), is_ident_continue);
@@ -137,11 +143,14 @@ pub fn lex(source: &str, diags: &mut Diagnostics) -> Option<Vec<Token>> {
                 let end = consume_while(&mut chars, source.len(), |c| c.is_ascii_digit());
                 tokens.push(token(TokenKind::IntLit, start, end));
             }
-            _ => diags.push(unexpected_character(start, single)),
+            _ => {
+                diags.push(unexpected_character(start, single));
+                return None;
+            }
         }
     }
 
-    if diags.is_empty() { Some(tokens) } else { None }
+    Some(tokens)
 }
 
 fn token(kind: TokenKind, start: usize, end: usize) -> Token {
@@ -573,25 +582,12 @@ mod tests {
     }
 
     #[test]
-    fn unexpected_characters_are_reported_and_skipped() {
-        let source = "@é";
-        let mut diags = Diagnostics::default();
+    fn lexing_stops_at_the_first_unexpected_character() {
+        assert_eq!(lex_err("@é"), vec![unexpected_character(0, 1)]);
+    }
 
-        assert_eq!(lex(source, &mut diags), None);
-
-        let reported: Vec<&Diagnostic> = diags.iter().collect();
-        assert_eq!(
-            reported,
-            vec![
-                &Diagnostic {
-                    kind: DiagnosticKind::UnexpectedCharacter,
-                    span: Span { start: 0, end: 1 },
-                },
-                &Diagnostic {
-                    kind: DiagnosticKind::UnexpectedCharacter,
-                    span: Span { start: 1, end: 3 },
-                },
-            ]
-        );
+    #[test]
+    fn tokens_after_the_first_error_are_not_lexed() {
+        assert_eq!(lex_err("1 & 2 |"), vec![unexpected_character(2, 3)]);
     }
 }

@@ -29,8 +29,8 @@ the features built on it — a new feature is not a reason to extend it.
 ```
 
 **Lexer and parser.** Both hand-written, chosen over generated ones for
-error-message quality and error recovery. The AST mirrors the surface syntax;
-desugaring happens in lowering, not here.
+error-message quality. The AST mirrors the surface syntax; desugaring happens
+in lowering, not here.
 
 **Type checking.** Produces a typed AST in which every expression has a
 resolved type. Types are checked, not inferred. This stage
