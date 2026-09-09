@@ -9,6 +9,19 @@ use crate::diagnostics::Span;
 pub enum Type {
     /// A 64-bit unsigned integer.
     Uint64,
+    /// A truth value, held as the AVM holds one: a `uint64` that is `0` for
+    /// `false` and nonzero for `true`. The compiler only ever produces `1`
+    /// for `true`.
+    Bool,
+}
+
+impl std::fmt::Display for Type {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Type::Uint64 => write!(f, "uint64"),
+            Type::Bool => write!(f, "bool"),
+        }
+    }
 }
 
 /// A variable's position in its function's frame: declarations counted

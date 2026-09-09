@@ -12,11 +12,13 @@ pub struct ValueId(pub u32);
 /// A single instruction.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Inst {
-    /// Defines `dest` as the `uint64` constant `value`.
+    /// Defines `dest` as the constant `value` of type `ty`.
     Const {
         /// The value it defines.
         dest: ValueId,
-        /// The constant it holds.
+        /// The type it has.
+        ty: Type,
+        /// The constant it holds: for a `Bool`, `0` or `1`.
         value: u64,
         /// The literal it came from.
         span: Span,
@@ -155,6 +157,26 @@ pub enum Violation {
         /// How many slots the frame holds.
         count: usize,
     },
+    /// An instruction uses an operand of the wrong type.
+    OperandType {
+        /// The offending instruction's position.
+        index: usize,
+        /// Which operand it is, counting from 0.
+        position: usize,
+        /// The value it uses.
+        value: ValueId,
+        /// The type that value has.
+        found: Type,
+        /// The type the instruction needs.
+        expected: Type,
+    },
+    /// A `Bool` constant holds something other than `0` or `1`.
+    BoolOutOfRange {
+        /// The offending instruction's position.
+        index: usize,
+        /// The constant it holds.
+        value: u64,
+    },
 }
 
 impl std::fmt::Display for Violation {
@@ -216,13 +238,28 @@ impl std::fmt::Display for Violation {
                  {count} locals",
                 local.0
             ),
+            Violation::OperandType {
+                index,
+                position,
+                value,
+                found,
+                expected,
+            } => write!(
+                f,
+                "well typed: instruction {index} uses %{} of type {found} as operand {position}, \
+                 expected {expected}",
+                value.0
+            ),
+            Violation::BoolOutOfRange { index, value } => write!(
+                f,
+                "well typed: instruction {index} defines a bool constant of {value}, expected 0 \
+                 or 1"
+            ),
         }
     }
 }
 
 /// Checks the v0 IR invariant, returning the first violation.
-///
-/// Type correctness is vacuous with one type and is not checked.
 pub fn verify(func: &Function) -> Result<(), Violation> {
     verify_return(func)?;
 
@@ -232,30 +269,46 @@ pub fn verify(func: &Function) -> Result<(), Violation> {
         });
     }
 
-    // The values defined and not yet consumed, most recent last.
-    let mut stack: Vec<ValueId> = Vec::new();
+    // The values defined and not yet consumed, most recent last, each with
+    // its type.
+    let mut stack: Vec<(ValueId, Type)> = Vec::new();
     // The number of values defined so far: the next definition must be
     // `ValueId(defs)`.
     let mut defs = 0;
 
     for (index, inst) in func.insts.iter().enumerate() {
-        let dest = match inst {
-            Inst::Const { dest, .. } => dest,
+        let (dest, ty) = match inst {
+            Inst::Const {
+                dest, ty, value, ..
+            } => {
+                if *ty == Type::Bool && *value > 1 {
+                    return Err(Violation::BoolOutOfRange {
+                        index,
+                        value: *value,
+                    });
+                }
+                (dest, *ty)
+            }
             Inst::Binary { dest, lhs, rhs, .. } => {
-                consume(&mut stack, index, &[*lhs, *rhs])?;
-                dest
+                consume(
+                    &mut stack,
+                    index,
+                    &[*lhs, *rhs],
+                    &[Type::Uint64, Type::Uint64],
+                )?;
+                (dest, Type::Uint64)
             }
             Inst::Store { local, value, .. } => {
-                addressable(*local, index, func.locals.len())?;
-                consume(&mut stack, index, &[*value])?;
+                let ty = slot(&func.locals, *local, index)?;
+                consume(&mut stack, index, &[*value], &[ty])?;
                 continue;
             }
             Inst::Load { dest, local, .. } => {
-                addressable(*local, index, func.locals.len())?;
-                dest
+                let ty = slot(&func.locals, *local, index)?;
+                (dest, ty)
             }
             Inst::Return { value, .. } => {
-                consume(&mut stack, index, &[*value])?;
+                consume(&mut stack, index, &[*value], &[func.ret])?;
                 continue;
             }
         };
@@ -268,7 +321,7 @@ pub fn verify(func: &Function) -> Result<(), Violation> {
             });
         }
         defs += 1;
-        stack.push(*dest);
+        stack.push((*dest, ty));
     }
 
     if !stack.is_empty() {
@@ -278,8 +331,13 @@ pub fn verify(func: &Function) -> Result<(), Violation> {
 }
 
 /// Consumes `operands` off `stack`, checking that they are the values on top
-/// of it, in order.
-fn consume(stack: &mut Vec<ValueId>, index: usize, operands: &[ValueId]) -> Result<(), Violation> {
+/// of it, in order, and that they have the types `expected`.
+fn consume(
+    stack: &mut Vec<(ValueId, Type)>,
+    index: usize,
+    operands: &[ValueId],
+    expected: &[Type],
+) -> Result<(), Violation> {
     let available = stack.len();
     let top = available
         .checked_sub(operands.len())
@@ -289,13 +347,27 @@ fn consume(stack: &mut Vec<ValueId>, index: usize, operands: &[ValueId]) -> Resu
             available,
         })?;
 
-    for (position, (operand, expected)) in operands.iter().zip(stack.iter().skip(top)).enumerate() {
-        if operand != expected {
+    for (position, ((operand, wanted), (live, found))) in operands
+        .iter()
+        .zip(expected)
+        .zip(stack.iter().skip(top))
+        .enumerate()
+    {
+        if operand != live {
             return Err(Violation::UseOutOfOrder {
                 index,
                 position,
                 value: *operand,
-                expected: *expected,
+                expected: *live,
+            });
+        }
+        if found != wanted {
+            return Err(Violation::OperandType {
+                index,
+                position,
+                value: *operand,
+                found: *found,
+                expected: *wanted,
             });
         }
     }
@@ -304,17 +376,16 @@ fn consume(stack: &mut Vec<ValueId>, index: usize, operands: &[ValueId]) -> Resu
     Ok(())
 }
 
-/// Checks that `local` is a slot of a frame of `count` slots.
-fn addressable(local: LocalId, index: usize, count: usize) -> Result<(), Violation> {
-    if usize::from(local.0) < count {
-        Ok(())
-    } else {
-        Err(Violation::LocalOutOfRange {
+/// Checks that `local` is a slot of the frame, returning its type.
+fn slot(locals: &[Type], local: LocalId, index: usize) -> Result<Type, Violation> {
+    locals
+        .get(usize::from(local.0))
+        .copied()
+        .ok_or(Violation::LocalOutOfRange {
             index,
             local,
-            count,
+            count: locals.len(),
         })
-    }
 }
 
 /// Checks that the last instruction is a `Return`, and no other one is.
@@ -344,20 +415,31 @@ mod tests {
         framed(0, insts)
     }
 
-    /// A function whose frame is `locals` slots of `Type::Uint64`.
+    /// A function whose frame is `locals` slots of `Type::Uint64`, returning
+    /// `Type::Uint64`.
     fn framed(locals: usize, insts: Vec<Inst>) -> Function {
+        shaped(Type::Uint64, vec![Type::Uint64; locals], insts)
+    }
+
+    /// A function returning `ret`, with `locals` as its frame.
+    fn shaped(ret: Type, locals: Vec<Type>, insts: Vec<Inst>) -> Function {
         Function {
             name: "approval".to_string(),
-            ret: Type::Uint64,
-            locals: vec![Type::Uint64; locals],
+            ret,
+            locals,
             insts,
             span: SPAN,
         }
     }
 
     fn constant(dest: u32, value: u64) -> Inst {
+        constant_of(dest, Type::Uint64, value)
+    }
+
+    fn constant_of(dest: u32, ty: Type, value: u64) -> Inst {
         Inst::Const {
             dest: ValueId(dest),
+            ty,
             value,
             span: SPAN,
         }
@@ -634,6 +716,181 @@ mod tests {
     }
 
     #[test]
+    fn a_bool_constant_is_returned() {
+        for value in [0, 1] {
+            assert_eq!(
+                verify(&shaped(
+                    Type::Bool,
+                    vec![],
+                    vec![constant_of(0, Type::Bool, value), ret(0)]
+                )),
+                Ok(())
+            );
+        }
+    }
+
+    #[test]
+    fn a_bool_constant_outside_its_range_is_rejected() {
+        assert_eq!(
+            verify(&shaped(
+                Type::Bool,
+                vec![],
+                vec![constant_of(0, Type::Bool, 2), ret(0)]
+            )),
+            Err(Violation::BoolOutOfRange { index: 0, value: 2 })
+        );
+    }
+
+    #[test]
+    fn returning_a_uint64_as_a_bool_is_rejected() {
+        assert_eq!(
+            verify(&shaped(Type::Bool, vec![], vec![constant(0, 1), ret(0)])),
+            Err(Violation::OperandType {
+                index: 1,
+                position: 0,
+                value: ValueId(0),
+                found: Type::Uint64,
+                expected: Type::Bool,
+            })
+        );
+    }
+
+    #[test]
+    fn returning_a_bool_as_a_uint64_is_rejected() {
+        assert_eq!(
+            verify(&function(vec![constant_of(0, Type::Bool, 1), ret(0)])),
+            Err(Violation::OperandType {
+                index: 1,
+                position: 0,
+                value: ValueId(0),
+                found: Type::Bool,
+                expected: Type::Uint64,
+            })
+        );
+    }
+
+    #[test]
+    fn storing_and_loading_a_bool_slot_is_valid() {
+        assert_eq!(
+            verify(&shaped(
+                Type::Bool,
+                vec![Type::Bool],
+                vec![
+                    constant_of(0, Type::Bool, 1),
+                    store(0, 0),
+                    load(1, 0),
+                    ret(1),
+                ]
+            )),
+            Ok(())
+        );
+    }
+
+    #[test]
+    fn storing_a_bool_in_a_uint64_slot_is_rejected() {
+        assert_eq!(
+            verify(&framed(
+                1,
+                vec![
+                    constant_of(0, Type::Bool, 1),
+                    store(0, 0),
+                    load(1, 0),
+                    ret(1),
+                ]
+            )),
+            Err(Violation::OperandType {
+                index: 1,
+                position: 0,
+                value: ValueId(0),
+                found: Type::Bool,
+                expected: Type::Uint64,
+            })
+        );
+    }
+
+    #[test]
+    fn a_load_carries_its_slots_type() {
+        assert_eq!(
+            verify(&shaped(
+                Type::Uint64,
+                vec![Type::Bool],
+                vec![
+                    constant_of(0, Type::Bool, 1),
+                    store(0, 0),
+                    load(1, 0),
+                    ret(1),
+                ]
+            )),
+            Err(Violation::OperandType {
+                index: 3,
+                position: 0,
+                value: ValueId(1),
+                found: Type::Bool,
+                expected: Type::Uint64,
+            })
+        );
+    }
+
+    #[test]
+    fn a_bool_as_the_left_operand_of_a_binary_is_rejected() {
+        assert_eq!(
+            verify(&function(vec![
+                constant_of(0, Type::Bool, 1),
+                constant(1, 2),
+                binary(2, BinaryOp::Add, 0, 1),
+                ret(2),
+            ])),
+            Err(Violation::OperandType {
+                index: 2,
+                position: 0,
+                value: ValueId(0),
+                found: Type::Bool,
+                expected: Type::Uint64,
+            })
+        );
+    }
+
+    #[test]
+    fn a_bool_as_the_right_operand_of_a_binary_is_rejected() {
+        assert_eq!(
+            verify(&function(vec![
+                constant(0, 1),
+                constant_of(1, Type::Bool, 1),
+                binary(2, BinaryOp::Add, 0, 1),
+                ret(2),
+            ])),
+            Err(Violation::OperandType {
+                index: 2,
+                position: 1,
+                value: ValueId(1),
+                found: Type::Bool,
+                expected: Type::Uint64,
+            })
+        );
+    }
+
+    #[test]
+    fn an_operand_out_of_order_is_rejected_before_its_type() {
+        assert_eq!(
+            verify(&framed(
+                1,
+                vec![
+                    constant(0, 1),
+                    constant_of(1, Type::Bool, 0),
+                    store(0, 0),
+                    ret(1),
+                ]
+            )),
+            Err(Violation::UseOutOfOrder {
+                index: 2,
+                position: 0,
+                value: ValueId(0),
+                expected: ValueId(1),
+            })
+        );
+    }
+
+    #[test]
     fn violations_describe_themselves() {
         assert_eq!(
             Violation::UseOutOfOrder {
@@ -670,6 +927,21 @@ mod tests {
             }
             .to_string(),
             "addressed within the frame: instruction 3 names l2 but the frame has 2 locals"
+        );
+        assert_eq!(
+            Violation::OperandType {
+                index: 2,
+                position: 0,
+                value: ValueId(0),
+                found: Type::Bool,
+                expected: Type::Uint64,
+            }
+            .to_string(),
+            "well typed: instruction 2 uses %0 of type bool as operand 0, expected uint64"
+        );
+        assert_eq!(
+            Violation::BoolOutOfRange { index: 0, value: 2 }.to_string(),
+            "well typed: instruction 0 defines a bool constant of 2, expected 0 or 1"
         );
     }
 }

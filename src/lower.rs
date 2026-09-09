@@ -2,7 +2,7 @@
 
 use crate::diagnostics::Diagnostics;
 use crate::ir::{Function, Inst, Program, ValueId};
-use crate::typed_ast::{self, Expr, ExprKind, Stmt};
+use crate::typed_ast::{self, Expr, ExprKind, Stmt, Type};
 
 /// Lowers every function in `program`, in source order.
 pub fn lower(program: &typed_ast::Program, _diags: &mut Diagnostics) -> Option<Program> {
@@ -68,6 +68,7 @@ fn lower_expr(expr: &Expr, insts: &mut Vec<Inst>, next_value: &mut u32) -> Value
             let dest = next_value_id(next_value);
             insts.push(Inst::Const {
                 dest,
+                ty: Type::Uint64,
                 value: *value,
                 span: expr.span,
             });
@@ -135,6 +136,7 @@ mod tests {
                     insts: vec![
                         Inst::Const {
                             dest: ValueId(0),
+                            ty: Type::Uint64,
                             value: 1,
                             span: span_of(source, "1", 0),
                         },
@@ -157,16 +159,19 @@ mod tests {
             vec![
                 Inst::Const {
                     dest: ValueId(0),
+                    ty: Type::Uint64,
                     value: 1,
                     span: span_of(source, "1", 0),
                 },
                 Inst::Const {
                     dest: ValueId(1),
+                    ty: Type::Uint64,
                     value: 2,
                     span: span_of(source, "2", 0),
                 },
                 Inst::Const {
                     dest: ValueId(2),
+                    ty: Type::Uint64,
                     value: 3,
                     span: span_of(source, "3", 0),
                 },
@@ -200,11 +205,13 @@ mod tests {
             vec![
                 Inst::Const {
                     dest: ValueId(0),
+                    ty: Type::Uint64,
                     value: 1,
                     span: span_of(source, "1", 0),
                 },
                 Inst::Const {
                     dest: ValueId(1),
+                    ty: Type::Uint64,
                     value: 2,
                     span: span_of(source, "2", 0),
                 },
@@ -217,6 +224,7 @@ mod tests {
                 },
                 Inst::Const {
                     dest: ValueId(3),
+                    ty: Type::Uint64,
                     value: 3,
                     span: span_of(source, "3", 0),
                 },
@@ -229,11 +237,13 @@ mod tests {
                 },
                 Inst::Const {
                     dest: ValueId(5),
+                    ty: Type::Uint64,
                     value: 4,
                     span: span_of(source, "4", 1),
                 },
                 Inst::Const {
                     dest: ValueId(6),
+                    ty: Type::Uint64,
                     value: 5,
                     span: span_of(source, "5", 0),
                 },
@@ -294,11 +304,13 @@ mod tests {
                 insts: vec![
                     Inst::Const {
                         dest: ValueId(0),
+                        ty: Type::Uint64,
                         value: 1,
                         span: one,
                     },
                     Inst::Const {
                         dest: ValueId(1),
+                        ty: Type::Uint64,
                         value: 2,
                         span: two,
                     },
@@ -327,6 +339,7 @@ mod tests {
                     },
                     Inst::Const {
                         dest: ValueId(4),
+                        ty: Type::Uint64,
                         value: 3,
                         span: three,
                     },
@@ -400,6 +413,7 @@ mod tests {
                         insts: vec![
                             Inst::Const {
                                 dest: ValueId(0),
+                                ty: Type::Uint64,
                                 value: 1,
                                 span: span_of(source, "1", 0),
                             },
@@ -417,6 +431,7 @@ mod tests {
                         insts: vec![
                             Inst::Const {
                                 dest: ValueId(0),
+                                ty: Type::Uint64,
                                 value: 2,
                                 span: span_of(source, "2", 0),
                             },
