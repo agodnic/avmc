@@ -75,6 +75,7 @@ fn function(func: &Function) -> String {
 fn placeholder(ty: Type) -> &'static str {
     match ty {
         Type::Uint64 => "pushint 0",
+        Type::Bool => "pushint 0",
     }
 }
 
@@ -198,11 +199,12 @@ mod tests {
     }
 
     /// Emits a hand-built program for `version`: one function named
-    /// `approval` with `locals` slots of `Type::Uint64` and `insts`, at the
-    /// zero span throughout. `emit_ok` and `emit_err` go through source,
-    /// which cannot produce a frame yet.
+    /// `approval` returning `ret`, with `locals` as its frame and `insts` as
+    /// its body, at the zero span throughout. `emit_ok` and `emit_err` go
+    /// through source, which cannot produce a frame yet.
     fn hand_built(
-        locals: usize,
+        ret: Type,
+        locals: Vec<Type>,
         insts: Vec<Inst>,
         version: u8,
         diags: &mut Diagnostics,
@@ -210,8 +212,8 @@ mod tests {
         let program = ir::Program {
             funcs: vec![Function {
                 name: ENTRY_POINT.to_string(),
-                ret: Type::Uint64,
-                locals: vec![Type::Uint64; locals],
+                ret,
+                locals,
                 insts,
                 span: ZERO,
             }],
@@ -221,24 +223,34 @@ mod tests {
     }
 
     /// Emits a hand-built program, asserting that it produced no diagnostics.
-    fn hand_built_ok(locals: usize, insts: Vec<Inst>, version: u8) -> String {
+    fn hand_built_ok(ret: Type, locals: Vec<Type>, insts: Vec<Inst>, version: u8) -> String {
         let mut diags = Diagnostics::default();
-        let teal = hand_built(locals, insts, version, &mut diags);
+        let teal = hand_built(ret, locals, insts, version, &mut diags);
         assert!(diags.is_empty());
         teal.expect("emission succeeded")
     }
 
     /// Emits a hand-built program, asserting that it emitted nothing, and
     /// returning the diagnostics in the order they were reported.
-    fn hand_built_err(locals: usize, insts: Vec<Inst>, version: u8) -> Vec<Diagnostic> {
+    fn hand_built_err(
+        ret: Type,
+        locals: Vec<Type>,
+        insts: Vec<Inst>,
+        version: u8,
+    ) -> Vec<Diagnostic> {
         let mut diags = Diagnostics::default();
-        assert_eq!(hand_built(locals, insts, version, &mut diags), None);
+        assert_eq!(hand_built(ret, locals, insts, version, &mut diags), None);
         diags.iter().cloned().collect()
     }
 
     fn constant(dest: u32, value: u64) -> Inst {
+        constant_of(dest, Type::Uint64, value)
+    }
+
+    fn constant_of(dest: u32, ty: Type, value: u64) -> Inst {
         Inst::Const {
             dest: ValueId(dest),
+            ty,
             value,
             span: ZERO,
         }
@@ -285,7 +297,7 @@ mod tests {
     #[test]
     fn a_frame_slot_is_allocated_and_addressed() {
         assert_eq!(
-            hand_built_ok(1, one_slot(), 10),
+            hand_built_ok(Type::Uint64, vec![Type::Uint64], one_slot(), 10),
             "#pragma version 10\n\
              callsub approval\n\
              return\n\
@@ -317,7 +329,7 @@ mod tests {
             ret(8),
         ];
         assert_eq!(
-            hand_built_ok(2, insts, 10),
+            hand_built_ok(Type::Uint64, vec![Type::Uint64; 2], insts, 10),
             "#pragma version 10\n\
              callsub approval\n\
              return\n\
@@ -341,6 +353,49 @@ mod tests {
     }
 
     #[test]
+    fn a_bool_constant_is_returned() {
+        assert_eq!(
+            hand_built_ok(
+                Type::Bool,
+                vec![],
+                vec![constant_of(0, Type::Bool, 1), ret(0)],
+                10
+            ),
+            "#pragma version 10\n\
+             callsub approval\n\
+             return\n\
+             approval:\n\
+             proto 0 1\n\
+             pushint 1\n\
+             retsub\n"
+        );
+    }
+
+    #[test]
+    fn a_bool_slot_starts_as_false() {
+        // `var ok bool = true; return ok`, as a later slice will lower it.
+        let insts = vec![
+            constant_of(0, Type::Bool, 1),
+            store(0, 0),
+            load(1, 0),
+            ret(1),
+        ];
+        assert_eq!(
+            hand_built_ok(Type::Bool, vec![Type::Bool], insts, 10),
+            "#pragma version 10\n\
+             callsub approval\n\
+             return\n\
+             approval:\n\
+             proto 0 1\n\
+             pushint 0\n\
+             pushint 1\n\
+             frame_bury 0\n\
+             frame_dig 0\n\
+             retsub\n"
+        );
+    }
+
+    #[test]
     fn the_frame_instructions_need_version_8() {
         let unavailable = |opcode| Diagnostic {
             kind: DiagnosticKind::OpcodeUnavailable {
@@ -351,7 +406,7 @@ mod tests {
             span: ZERO,
         };
         assert_eq!(
-            hand_built_err(1, one_slot(), 7),
+            hand_built_err(Type::Uint64, vec![Type::Uint64], one_slot(), 7),
             vec![
                 unavailable("proto"),
                 unavailable("frame_bury"),
