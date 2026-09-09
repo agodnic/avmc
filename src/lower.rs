@@ -553,4 +553,37 @@ mod tests {
             }
         );
     }
+
+    #[test]
+    fn a_comparison_lowers_like_arithmetic() {
+        let source = "func approval() bool { return 1 < 2 }";
+        assert_eq!(
+            lower_ok(source).funcs[0].insts,
+            vec![
+                Inst::Const {
+                    dest: ValueId(0),
+                    ty: Type::Uint64,
+                    value: 1,
+                    span: span_of(source, "1", 0),
+                },
+                Inst::Const {
+                    dest: ValueId(1),
+                    ty: Type::Uint64,
+                    value: 2,
+                    span: span_of(source, "2", 0),
+                },
+                Inst::Binary {
+                    dest: ValueId(2),
+                    op: BinaryOp::Lt,
+                    lhs: ValueId(0),
+                    rhs: ValueId(1),
+                    span: span_of(source, "1 < 2", 0),
+                },
+                Inst::Return {
+                    value: ValueId(2),
+                    span: span_of(source, "return 1 < 2", 0),
+                },
+            ]
+        );
+    }
 }

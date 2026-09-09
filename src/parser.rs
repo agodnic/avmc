@@ -271,7 +271,27 @@ fn binary_op(kind: TokenKind) -> Option<BinaryOp> {
         TokenKind::Star => Some(BinaryOp::Mul),
         TokenKind::Slash => Some(BinaryOp::Div),
         TokenKind::Percent => Some(BinaryOp::Mod),
-        _ => None,
+        TokenKind::EqEq => Some(BinaryOp::Eq),
+        TokenKind::BangEq => Some(BinaryOp::Ne),
+        TokenKind::Lt => Some(BinaryOp::Lt),
+        TokenKind::LtEq => Some(BinaryOp::Le),
+        TokenKind::Gt => Some(BinaryOp::Gt),
+        TokenKind::GtEq => Some(BinaryOp::Ge),
+        TokenKind::Func
+        | TokenKind::Return
+        | TokenKind::Var
+        | TokenKind::True
+        | TokenKind::False
+        | TokenKind::Ident
+        | TokenKind::IntLit
+        | TokenKind::LParen
+        | TokenKind::RParen
+        | TokenKind::LBrace
+        | TokenKind::RBrace
+        | TokenKind::Equals
+        | TokenKind::Bang
+        | TokenKind::AmpAmp
+        | TokenKind::PipePipe => None,
     }
 }
 
@@ -1157,6 +1177,9 @@ mod tests {
             ("1 % 2 + 3", "`%`", "`+`", 0),
             ("1 + 2 % 3", "`+`", "`%`", 0),
             ("1 * 2 % 3", "`*`", "`%`", 0),
+            ("1 < 2 < 3", "`<`", "`<`", 1),
+            ("1 == 2 == 3", "`==`", "`==`", 1),
+            ("1 < 2 == true", "`<`", "`==`", 0),
         ];
 
         for (expr, left, right, nth) in cases {
@@ -1267,6 +1290,169 @@ mod tests {
                 },
                 span: Span { start: 18, end: 45 },
             }]
+        );
+    }
+
+    #[test]
+    fn parses_every_comparison_operator() {
+        let cases = [
+            ("1 == 2", BinaryOp::Eq),
+            ("1 != 2", BinaryOp::Ne),
+            ("1 < 2", BinaryOp::Lt),
+            ("1 <= 2", BinaryOp::Le),
+            ("1 > 2", BinaryOp::Gt),
+            ("1 >= 2", BinaryOp::Ge),
+        ];
+
+        for (expr, op) in cases {
+            let source = wrap(expr);
+            let mut span = spans(&source);
+            span("(");
+            span(")");
+            let one = span("1");
+            let two = span("2");
+
+            assert_eq!(
+                returned(&source),
+                binary(
+                    op,
+                    Expr::IntLit {
+                        value: 1,
+                        span: one
+                    },
+                    Expr::IntLit {
+                        value: 2,
+                        span: two
+                    },
+                ),
+                "{source}"
+            );
+        }
+    }
+
+    #[test]
+    fn comparison_binds_looser_than_arithmetic() {
+        let source = wrap("1 + 2 == 3 * 4");
+        let mut span = spans(&source);
+        span("(");
+        span(")");
+        let one = span("1");
+        let two = span("2");
+        let three = span("3");
+        let four = span("4");
+
+        let int = |value, span| Expr::IntLit { value, span };
+        assert_eq!(
+            returned(&source),
+            binary(
+                BinaryOp::Eq,
+                binary(BinaryOp::Add, int(1, one), int(2, two)),
+                binary(BinaryOp::Mul, int(3, three), int(4, four)),
+            )
+        );
+    }
+
+    #[test]
+    fn comparison_binds_looser_than_modulo() {
+        let source = wrap("1 % 2 == 0");
+        let mut span = spans(&source);
+        span("(");
+        span(")");
+        let one = span("1");
+        let two = span("2");
+        let zero = span("0");
+
+        let int = |value, span| Expr::IntLit { value, span };
+        assert_eq!(
+            returned(&source),
+            binary(
+                BinaryOp::Eq,
+                binary(BinaryOp::Mod, int(1, one), int(2, two)),
+                int(0, zero),
+            )
+        );
+    }
+
+    #[test]
+    fn modulo_on_the_right_of_a_comparison_binds_tighter() {
+        let source = wrap("1 == 2 % 3");
+        let mut span = spans(&source);
+        span("(");
+        span(")");
+        let one = span("1");
+        let two = span("2");
+        let three = span("3");
+
+        let int = |value, span| Expr::IntLit { value, span };
+        assert_eq!(
+            returned(&source),
+            binary(
+                BinaryOp::Eq,
+                int(1, one),
+                binary(BinaryOp::Mod, int(2, two), int(3, three)),
+            )
+        );
+    }
+
+    #[test]
+    fn addition_on_the_right_of_a_comparison_binds_tighter() {
+        let source = wrap("1 < 2 + 3");
+        let mut span = spans(&source);
+        span("(");
+        span(")");
+        let one = span("1");
+        let two = span("2");
+        let three = span("3");
+
+        let int = |value, span| Expr::IntLit { value, span };
+        assert_eq!(
+            returned(&source),
+            binary(
+                BinaryOp::Lt,
+                int(1, one),
+                binary(BinaryOp::Add, int(2, two), int(3, three)),
+            )
+        );
+    }
+
+    #[test]
+    fn parentheses_make_a_comparison_an_operand() {
+        let source = wrap("(1 < 2) == true");
+        let mut span = spans(&source);
+        span("(");
+        span(")");
+        let open = span("(");
+        let one = span("1");
+        let two = span("2");
+        let close = span(")");
+        let literal = span("true");
+
+        let parenthesized = Expr::Binary {
+            op: BinaryOp::Lt,
+            lhs: Box::new(Expr::IntLit {
+                value: 1,
+                span: one,
+            }),
+            rhs: Box::new(Expr::IntLit {
+                value: 2,
+                span: two,
+            }),
+            span: Span {
+                start: open.start,
+                end: close.end,
+            },
+        };
+
+        assert_eq!(
+            returned(&source),
+            binary(
+                BinaryOp::Eq,
+                parenthesized,
+                Expr::BoolLit {
+                    value: true,
+                    span: literal,
+                },
+            )
         );
     }
 }

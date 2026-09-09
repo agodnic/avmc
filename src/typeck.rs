@@ -2,7 +2,9 @@
 
 use crate::ast;
 use crate::diagnostics::{Diagnostic, DiagnosticKind, Diagnostics};
-use crate::typed_ast::{Expr, ExprKind, FuncDecl, LocalId, Program, Stmt, Type};
+use crate::typed_ast::{
+    Expr, ExprKind, FuncDecl, LocalId, Program, Stmt, Type, operand_type, result_type,
+};
 use std::collections::HashSet;
 
 /// Checks `program`: its declared names, then every function in source order.
@@ -223,10 +225,12 @@ fn check_expr(
             // Both operands are checked, so both report.
             let lhs = check_expr(lhs, locals, diags);
             let rhs = check_expr(rhs, locals, diags);
-            // Arithmetic is on `uint64` alone.
-            let operand = Some(Type::Uint64);
-            let lhs_agrees = check_type(lhs.as_ref(), operand, diags);
-            let rhs_agrees = check_type(rhs.as_ref(), operand, diags);
+            // Equality takes any one type: the right operand must match the
+            // left.
+            let lhs_expected = operand_type(*op);
+            let rhs_expected = lhs_expected.or(lhs.as_ref().map(|lhs| lhs.ty));
+            let lhs_agrees = check_type(lhs.as_ref(), lhs_expected, diags);
+            let rhs_agrees = check_type(rhs.as_ref(), rhs_expected, diags);
             (lhs_agrees && rhs_agrees).then_some(())?;
             (
                 ExprKind::Binary {
@@ -234,7 +238,7 @@ fn check_expr(
                     lhs: Box::new(lhs?),
                     rhs: Box::new(rhs?),
                 },
-                Type::Uint64,
+                result_type(*op),
                 *span,
             )
         }
@@ -1079,6 +1083,205 @@ mod tests {
                     span: func_name,
                 },
             ]
+        );
+    }
+
+    /// The typed `Expr` of the one `return` in `source`.
+    fn returned(source: &str) -> Expr {
+        let program = check_ok(source);
+        let funcs = program.funcs;
+        assert_eq!(funcs.len(), 1);
+        let mut body = funcs.into_iter().flat_map(|func| func.body);
+        let Some(Stmt::Return { expr, .. }) = body.next() else {
+            panic!("one return statement")
+        };
+        assert!(body.next().is_none());
+        expr
+    }
+
+    #[test]
+    fn a_comparison_of_integers_is_a_bool() {
+        let source = "func approval() bool { return 1 < 2 }";
+        let mut span = spans(source);
+        span("bool");
+        let one = span("1");
+        let two = span("2");
+
+        assert_eq!(
+            returned(source),
+            Expr {
+                kind: ExprKind::Binary {
+                    op: ast::BinaryOp::Lt,
+                    lhs: Box::new(Expr {
+                        kind: ExprKind::IntLit(1),
+                        ty: Type::Uint64,
+                        span: one,
+                    }),
+                    rhs: Box::new(Expr {
+                        kind: ExprKind::IntLit(2),
+                        ty: Type::Uint64,
+                        span: two,
+                    }),
+                },
+                ty: Type::Bool,
+                span: Span {
+                    start: one.start,
+                    end: two.end,
+                },
+            }
+        );
+    }
+
+    #[test]
+    fn equality_takes_booleans() {
+        let source = "func approval() bool { return true == false }";
+        let mut span = spans(source);
+        span("bool");
+        let left = span("true");
+        let right = span("false");
+
+        assert_eq!(
+            returned(source),
+            Expr {
+                kind: ExprKind::Binary {
+                    op: ast::BinaryOp::Eq,
+                    lhs: Box::new(Expr {
+                        kind: ExprKind::BoolLit(true),
+                        ty: Type::Bool,
+                        span: left,
+                    }),
+                    rhs: Box::new(Expr {
+                        kind: ExprKind::BoolLit(false),
+                        ty: Type::Bool,
+                        span: right,
+                    }),
+                },
+                ty: Type::Bool,
+                span: Span {
+                    start: left.start,
+                    end: right.end,
+                },
+            }
+        );
+    }
+
+    #[test]
+    fn a_comparison_of_arithmetic_checks() {
+        let source = "func approval() bool { return 1 + 2 < 3 * 4 }";
+        assert_eq!(returned(source).ty, Type::Bool);
+    }
+
+    #[test]
+    fn a_returned_comparison_must_have_the_return_type() {
+        let source = wrap("return 1 < 2");
+        assert_eq!(
+            check_err(&source),
+            vec![Diagnostic {
+                kind: DiagnosticKind::TypeMismatch {
+                    expected: Type::Uint64,
+                    found: Type::Bool,
+                },
+                span: span_of(&source, "1 < 2", 0),
+            }]
+        );
+    }
+
+    #[test]
+    fn a_boolean_operand_of_an_ordering_is_reported() {
+        let source = "func approval() bool { return 1 < true }";
+        assert_eq!(
+            check_err(source),
+            vec![Diagnostic {
+                kind: DiagnosticKind::TypeMismatch {
+                    expected: Type::Uint64,
+                    found: Type::Bool,
+                },
+                span: span_of(source, "true", 0),
+            }]
+        );
+    }
+
+    #[test]
+    fn both_boolean_operands_of_an_ordering_are_reported() {
+        let source = "func approval() bool { return true < false }";
+        let mut span = spans(source);
+        span("bool");
+        let left = span("true");
+        let right = span("false");
+
+        let mismatch = Diagnostic {
+            kind: DiagnosticKind::TypeMismatch {
+                expected: Type::Uint64,
+                found: Type::Bool,
+            },
+            span: left,
+        };
+
+        assert_eq!(
+            check_err(source),
+            vec![
+                mismatch.clone(),
+                Diagnostic {
+                    span: right,
+                    ..mismatch
+                },
+            ]
+        );
+    }
+
+    #[test]
+    fn equality_takes_the_type_of_its_left_operand() {
+        let source = "func approval() bool { return 1 == true }";
+        assert_eq!(
+            check_err(source),
+            vec![Diagnostic {
+                kind: DiagnosticKind::TypeMismatch {
+                    expected: Type::Uint64,
+                    found: Type::Bool,
+                },
+                span: span_of(source, "true", 0),
+            }]
+        );
+
+        let source = "func approval() bool { return true == 1 }";
+        assert_eq!(
+            check_err(source),
+            vec![Diagnostic {
+                kind: DiagnosticKind::TypeMismatch {
+                    expected: Type::Bool,
+                    found: Type::Uint64,
+                },
+                span: span_of(source, "1", 0),
+            }]
+        );
+    }
+
+    #[test]
+    fn a_comparison_is_a_boolean_operand_of_equality() {
+        let source = "func approval() bool { return (1 == 2) == 3 }";
+        assert_eq!(
+            check_err(source),
+            vec![Diagnostic {
+                kind: DiagnosticKind::TypeMismatch {
+                    expected: Type::Bool,
+                    found: Type::Uint64,
+                },
+                span: span_of(source, "3", 0),
+            }]
+        );
+    }
+
+    #[test]
+    fn an_unresolved_left_operand_leaves_the_right_one_unchecked() {
+        let source = "func approval() bool { return x == 1 }";
+        assert_eq!(
+            check_err(source),
+            vec![Diagnostic {
+                kind: DiagnosticKind::UndefinedVariable {
+                    name: "x".to_string(),
+                },
+                span: span_of(source, "x", 0),
+            }]
         );
     }
 }
