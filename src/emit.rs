@@ -724,4 +724,38 @@ mod tests {
             }]
         );
     }
+
+    /// The example program of the comparison milestone.
+    const COMPARISONS: &str = "func approval() bool {\n  var x uint64 = 1 + 2\n  \
+                               var big bool = x * 2 >= 6\n  return big == (x != 4)\n}\n";
+
+    #[test]
+    fn emits_the_comparisons_program() {
+        assert_eq!(
+            emit_ok(COMPARISONS, 10),
+            "#pragma version 10\n\
+             callsub approval\n\
+             return\n\
+             approval:\n\
+             proto 0 1\n\
+             pushint 0\n\
+             pushint 0\n\
+             pushint 1\n\
+             pushint 2\n\
+             +\n\
+             frame_bury 0\n\
+             frame_dig 0\n\
+             pushint 2\n\
+             *\n\
+             pushint 6\n\
+             >=\n\
+             frame_bury 1\n\
+             frame_dig 1\n\
+             frame_dig 0\n\
+             pushint 4\n\
+             !=\n\
+             ==\n\
+             retsub\n"
+        );
+    }
 }
