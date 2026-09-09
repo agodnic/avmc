@@ -20,7 +20,7 @@ pub fn parse(source: &str, tokens: &[Token], diags: &mut Diagnostics) -> Option<
 }
 
 /// What the grammar allows where an operand is expected.
-const OPERAND: &str = "an integer literal or `(`";
+const OPERAND: &str = "an integer literal, an identifier, or `(`";
 
 struct Parser<'a> {
     source: &'a str,
@@ -62,14 +62,34 @@ impl Parser<'_> {
     }
 
     fn stmt(&mut self) -> Option<Stmt> {
+        if self.peek_kind() == Some(TokenKind::Var) {
+            return self.var_stmt();
+        }
+
         let start = self
-            .expect(TokenKind::Return, "`return` or `}`")?
+            .expect(TokenKind::Return, "`var`, `return` or `}`")?
             .span
             .start;
         let expr = self.expr(None)?;
         let end = expr.span().end;
         Some(Stmt::Return {
             expr,
+            span: Span { start, end },
+        })
+    }
+
+    /// `var name type = init`.
+    fn var_stmt(&mut self) -> Option<Stmt> {
+        let start = self.expect(TokenKind::Var, "`var`")?.span.start;
+        let name = self.name()?;
+        let ty = TypeRef { name: self.name()? };
+        self.expect(TokenKind::Equals, "`=`")?;
+        let init = self.expr(None)?;
+        let end = init.span().end;
+        Some(Stmt::Var {
+            name,
+            ty,
+            init,
             span: Span { start, end },
         })
     }
@@ -121,13 +141,19 @@ impl Parser<'_> {
         Some(lhs)
     }
 
-    /// An integer literal, or a parenthesized expression.
+    /// An integer literal, a variable, or a parenthesized expression.
     fn operand(&mut self) -> Option<Expr> {
         if self.peek_kind() == Some(TokenKind::LParen) {
             let start = self.expect(TokenKind::LParen, OPERAND)?.span.start;
             let inner = self.expr(None)?;
             let end = self.expect(TokenKind::RParen, "`)`")?.span.end;
             return Some(inner.with_span(Span { start, end }));
+        }
+
+        if self.peek_kind() == Some(TokenKind::Ident) {
+            let name = self.name()?;
+            let span = name.span;
+            return Some(Expr::Var { name, span });
         }
 
         let span = self.expect(TokenKind::IntLit, OPERAND)?.span;
@@ -202,6 +228,7 @@ fn describe(kind: TokenKind) -> &'static str {
     match kind {
         TokenKind::Func => "`func`",
         TokenKind::Return => "`return`",
+        TokenKind::Var => "`var`",
         TokenKind::Ident => "an identifier",
         TokenKind::IntLit => "an integer literal",
         TokenKind::LParen => "`(`",
@@ -213,6 +240,7 @@ fn describe(kind: TokenKind) -> &'static str {
         TokenKind::Star => "`*`",
         TokenKind::Slash => "`/`",
         TokenKind::Percent => "`%`",
+        TokenKind::Equals => "`=`",
     }
 }
 
@@ -287,6 +315,218 @@ mod tests {
                     }],
                     span: Span { start, end },
                 }]
+            }
+        );
+    }
+
+    /// The example program of the variables milestone.
+    const VARIABLES: &str = "func approval() uint64 {\n  var x uint64 = 1 + 2\n  \
+                             var y uint64 = x * 3\n  return y - x\n}\n";
+
+    /// `lhs op rhs`, spanning from one operand to the other.
+    fn binary(op: BinaryOp, lhs: Expr, rhs: Expr) -> Expr {
+        let span = Span {
+            start: lhs.span().start,
+            end: rhs.span().end,
+        };
+        Expr::Binary {
+            op,
+            lhs: Box::new(lhs),
+            rhs: Box::new(rhs),
+            span,
+        }
+    }
+
+    #[test]
+    fn parses_the_variables_program() {
+        let source = VARIABLES;
+        let mut span = spans(source);
+
+        let start = span("func").start;
+        let func_name = name("approval", span("approval"));
+        span("(");
+        span(")");
+        let ret = TypeRef {
+            name: name("uint64", span("uint64")),
+        };
+        span("{");
+
+        let first_var = span("var").start;
+        let x = name("x", span("x"));
+        let x_ty = TypeRef {
+            name: name("uint64", span("uint64")),
+        };
+        span("=");
+        let one = span("1");
+        let two = span("2");
+
+        let second_var = span("var").start;
+        let y = name("y", span("y"));
+        let y_ty = TypeRef {
+            name: name("uint64", span("uint64")),
+        };
+        span("=");
+        let x_times = span("x");
+        let three = span("3");
+
+        let return_start = span("return").start;
+        let y_minus = span("y");
+        let x_minus = span("x");
+        let end = span("}").end;
+
+        let int = |value, span| Expr::IntLit { value, span };
+        let var = |text: &str, span| Expr::Var {
+            name: name(text, span),
+            span,
+        };
+
+        assert_eq!(
+            parse_ok(source),
+            Program {
+                funcs: vec![FuncDecl {
+                    name: func_name,
+                    ret,
+                    body: vec![
+                        Stmt::Var {
+                            name: x,
+                            ty: x_ty,
+                            init: binary(BinaryOp::Add, int(1, one), int(2, two)),
+                            span: Span {
+                                start: first_var,
+                                end: two.end
+                            },
+                        },
+                        Stmt::Var {
+                            name: y,
+                            ty: y_ty,
+                            init: binary(BinaryOp::Mul, var("x", x_times), int(3, three)),
+                            span: Span {
+                                start: second_var,
+                                end: three.end
+                            },
+                        },
+                        Stmt::Return {
+                            expr: binary(BinaryOp::Sub, var("y", y_minus), var("x", x_minus)),
+                            span: Span {
+                                start: return_start,
+                                end: x_minus.end
+                            },
+                        },
+                    ],
+                    span: Span { start, end },
+                }]
+            }
+        );
+    }
+
+    #[test]
+    fn a_variable_is_an_operand() {
+        let source = wrap("x + 1");
+        let mut span = spans(&source);
+        span("(");
+        span(")");
+        let x = span("x");
+        let one = span("1");
+
+        assert_eq!(
+            returned(&source),
+            binary(
+                BinaryOp::Add,
+                Expr::Var {
+                    name: name("x", x),
+                    span: x
+                },
+                Expr::IntLit {
+                    value: 1,
+                    span: one
+                },
+            )
+        );
+    }
+
+    #[test]
+    fn parentheses_around_a_variable_widen_its_span() {
+        let source = wrap("(x)");
+        let mut span = spans(&source);
+        span("(");
+        span(")");
+        let open = span("(");
+        let x = span("x");
+        let close = span(")");
+
+        assert_eq!(
+            returned(&source),
+            Expr::Var {
+                name: name("x", x),
+                span: Span {
+                    start: open.start,
+                    end: close.end
+                },
+            }
+        );
+    }
+
+    #[test]
+    fn a_declaration_without_a_type_is_reported() {
+        let source = "func f() uint64 { var x = 1 }";
+        let mut span = spans(source);
+        assert_eq!(
+            parse_err(source),
+            Diagnostic {
+                kind: DiagnosticKind::UnexpectedToken {
+                    expected: "an identifier",
+                    found: "`=`",
+                },
+                span: span("="),
+            }
+        );
+    }
+
+    #[test]
+    fn a_declaration_without_an_equals_is_reported() {
+        let source = "func f() uint64 { var x uint64 1 }";
+        let mut span = spans(source);
+        assert_eq!(
+            parse_err(source),
+            Diagnostic {
+                kind: DiagnosticKind::UnexpectedToken {
+                    expected: "`=`",
+                    found: "an integer literal",
+                },
+                span: span("1"),
+            }
+        );
+    }
+
+    #[test]
+    fn a_declaration_without_an_initializer_is_reported() {
+        let source = "func f() uint64 { var x uint64 = }";
+        let mut span = spans(source);
+        span("{");
+        assert_eq!(
+            parse_err(source),
+            Diagnostic {
+                kind: DiagnosticKind::UnexpectedToken {
+                    expected: OPERAND,
+                    found: "`}`",
+                },
+                span: span("}"),
+            }
+        );
+    }
+
+    #[test]
+    fn a_statement_must_start_with_var_or_return() {
+        let source = "func f() uint64 { 1 }";
+        let mut span = spans(source);
+        assert_eq!(
+            parse_err(source),
+            Diagnostic {
+                kind: DiagnosticKind::UnexpectedToken {
+                    expected: "`var`, `return` or `}`",
+                    found: "an integer literal",
+                },
+                span: span("1"),
             }
         );
     }
@@ -383,7 +623,7 @@ mod tests {
             parse_err(&source),
             Diagnostic {
                 kind: DiagnosticKind::UnexpectedToken {
-                    expected: "an integer literal or `(`",
+                    expected: "an integer literal, an identifier, or `(`",
                     found: "`+`",
                 },
                 span: span("+"),
@@ -401,7 +641,7 @@ mod tests {
             parse_err(&source),
             Diagnostic {
                 kind: DiagnosticKind::UnexpectedToken {
-                    expected: "an integer literal or `(`",
+                    expected: "an integer literal, an identifier, or `(`",
                     found: "`)`",
                 },
                 span: span(")"),
@@ -828,7 +1068,7 @@ mod tests {
             parse_err(source),
             Diagnostic {
                 kind: DiagnosticKind::UnexpectedToken {
-                    expected: "an integer literal or `(`",
+                    expected: "an integer literal, an identifier, or `(`",
                     found: "end of input",
                 },
                 span: Span {
@@ -846,7 +1086,7 @@ mod tests {
             parse_err(source),
             Diagnostic {
                 kind: DiagnosticKind::UnexpectedToken {
-                    expected: "`return` or `}`",
+                    expected: "`var`, `return` or `}`",
                     found: "end of input",
                 },
                 span: Span {

@@ -49,6 +49,15 @@ pub enum DiagnosticKind {
         left: &'static str,
         right: &'static str,
     },
+    UndefinedVariable {
+        name: String,
+    },
+    DuplicateVariable {
+        name: String,
+    },
+    TooManyVariables {
+        max: usize,
+    },
 }
 
 impl DiagnosticKind {
@@ -65,6 +74,10 @@ impl DiagnosticKind {
             Self::MissingEntryPoint { .. } => 8,
             Self::OpcodeUnavailable { .. } => 9,
             Self::AmbiguousPrecedence { .. } => 10,
+            // 11 was retired and stays retired.
+            Self::UndefinedVariable { .. } => 12,
+            Self::DuplicateVariable { .. } => 13,
+            Self::TooManyVariables { .. } => 14,
         };
         Code {
             severity: Severity::Error,
@@ -98,6 +111,11 @@ impl fmt::Display for DiagnosticKind {
             }
             Self::AmbiguousPrecedence { left, right } => {
                 write!(f, "{left} and {right} need parentheses to disambiguate")
+            }
+            Self::UndefinedVariable { name } => write!(f, "undefined variable `{name}`"),
+            Self::DuplicateVariable { name } => write!(f, "duplicate variable `{name}`"),
+            Self::TooManyVariables { max } => {
+                write!(f, "a function may declare at most {max} variables")
             }
         }
     }
@@ -230,6 +248,25 @@ mod tests {
                 "E0010",
                 "`%` and `+` need parentheses to disambiguate",
             ),
+            (
+                DiagnosticKind::UndefinedVariable {
+                    name: "x".to_string(),
+                },
+                "E0012",
+                "undefined variable `x`",
+            ),
+            (
+                DiagnosticKind::DuplicateVariable {
+                    name: "x".to_string(),
+                },
+                "E0013",
+                "duplicate variable `x`",
+            ),
+            (
+                DiagnosticKind::TooManyVariables { max: 128 },
+                "E0014",
+                "a function may declare at most 128 variables",
+            ),
         ];
 
         // Exhaustive, with no wildcard arm, so that adding a variant to
@@ -245,7 +282,10 @@ mod tests {
                 | DiagnosticKind::DuplicateFunction { .. }
                 | DiagnosticKind::MissingEntryPoint { .. }
                 | DiagnosticKind::OpcodeUnavailable { .. }
-                | DiagnosticKind::AmbiguousPrecedence { .. } => {}
+                | DiagnosticKind::AmbiguousPrecedence { .. }
+                | DiagnosticKind::UndefinedVariable { .. }
+                | DiagnosticKind::DuplicateVariable { .. }
+                | DiagnosticKind::TooManyVariables { .. } => {}
             }
         }
 

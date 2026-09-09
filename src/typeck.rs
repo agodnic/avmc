@@ -2,7 +2,7 @@
 
 use crate::ast;
 use crate::diagnostics::{Diagnostic, DiagnosticKind, Diagnostics};
-use crate::typed_ast::{Expr, ExprKind, FuncDecl, Program, Stmt, Type};
+use crate::typed_ast::{Expr, ExprKind, FuncDecl, LocalId, Program, Stmt, Type};
 use std::collections::HashSet;
 
 /// The one type name the language has.
@@ -74,23 +74,27 @@ fn resolve_type(ret: &ast::TypeRef, diags: &mut Diagnostics) -> Option<Type> {
     None
 }
 
-/// Checks a function body: it must end with a `return`, and nothing may follow
-/// one — of which only the first is reported.
+/// Checks a function body: every statement in it, in a scope of its own. The
+/// body must end with a `return`, and nothing may follow one — of which only
+/// the first is reported.
 fn check_body(func: &ast::FuncDecl, diags: &mut Diagnostics) -> Option<Vec<Stmt>> {
     let mut stmts = Vec::new();
+    // The variables declared so far, in order: a name's index is its slot.
+    let mut locals = Vec::new();
+    let mut ok = true;
     let mut returned = false;
     let mut unreachable = None;
 
     for stmt in &func.body {
-        let ast::Stmt::Return { expr, span } = stmt;
+        let (ast::Stmt::Var { span, .. } | ast::Stmt::Return { span, .. }) = stmt;
         if returned && unreachable.is_none() {
             unreachable = Some(*span);
         }
-        stmts.push(Stmt::Return {
-            expr: check_expr(expr),
-            span: *span,
-        });
-        returned = true;
+        match check_stmt(stmt, &mut locals, diags) {
+            Some(stmt) => stmts.push(stmt),
+            None => ok = false,
+        }
+        returned |= matches!(stmt, ast::Stmt::Return { .. });
     }
 
     if !returned {
@@ -107,27 +111,113 @@ fn check_body(func: &ast::FuncDecl, diags: &mut Diagnostics) -> Option<Vec<Stmt>
         });
         return None;
     }
-    Some(stmts)
+    ok.then_some(stmts)
 }
 
-/// Checks one expression. With one type there is nothing that can fail.
-fn check_expr(expr: &ast::Expr) -> Expr {
+/// Checks one statement, adding what it declares to `locals`.
+///
+/// A declaration's initializer, type and name are independent: each is
+/// checked, and reported, whether or not another failed.
+fn check_stmt<'a>(
+    stmt: &'a ast::Stmt,
+    locals: &mut Vec<&'a str>,
+    diags: &mut Diagnostics,
+) -> Option<Stmt> {
+    match stmt {
+        ast::Stmt::Var {
+            name,
+            ty,
+            init,
+            span,
+        } => {
+            // The initializer cannot see the name being declared.
+            let init = check_expr(init, locals, diags);
+            let ty = resolve_type(ty, diags);
+            let local = declare(name, locals, diags);
+            Some(Stmt::Var {
+                local: local?,
+                ty: ty?,
+                init: init?,
+                span: *span,
+            })
+        }
+        ast::Stmt::Return { expr, span } => Some(Stmt::Return {
+            expr: check_expr(expr, locals, diags)?,
+            span: *span,
+        }),
+    }
+}
+
+/// Declares `name`, reporting it if the scope already holds it or has no room
+/// for it. A name that is reported is not declared.
+fn declare<'a>(
+    name: &'a ast::Name,
+    locals: &mut Vec<&'a str>,
+    diags: &mut Diagnostics,
+) -> Option<LocalId> {
+    let kind = if locals.contains(&name.text.as_str()) {
+        DiagnosticKind::DuplicateVariable {
+            name: name.text.clone(),
+        }
+    } else if let Some(local) = LocalId::new(locals.len()) {
+        locals.push(&name.text);
+        return Some(local);
+    } else {
+        DiagnosticKind::TooManyVariables {
+            max: LocalId::CAPACITY,
+        }
+    };
+
+    diags.push(Diagnostic {
+        kind,
+        span: name.span,
+    });
+    None
+}
+
+/// Checks one expression. A name that resolves to no variable is the one
+/// thing that can fail.
+fn check_expr(expr: &ast::Expr, locals: &[&str], diags: &mut Diagnostics) -> Option<Expr> {
     let (kind, span) = match expr {
         ast::Expr::IntLit { value, span } => (ExprKind::IntLit(*value), *span),
-        ast::Expr::Binary { op, lhs, rhs, span } => (
-            ExprKind::Binary {
-                op: *op,
-                lhs: Box::new(check_expr(lhs)),
-                rhs: Box::new(check_expr(rhs)),
-            },
-            *span,
-        ),
+        ast::Expr::Binary { op, lhs, rhs, span } => {
+            // Both operands are checked, so both report.
+            let lhs = check_expr(lhs, locals, diags);
+            let rhs = check_expr(rhs, locals, diags);
+            (
+                ExprKind::Binary {
+                    op: *op,
+                    lhs: Box::new(lhs?),
+                    rhs: Box::new(rhs?),
+                },
+                *span,
+            )
+        }
+        ast::Expr::Var { name, span } => (ExprKind::Var(resolve_var(name, locals, diags)?), *span),
     };
-    Expr {
+    Some(Expr {
         kind,
         ty: Type::Uint64,
         span,
+    })
+}
+
+/// Resolves a name to its frame slot, reporting it if it names no variable.
+fn resolve_var(name: &ast::Name, locals: &[&str], diags: &mut Diagnostics) -> Option<LocalId> {
+    let local = locals
+        .iter()
+        .position(|declared| *declared == name.text)
+        .and_then(LocalId::new);
+
+    if local.is_none() {
+        diags.push(Diagnostic {
+            kind: DiagnosticKind::UndefinedVariable {
+                name: name.text.clone(),
+            },
+            span: name.span,
+        });
     }
+    local
 }
 
 #[cfg(test)]
@@ -184,6 +274,250 @@ mod tests {
                     span: Span { start, end },
                 }]
             }
+        );
+    }
+
+    /// The example program of the variables milestone.
+    const VARIABLES: &str = "func approval() uint64 {\n  var x uint64 = 1 + 2\n  \
+                             var y uint64 = x * 3\n  return y - x\n}\n";
+
+    /// `func approval() uint64 { <body> }`.
+    fn wrap(body: &str) -> String {
+        format!("func approval() uint64 {{ {body} }}")
+    }
+
+    #[test]
+    fn checks_the_variables_program() {
+        let source = VARIABLES;
+        let mut span = spans(source);
+
+        span("func");
+        span("approval");
+        span("uint64");
+
+        let first_var = span("var").start;
+        span("x");
+        span("uint64");
+        let one = span("1");
+        let two = span("2");
+
+        let second_var = span("var").start;
+        span("y");
+        span("uint64");
+        let x_times = span("x");
+        let three = span("3");
+
+        let return_start = span("return").start;
+        let y_minus = span("y");
+        let x_minus = span("x");
+
+        let uint64 = |kind, span| Expr {
+            kind,
+            ty: Type::Uint64,
+            span,
+        };
+        let binary = |op, lhs: Expr, rhs: Expr| {
+            let span = Span {
+                start: lhs.span.start,
+                end: rhs.span.end,
+            };
+            uint64(
+                ExprKind::Binary {
+                    op,
+                    lhs: Box::new(lhs),
+                    rhs: Box::new(rhs),
+                },
+                span,
+            )
+        };
+
+        assert_eq!(
+            check_ok(source).funcs[0].body,
+            vec![
+                Stmt::Var {
+                    local: LocalId(0),
+                    ty: Type::Uint64,
+                    init: binary(
+                        ast::BinaryOp::Add,
+                        uint64(ExprKind::IntLit(1), one),
+                        uint64(ExprKind::IntLit(2), two),
+                    ),
+                    span: Span {
+                        start: first_var,
+                        end: two.end
+                    },
+                },
+                Stmt::Var {
+                    local: LocalId(1),
+                    ty: Type::Uint64,
+                    init: binary(
+                        ast::BinaryOp::Mul,
+                        uint64(ExprKind::Var(LocalId(0)), x_times),
+                        uint64(ExprKind::IntLit(3), three),
+                    ),
+                    span: Span {
+                        start: second_var,
+                        end: three.end
+                    },
+                },
+                Stmt::Return {
+                    expr: binary(
+                        ast::BinaryOp::Sub,
+                        uint64(ExprKind::Var(LocalId(1)), y_minus),
+                        uint64(ExprKind::Var(LocalId(0)), x_minus),
+                    ),
+                    span: Span {
+                        start: return_start,
+                        end: x_minus.end
+                    },
+                },
+            ]
+        );
+    }
+
+    #[test]
+    fn an_undefined_variable_is_reported() {
+        let source = wrap("return x");
+        assert_eq!(
+            check_err(&source),
+            vec![Diagnostic {
+                kind: DiagnosticKind::UndefinedVariable {
+                    name: "x".to_string(),
+                },
+                span: span_of(&source, "x", 0),
+            }]
+        );
+    }
+
+    #[test]
+    fn an_initializer_cannot_see_the_name_it_declares() {
+        let source = wrap("var x uint64 = x return x");
+        let mut span = spans(&source);
+        span("x");
+
+        assert_eq!(
+            check_err(&source),
+            vec![Diagnostic {
+                kind: DiagnosticKind::UndefinedVariable {
+                    name: "x".to_string(),
+                },
+                span: span("x"),
+            }]
+        );
+    }
+
+    #[test]
+    fn a_duplicate_declaration_is_reported_at_the_later_one() {
+        let source = wrap("var x uint64 = 1 var x uint64 = 2 return x");
+        let mut span = spans(&source);
+        span("x");
+
+        assert_eq!(
+            check_err(&source),
+            vec![Diagnostic {
+                kind: DiagnosticKind::DuplicateVariable {
+                    name: "x".to_string(),
+                },
+                span: span("x"),
+            }]
+        );
+    }
+
+    #[test]
+    fn an_unknown_declared_type_is_reported() {
+        let source = wrap("var x bytes = 1 return x");
+        assert_eq!(
+            check_err(&source),
+            vec![Diagnostic {
+                kind: DiagnosticKind::UnknownType {
+                    name: "bytes".to_string(),
+                },
+                span: span_of(&source, "bytes", 0),
+            }]
+        );
+    }
+
+    /// `var v0 uint64 = 0 .. var v<count-1> uint64 = 0 return v0`.
+    fn declarations(count: usize) -> String {
+        let mut body = String::new();
+        for index in 0..count {
+            body.push_str(&format!("var v{index} uint64 = 0 "));
+        }
+        body.push_str("return v0");
+        wrap(&body)
+    }
+
+    #[test]
+    fn a_function_may_declare_the_frame_capacity() {
+        let source = declarations(LocalId::CAPACITY);
+        let body = &check_ok(&source).funcs[0].body;
+
+        assert_eq!(body.len(), LocalId::CAPACITY + 1);
+        assert!(matches!(
+            body[LocalId::CAPACITY - 1],
+            Stmt::Var {
+                local: LocalId(127),
+                ..
+            }
+        ));
+    }
+
+    #[test]
+    fn one_declaration_past_the_capacity_is_reported() {
+        let source = declarations(LocalId::CAPACITY + 1);
+        assert_eq!(
+            check_err(&source),
+            vec![Diagnostic {
+                kind: DiagnosticKind::TooManyVariables {
+                    max: LocalId::CAPACITY,
+                },
+                span: span_of(&source, "v128", 0),
+            }]
+        );
+    }
+
+    #[test]
+    fn a_body_of_declarations_alone_is_missing_a_return() {
+        let source = wrap("var x uint64 = 1");
+        let mut span = spans(&source);
+        span("func");
+
+        assert_eq!(
+            check_err(&source),
+            vec![Diagnostic {
+                kind: DiagnosticKind::MissingReturn,
+                span: span("approval"),
+            }]
+        );
+    }
+
+    #[test]
+    fn a_declaration_after_a_return_is_unreachable() {
+        let source = wrap("return 1 var x uint64 = 2");
+        assert_eq!(
+            check_err(&source),
+            vec![Diagnostic {
+                kind: DiagnosticKind::UnreachableStatement,
+                span: span_of(&source, "var x uint64 = 2", 0),
+            }]
+        );
+    }
+
+    #[test]
+    fn a_variable_does_not_outlive_its_function() {
+        let source = "func a() uint64 { var x uint64 = 1 return x } func b() uint64 { return x }";
+        let mut span = spans(source);
+        span("x");
+        span("x");
+
+        assert_eq!(
+            check_err(source),
+            vec![Diagnostic {
+                kind: DiagnosticKind::UndefinedVariable {
+                    name: "x".to_string(),
+                },
+                span: span("x"),
+            }]
         );
     }
 
