@@ -11,12 +11,12 @@ use std::process::{Command, Output};
 /// The example program of the v0 milestone.
 const EXAMPLE: &str = "func approval() uint64 { return 1 }";
 
-/// The TEAL the example program compiles to for version 10.
+/// The TEAL the example program compiles to.
 const EXAMPLE_TEAL: &str =
-    "#pragma version 10\ncallsub approval\nreturn\napproval:\nproto 0 1\npushint 1\nretsub\n";
+    "#pragma version 13\ncallsub approval\nreturn\napproval:\nproto 0 1\npushint 1\nretsub\n";
 
 /// The usage line the binary reports for any bad argument list.
-const USAGE: &str = "usage: avmc <file> --teal-version <N>, with N from 1 to 11\n";
+const USAGE: &str = "usage: avmc <file>\n";
 
 /// A source file that lives for as long as one test, named after it so that
 /// tests running in parallel never share a path.
@@ -66,7 +66,7 @@ fn stderr(output: &Output) -> &str {
 #[test]
 fn compiles_a_file_to_teal() {
     let file = SourceFile::new("compiles_a_file_to_teal", EXAMPLE);
-    let output = run(&[file.path(), "--teal-version", "10"]);
+    let output = run(&[file.path()]);
 
     assert_eq!(stdout(&output), EXAMPLE_TEAL);
     assert_eq!(stderr(&output), "");
@@ -79,11 +79,11 @@ fn compiles_arithmetic_to_teal() {
         "compiles_arithmetic_to_teal",
         "func approval() uint64 {\n  return (1 + 2) * 3 - 4 / 5\n}\n",
     );
-    let output = run(&[file.path(), "--teal-version", "10"]);
+    let output = run(&[file.path()]);
 
     assert_eq!(
         stdout(&output),
-        "#pragma version 10\n\
+        "#pragma version 13\n\
          callsub approval\n\
          return\n\
          approval:\n\
@@ -113,11 +113,11 @@ fn compiles_variables_to_teal() {
            return y - x\n\
          }\n",
     );
-    let output = run(&[file.path(), "--teal-version", "10"]);
+    let output = run(&[file.path()]);
 
     assert_eq!(
         stdout(&output),
-        "#pragma version 10\n\
+        "#pragma version 13\n\
          callsub approval\n\
          return\n\
          approval:\n\
@@ -150,11 +150,11 @@ fn compiles_booleans_to_teal() {
            return ok\n\
          }\n",
     );
-    let output = run(&[file.path(), "--teal-version", "10"]);
+    let output = run(&[file.path()]);
 
     assert_eq!(
         stdout(&output),
-        "#pragma version 10\n\
+        "#pragma version 13\n\
          callsub approval\n\
          return\n\
          approval:\n\
@@ -175,7 +175,7 @@ fn reports_a_boolean_in_arithmetic() {
         "reports_a_boolean_in_arithmetic",
         "func approval() uint64 {\n  return true + 1\n}\n",
     );
-    let output = run(&[file.path(), "--teal-version", "10"]);
+    let output = run(&[file.path()]);
 
     assert_eq!(stdout(&output), "");
     assert_eq!(
@@ -194,7 +194,7 @@ fn reports_an_undefined_variable() {
         "reports_an_undefined_variable",
         "func approval() uint64 {\n  return x\n}\n",
     );
-    let output = run(&[file.path(), "--teal-version", "10"]);
+    let output = run(&[file.path()]);
 
     assert_eq!(stdout(&output), "");
     assert_eq!(
@@ -213,7 +213,7 @@ fn reports_a_type_mismatch() {
         "reports_a_type_mismatch",
         "func approval() bool {\n  return 1\n}\n",
     );
-    let output = run(&[file.path(), "--teal-version", "10"]);
+    let output = run(&[file.path()]);
 
     assert_eq!(stdout(&output), "");
     assert_eq!(
@@ -227,22 +227,12 @@ fn reports_a_type_mismatch() {
 }
 
 #[test]
-fn accepts_the_flag_before_the_path() {
-    let file = SourceFile::new("accepts_the_flag_before_the_path", EXAMPLE);
-    let output = run(&["--teal-version", "10", file.path()]);
-
-    assert_eq!(stdout(&output), EXAMPLE_TEAL);
-    assert_eq!(stderr(&output), "");
-    assert_eq!(code(&output), 0);
-}
-
-#[test]
 fn reports_a_lexing_error() {
     let file = SourceFile::new(
         "reports_a_lexing_error",
         "func approval() uint64 {\n  return @\n}\n",
     );
-    let output = run(&[file.path(), "--teal-version", "10"]);
+    let output = run(&[file.path()]);
 
     assert_eq!(stdout(&output), "");
     assert_eq!(
@@ -258,7 +248,7 @@ fn reports_a_missing_entry_point() {
         "reports_a_missing_entry_point",
         "func f() uint64 { return 1 }",
     );
-    let output = run(&[file.path(), "--teal-version", "10"]);
+    let output = run(&[file.path()]);
 
     assert_eq!(stdout(&output), "");
     assert_eq!(
@@ -272,9 +262,8 @@ fn reports_a_missing_entry_point() {
 }
 
 #[test]
-fn rejects_a_missing_version() {
-    let file = SourceFile::new("rejects_a_missing_version", EXAMPLE);
-    let output = run(&[file.path()]);
+fn rejects_no_arguments() {
+    let output = run(&[]);
 
     assert_eq!(stdout(&output), "");
     assert_eq!(stderr(&output), USAGE);
@@ -282,39 +271,9 @@ fn rejects_a_missing_version() {
 }
 
 #[test]
-fn rejects_a_version_that_is_not_a_number() {
-    let file = SourceFile::new("rejects_a_version_that_is_not_a_number", EXAMPLE);
-    let output = run(&[file.path(), "--teal-version", "abc"]);
-
-    assert_eq!(stdout(&output), "");
-    assert_eq!(stderr(&output), USAGE);
-    assert_eq!(code(&output), 2);
-}
-
-#[test]
-fn rejects_a_version_below_the_supported_range() {
-    let file = SourceFile::new("rejects_a_version_below_the_supported_range", EXAMPLE);
-    let output = run(&[file.path(), "--teal-version", "0"]);
-
-    assert_eq!(stdout(&output), "");
-    assert_eq!(stderr(&output), USAGE);
-    assert_eq!(code(&output), 2);
-}
-
-#[test]
-fn rejects_a_version_above_the_supported_range() {
-    let file = SourceFile::new("rejects_a_version_above_the_supported_range", EXAMPLE);
-    let output = run(&[file.path(), "--teal-version", "255"]);
-
-    assert_eq!(stdout(&output), "");
-    assert_eq!(stderr(&output), USAGE);
-    assert_eq!(code(&output), 2);
-}
-
-#[test]
-fn rejects_a_version_that_does_not_fit_in_a_byte() {
-    let file = SourceFile::new("rejects_a_version_that_does_not_fit_in_a_byte", EXAMPLE);
-    let output = run(&[file.path(), "--teal-version", "256"]);
+fn rejects_a_second_path() {
+    let file = SourceFile::new("rejects_a_second_path", EXAMPLE);
+    let output = run(&[file.path(), file.path()]);
 
     assert_eq!(stdout(&output), "");
     assert_eq!(stderr(&output), USAGE);
@@ -329,7 +288,7 @@ fn reports_a_file_it_cannot_read() {
     ));
     assert!(!Path::new(&missing).exists());
     let path = missing.to_str().expect("a UTF-8 temporary path");
-    let output = run(&[path, "--teal-version", "10"]);
+    let output = run(&[path]);
 
     assert_eq!(stdout(&output), "");
     assert!(
@@ -350,11 +309,11 @@ fn compiles_a_comparison_to_teal() {
            return big == (x != 4)\n\
          }\n",
     );
-    let output = run(&[file.path(), "--teal-version", "10"]);
+    let output = run(&[file.path()]);
 
     assert_eq!(
         stdout(&output),
-        "#pragma version 10\n\
+        "#pragma version 13\n\
          callsub approval\n\
          return\n\
          approval:\n\
@@ -392,11 +351,11 @@ fn compiles_logical_operators_to_teal() {
            return !(x > 5) && (odd || x == 4)\n\
          }\n",
     );
-    let output = run(&[file.path(), "--teal-version", "10"]);
+    let output = run(&[file.path()]);
 
     assert_eq!(
         stdout(&output),
-        "#pragma version 10\n\
+        "#pragma version 13\n\
          callsub approval\n\
          return\n\
          approval:\n\

@@ -40,11 +40,6 @@ pub enum DiagnosticKind {
     MissingEntryPoint {
         name: &'static str,
     },
-    OpcodeUnavailable {
-        opcode: &'static str,
-        min: u8,
-        target: u8,
-    },
     /// `left` and `right` describe the two operators, backticks included.
     AmbiguousPrecedence {
         left: &'static str,
@@ -77,7 +72,7 @@ impl DiagnosticKind {
             Self::UnreachableStatement => 6,
             Self::DuplicateFunction { .. } => 7,
             Self::MissingEntryPoint { .. } => 8,
-            Self::OpcodeUnavailable { .. } => 9,
+            // 9 was retired and stays retired.
             Self::AmbiguousPrecedence { .. } => 10,
             // 11 was retired and stays retired.
             Self::UndefinedVariable { .. } => 12,
@@ -105,16 +100,6 @@ impl fmt::Display for DiagnosticKind {
             Self::UnreachableStatement => write!(f, "unreachable statement"),
             Self::DuplicateFunction { name } => write!(f, "duplicate function `{name}`"),
             Self::MissingEntryPoint { name } => write!(f, "missing entry point `{name}`"),
-            Self::OpcodeUnavailable {
-                opcode,
-                min,
-                target,
-            } => {
-                write!(
-                    f,
-                    "`{opcode}` requires TEAL version {min}, target is {target}"
-                )
-            }
             Self::AmbiguousPrecedence { left, right } => {
                 write!(f, "{left} and {right} need parentheses to disambiguate")
             }
@@ -244,15 +229,6 @@ mod tests {
                 "missing entry point `approval`",
             ),
             (
-                DiagnosticKind::OpcodeUnavailable {
-                    opcode: "pushint",
-                    min: 3,
-                    target: 2,
-                },
-                "E0009",
-                "`pushint` requires TEAL version 3, target is 2",
-            ),
-            (
                 DiagnosticKind::AmbiguousPrecedence {
                     left: "`%`",
                     right: "`+`",
@@ -301,7 +277,6 @@ mod tests {
                 | DiagnosticKind::UnreachableStatement
                 | DiagnosticKind::DuplicateFunction { .. }
                 | DiagnosticKind::MissingEntryPoint { .. }
-                | DiagnosticKind::OpcodeUnavailable { .. }
                 | DiagnosticKind::AmbiguousPrecedence { .. }
                 | DiagnosticKind::UndefinedVariable { .. }
                 | DiagnosticKind::DuplicateVariable { .. }

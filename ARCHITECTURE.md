@@ -50,9 +50,8 @@ traffic, and no scheduling algorithm.
 single assignment, at every IR boundary in debug and test builds. What it
 checks grows with the IR.
 
-**The target TEAL version is a required compilation parameter**, never inferred
-from the source and never silently upgraded. Using an opcode unavailable in the
-target version is a compile error.
+**Emission targets the TEAL version MainNet runs.** It is fixed in the
+compiler, not a compilation parameter.
 
 ## 2. Stage contracts
 
@@ -78,9 +77,9 @@ These hold across every stage. Agents and contributors must not violate them.
 
 - **Spans everywhere.** Every token, AST node, IR instruction, and emitted
   opcode carries a source span. A diagnostic without a span is a bug.
-- **Determinism.** For a fixed compiler version, input, and target TEAL
-  version, output is byte-identical. No hash-map iteration order, no
-  timestamps, no absolute paths, no parallelism-dependent ordering.
+- **Determinism.** For a fixed compiler version and input, output is
+  byte-identical. No hash-map iteration order, no timestamps, no absolute
+  paths, no parallelism-dependent ordering.
 - **No panics.** Malformed source produces diagnostics, never a panic.
   `unwrap`/`expect`/`panic!` are permitted only for conditions the IR verifier
   has already established.
