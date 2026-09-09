@@ -3,19 +3,19 @@
 //! Both functions are pure; all I/O lives in `src/main.rs`.
 
 use crate::diagnostics::{Diagnostic, Diagnostics};
-use crate::emit::{TealVersion, emit};
+use crate::emit::emit;
 use crate::lexer::lex;
 use crate::lower::lower;
 use crate::parser::parse;
 use crate::typeck::check;
 
 /// Compiles `source` to TEAL text, stopping at the first stage that fails.
-pub fn compile(source: &str, version: TealVersion, diags: &mut Diagnostics) -> Option<String> {
+pub fn compile(source: &str, diags: &mut Diagnostics) -> Option<String> {
     let tokens = lex(source, diags)?;
     let parsed = parse(source, &tokens, diags)?;
     let checked = check(&parsed, diags)?;
     let ir = lower(&checked, diags)?;
-    emit(&ir, version, diags)
+    emit(&ir, diags)
 }
 
 /// Renders `diagnostic` as one line, without a trailing newline.
@@ -50,12 +50,11 @@ mod tests {
     use crate::diagnostics::{DiagnosticKind, Span};
     use crate::testing::{EXAMPLE, span_of};
 
-    /// The diagnostics reported while compiling `source` for `version`,
-    /// asserting that nothing was emitted.
-    fn compile_err(source: &str, version: u8) -> Vec<DiagnosticKind> {
+    /// The diagnostics reported while compiling `source`, asserting that
+    /// nothing was emitted.
+    fn compile_err(source: &str) -> Vec<DiagnosticKind> {
         let mut diags = Diagnostics::default();
-        let version = TealVersion::new(version).expect("a supported version");
-        assert_eq!(compile(source, version, &mut diags), None);
+        assert_eq!(compile(source, &mut diags), None);
         diags.iter().map(|diag| diag.kind.clone()).collect()
     }
 
@@ -70,11 +69,10 @@ mod tests {
     #[test]
     fn example_program_compiles() {
         let mut diags = Diagnostics::default();
-        let version = TealVersion::new(10).expect("a supported version");
         assert_eq!(
-            compile(EXAMPLE, version, &mut diags),
+            compile(EXAMPLE, &mut diags),
             Some(
-                "#pragma version 10\ncallsub approval\nreturn\napproval:\nproto 0 1\npushint 1\nretsub\n"
+                "#pragma version 13\ncallsub approval\nreturn\napproval:\nproto 0 1\npushint 1\nretsub\n"
                     .to_string()
             )
         );
@@ -84,37 +82,8 @@ mod tests {
     #[test]
     fn lexing_stops_the_pipeline() {
         assert_eq!(
-            compile_err("func approval() uint64 { return @ }", 10),
+            compile_err("func approval() uint64 { return @ }"),
             [DiagnosticKind::UnexpectedCharacter]
-        );
-    }
-
-    #[test]
-    fn emission_reports_an_unsupported_version() {
-        assert_eq!(
-            compile_err(EXAMPLE, 2),
-            [
-                DiagnosticKind::OpcodeUnavailable {
-                    opcode: "callsub",
-                    min: 4,
-                    target: 2,
-                },
-                DiagnosticKind::OpcodeUnavailable {
-                    opcode: "proto",
-                    min: 8,
-                    target: 2,
-                },
-                DiagnosticKind::OpcodeUnavailable {
-                    opcode: "pushint",
-                    min: 3,
-                    target: 2,
-                },
-                DiagnosticKind::OpcodeUnavailable {
-                    opcode: "retsub",
-                    min: 4,
-                    target: 2,
-                },
-            ]
         );
     }
 

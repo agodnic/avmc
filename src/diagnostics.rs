@@ -40,11 +40,6 @@ pub enum DiagnosticKind {
     MissingEntryPoint {
         name: &'static str,
     },
-    OpcodeUnavailable {
-        opcode: &'static str,
-        min: u8,
-        target: u8,
-    },
     /// `left` and `right` describe the two operators, backticks included.
     AmbiguousPrecedence {
         left: &'static str,
@@ -77,13 +72,11 @@ impl DiagnosticKind {
             Self::UnreachableStatement => 6,
             Self::DuplicateFunction { .. } => 7,
             Self::MissingEntryPoint { .. } => 8,
-            Self::OpcodeUnavailable { .. } => 9,
-            Self::AmbiguousPrecedence { .. } => 10,
-            // 11 was retired and stays retired.
-            Self::UndefinedVariable { .. } => 12,
-            Self::DuplicateVariable { .. } => 13,
-            Self::TooManyVariables { .. } => 14,
-            Self::TypeMismatch { .. } => 15,
+            Self::AmbiguousPrecedence { .. } => 9,
+            Self::UndefinedVariable { .. } => 10,
+            Self::DuplicateVariable { .. } => 11,
+            Self::TooManyVariables { .. } => 12,
+            Self::TypeMismatch { .. } => 13,
         };
         Code {
             severity: Severity::Error,
@@ -105,16 +98,6 @@ impl fmt::Display for DiagnosticKind {
             Self::UnreachableStatement => write!(f, "unreachable statement"),
             Self::DuplicateFunction { name } => write!(f, "duplicate function `{name}`"),
             Self::MissingEntryPoint { name } => write!(f, "missing entry point `{name}`"),
-            Self::OpcodeUnavailable {
-                opcode,
-                min,
-                target,
-            } => {
-                write!(
-                    f,
-                    "`{opcode}` requires TEAL version {min}, target is {target}"
-                )
-            }
             Self::AmbiguousPrecedence { left, right } => {
                 write!(f, "{left} and {right} need parentheses to disambiguate")
             }
@@ -244,39 +227,30 @@ mod tests {
                 "missing entry point `approval`",
             ),
             (
-                DiagnosticKind::OpcodeUnavailable {
-                    opcode: "pushint",
-                    min: 3,
-                    target: 2,
-                },
-                "E0009",
-                "`pushint` requires TEAL version 3, target is 2",
-            ),
-            (
                 DiagnosticKind::AmbiguousPrecedence {
                     left: "`%`",
                     right: "`+`",
                 },
-                "E0010",
+                "E0009",
                 "`%` and `+` need parentheses to disambiguate",
             ),
             (
                 DiagnosticKind::UndefinedVariable {
                     name: "x".to_string(),
                 },
-                "E0012",
+                "E0010",
                 "undefined variable `x`",
             ),
             (
                 DiagnosticKind::DuplicateVariable {
                     name: "x".to_string(),
                 },
-                "E0013",
+                "E0011",
                 "duplicate variable `x`",
             ),
             (
                 DiagnosticKind::TooManyVariables { max: 128 },
-                "E0014",
+                "E0012",
                 "a function may declare at most 128 variables",
             ),
             (
@@ -284,7 +258,7 @@ mod tests {
                     expected: Type::Bool,
                     found: Type::Uint64,
                 },
-                "E0015",
+                "E0013",
                 "mismatched types: expected `bool`, found `uint64`",
             ),
         ];
@@ -301,7 +275,6 @@ mod tests {
                 | DiagnosticKind::UnreachableStatement
                 | DiagnosticKind::DuplicateFunction { .. }
                 | DiagnosticKind::MissingEntryPoint { .. }
-                | DiagnosticKind::OpcodeUnavailable { .. }
                 | DiagnosticKind::AmbiguousPrecedence { .. }
                 | DiagnosticKind::UndefinedVariable { .. }
                 | DiagnosticKind::DuplicateVariable { .. }

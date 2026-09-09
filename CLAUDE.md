@@ -19,5 +19,5 @@ The items in this section are not hard rules - they can be broken if there is a 
 
 # Usage
 ```sh
-cargo run -- program.txt --teal-version 10
+cargo run -- program.txt
 ```
