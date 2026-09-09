@@ -54,11 +54,6 @@ checks grows with the IR.
 from the source and never silently upgraded. Using an opcode unavailable in the
 target version is a compile error.
 
-**Every function is a TEAL subroutine** with a `proto` frame, and a program
-is a `callsub` to its entry point followed by `return`. That holds even for
-a program with one function: one shape, no special case for the entry
-point, and no stage ever needs to know the operand stack's depth.
-
 ## 2. Stage contracts
 
 Uniform, and enforced by review:
