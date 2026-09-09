@@ -46,6 +46,11 @@ order — stack order. Lowering an expression tree in post-order produces exactl
 that, so emission is one linear pass with no stack shuffling, no scratch
 traffic, and no scheduling algorithm.
 
+**A function's frame** holds one typed slot per variable. A variable is not an
+IR value: it is a frame slot, and its only address is its index. The operand
+stack above the frame still holds only single-use temporaries in stack order,
+so the invariant, the verifier's walk, and post-order lowering are untouched.
+
 **The verifier** enforces that invariant, along with type correctness and
 single assignment, at every IR boundary in debug and test builds. What it
 checks grows with the IR.

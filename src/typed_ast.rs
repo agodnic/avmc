@@ -11,6 +11,17 @@ pub enum Type {
     Uint64,
 }
 
+/// A variable's position in its function's frame: declarations counted
+/// from 0.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct LocalId(pub u8);
+
+impl LocalId {
+    /// How many variables a frame can hold. `frame_dig` addresses a local
+    /// with the non-negative half of a signed byte.
+    pub const CAPACITY: usize = 128;
+}
+
 /// A whole source file.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Program {

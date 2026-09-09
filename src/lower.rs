@@ -35,6 +35,7 @@ fn lower_func(func: &typed_ast::FuncDecl) -> Function {
     Function {
         name: func.name.text.clone(),
         ret: func.ret,
+        locals: Vec::new(),
         insts,
         span: func.span,
     }
@@ -100,6 +101,7 @@ mod tests {
                 funcs: vec![Function {
                     name: "approval".to_string(),
                     ret: Type::Uint64,
+                    locals: vec![],
                     insts: vec![
                         Inst::Const {
                             dest: ValueId(0),
@@ -242,6 +244,7 @@ mod tests {
                     Function {
                         name: "a".to_string(),
                         ret: Type::Uint64,
+                        locals: vec![],
                         insts: vec![
                             Inst::Const {
                                 dest: ValueId(0),
@@ -258,6 +261,7 @@ mod tests {
                     Function {
                         name: "b".to_string(),
                         ret: Type::Uint64,
+                        locals: vec![],
                         insts: vec![
                             Inst::Const {
                                 dest: ValueId(0),
