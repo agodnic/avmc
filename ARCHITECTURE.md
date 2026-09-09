@@ -33,7 +33,7 @@ error-message quality and error recovery. The AST mirrors the surface syntax;
 desugaring happens in lowering, not here.
 
 **Type checking.** Produces a typed AST in which every expression has a
-resolved type. Types are checked, not inferred, beyond local `let`. This stage
+resolved type. Types are checked, not inferred. This stage
 also enforces the AVM-derived static rules: byte-length bounds and the absence
 of constructs the machine cannot support.
 

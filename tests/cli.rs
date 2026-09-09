@@ -104,6 +104,63 @@ fn compiles_arithmetic_to_teal() {
 }
 
 #[test]
+fn compiles_variables_to_teal() {
+    let file = SourceFile::new(
+        "compiles_variables_to_teal",
+        "func approval() uint64 {\n  \
+           var x uint64 = 1 + 2\n  \
+           var y uint64 = x * 3\n  \
+           return y - x\n\
+         }\n",
+    );
+    let output = run(&[file.path(), "--teal-version", "10"]);
+
+    assert_eq!(
+        stdout(&output),
+        "#pragma version 10\n\
+         callsub approval\n\
+         return\n\
+         approval:\n\
+         proto 0 1\n\
+         pushint 0\n\
+         pushint 0\n\
+         pushint 1\n\
+         pushint 2\n\
+         +\n\
+         frame_bury 0\n\
+         frame_dig 0\n\
+         pushint 3\n\
+         *\n\
+         frame_bury 1\n\
+         frame_dig 1\n\
+         frame_dig 0\n\
+         -\n\
+         retsub\n"
+    );
+    assert_eq!(stderr(&output), "");
+    assert_eq!(code(&output), 0);
+}
+
+#[test]
+fn reports_an_undefined_variable() {
+    let file = SourceFile::new(
+        "reports_an_undefined_variable",
+        "func approval() uint64 {\n  return x\n}\n",
+    );
+    let output = run(&[file.path(), "--teal-version", "10"]);
+
+    assert_eq!(stdout(&output), "");
+    assert_eq!(
+        stderr(&output),
+        format!(
+            "{}:2:10: error[E0012]: undefined variable `x`\n",
+            file.path()
+        )
+    );
+    assert_eq!(code(&output), 1);
+}
+
+#[test]
 fn accepts_the_flag_before_the_path() {
     let file = SourceFile::new("accepts_the_flag_before_the_path", EXAMPLE);
     let output = run(&["--teal-version", "10", file.path()]);

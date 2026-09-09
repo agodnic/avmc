@@ -11,6 +11,8 @@ pub enum TokenKind {
     Func,
     /// The keyword `return`.
     Return,
+    /// The keyword `var`.
+    Var,
     /// An identifier: `[A-Za-z_][A-Za-z0-9_]*`, keywords excluded.
     Ident,
     /// An integer literal: `[0-9]+`. The value is not parsed here.
@@ -33,6 +35,8 @@ pub enum TokenKind {
     Slash,
     /// `%`
     Percent,
+    /// `=`
+    Equals,
 }
 
 /// A token: a kind and the source range it covers.
@@ -70,11 +74,13 @@ pub fn lex(source: &str, diags: &mut Diagnostics) -> Option<Vec<Token>> {
             '*' => tokens.push(token(TokenKind::Star, start, single)),
             '/' => tokens.push(token(TokenKind::Slash, start, single)),
             '%' => tokens.push(token(TokenKind::Percent, start, single)),
+            '=' => tokens.push(token(TokenKind::Equals, start, single)),
             _ if is_ident_start(c) => {
                 let end = consume_while(&mut chars, source.len(), is_ident_continue);
                 let kind = match source.get(start..end) {
                     Some("func") => TokenKind::Func,
                     Some("return") => TokenKind::Return,
+                    Some("var") => TokenKind::Var,
                     _ => TokenKind::Ident,
                 };
                 tokens.push(token(kind, start, end));
@@ -294,6 +300,52 @@ mod tests {
             vec![
                 token(TokenKind::IntLit, 0, 1),
                 token(TokenKind::Percent, 1, 2),
+                token(TokenKind::IntLit, 2, 3),
+            ]
+        );
+    }
+
+    #[test]
+    fn lexes_a_variable_declaration() {
+        let source = "var x uint64 = 1";
+        let expected = spans(
+            source,
+            &[
+                (TokenKind::Var, "var"),
+                (TokenKind::Ident, "x"),
+                (TokenKind::Ident, "uint64"),
+                (TokenKind::Equals, "="),
+                (TokenKind::IntLit, "1"),
+            ],
+        );
+        assert_eq!(lex_ok(source), expected);
+    }
+
+    #[test]
+    fn var_prefixes_are_identifiers() {
+        assert_eq!(
+            lex_ok("var_ variable"),
+            vec![
+                token(TokenKind::Ident, 0, 4),
+                token(TokenKind::Ident, 5, 13)
+            ]
+        );
+    }
+
+    #[test]
+    fn an_equals_is_never_part_of_another_token() {
+        assert_eq!(
+            lex_ok("=="),
+            vec![
+                token(TokenKind::Equals, 0, 1),
+                token(TokenKind::Equals, 1, 2)
+            ]
+        );
+        assert_eq!(
+            lex_ok("x=1"),
+            vec![
+                token(TokenKind::Ident, 0, 1),
+                token(TokenKind::Equals, 1, 2),
                 token(TokenKind::IntLit, 2, 3),
             ]
         );

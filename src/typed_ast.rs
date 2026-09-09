@@ -20,6 +20,13 @@ impl LocalId {
     /// How many variables a frame can hold. `frame_dig` addresses a local
     /// with the non-negative half of a signed byte.
     pub const CAPACITY: usize = 128;
+
+    /// The slot of the `index`th declaration, or `None` if a frame cannot
+    /// hold that many.
+    pub fn new(index: usize) -> Option<Self> {
+        let slot = u8::try_from(index).ok()?;
+        (usize::from(slot) < Self::CAPACITY).then_some(Self(slot))
+    }
 }
 
 /// A whole source file.
@@ -45,6 +52,17 @@ pub struct FuncDecl {
 /// A statement.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Stmt {
+    /// `var`, with its name resolved to a frame slot.
+    Var {
+        /// The slot it declares.
+        local: LocalId,
+        /// The declared type.
+        ty: Type,
+        /// The initializer.
+        init: Expr,
+        /// From `var` through the initializer.
+        span: Span,
+    },
     /// `return expr`.
     Return {
         /// The returned expression.
@@ -79,6 +97,8 @@ pub enum ExprKind {
         /// The right operand.
         rhs: Box<Expr>,
     },
+    /// A variable, by frame slot.
+    Var(LocalId),
 }
 
 impl Expr {

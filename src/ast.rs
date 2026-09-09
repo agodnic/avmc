@@ -41,6 +41,17 @@ pub struct TypeRef {
 /// A statement.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Stmt {
+    /// `var name type = init`.
+    Var {
+        /// The declared name.
+        name: Name,
+        /// The declared type.
+        ty: TypeRef,
+        /// The initializer.
+        init: Expr,
+        /// From `var` through the initializer.
+        span: Span,
+    },
     /// `return expr`.
     Return {
         /// The returned expression.
@@ -71,13 +82,20 @@ pub enum Expr {
         /// From the first byte of `lhs` through the last byte of `rhs`.
         span: Span,
     },
+    /// A variable, by name.
+    Var {
+        /// The name it was written as.
+        name: Name,
+        /// `name.span`, unless parentheses widened it.
+        span: Span,
+    },
 }
 
 impl Expr {
     /// Where it was written.
     pub fn span(&self) -> Span {
         match self {
-            Expr::IntLit { span, .. } | Expr::Binary { span, .. } => *span,
+            Expr::IntLit { span, .. } | Expr::Binary { span, .. } | Expr::Var { span, .. } => *span,
         }
     }
 
@@ -86,6 +104,7 @@ impl Expr {
         match self {
             Expr::IntLit { value, .. } => Expr::IntLit { value, span },
             Expr::Binary { op, lhs, rhs, .. } => Expr::Binary { op, lhs, rhs, span },
+            Expr::Var { name, .. } => Expr::Var { name, span },
         }
     }
 }
