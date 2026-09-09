@@ -1,6 +1,6 @@
 //! Emission: IR to TEAL text, in a single linear pass.
 
-use crate::ast::BinaryOp;
+use crate::ast::{BinaryOp, UnaryOp};
 use crate::diagnostics::{Diagnostic, DiagnosticKind, Diagnostics, Span};
 use crate::ir::{self, Function, Inst};
 use crate::typed_ast::Type;
@@ -127,7 +127,7 @@ fn check_versions(func: &Function, version: TealVersion, diags: &mut Diagnostics
 fn min_version(inst: &Inst) -> u8 {
     match inst {
         Inst::Const { .. } => 3,
-        Inst::Binary { .. } => 1,
+        Inst::Binary { .. } | Inst::Unary { .. } => 1,
         Inst::Store { .. } | Inst::Load { .. } => 8,
         Inst::Return { .. } => 4,
     }
@@ -143,6 +143,17 @@ fn opcode(inst: &Inst) -> &'static str {
             BinaryOp::Mul => "*",
             BinaryOp::Div => "/",
             BinaryOp::Mod => "%",
+            BinaryOp::Eq => "==",
+            BinaryOp::Ne => "!=",
+            BinaryOp::Lt => "<",
+            BinaryOp::Le => "<=",
+            BinaryOp::Gt => ">",
+            BinaryOp::Ge => ">=",
+            BinaryOp::And => "&&",
+            BinaryOp::Or => "||",
+        },
+        Inst::Unary { op, .. } => match op {
+            UnaryOp::Not => "!",
         },
         Inst::Store { .. } => "frame_bury",
         Inst::Load { .. } => "frame_dig",
@@ -160,7 +171,7 @@ fn line(inst: &Inst) -> String {
         Inst::Store { local, .. } | Inst::Load { local, .. } => {
             format!("{} {}", opcode(inst), local.0)
         }
-        Inst::Binary { .. } | Inst::Return { .. } => opcode(inst).to_string(),
+        Inst::Binary { .. } | Inst::Unary { .. } | Inst::Return { .. } => opcode(inst).to_string(),
     }
 }
 
@@ -262,6 +273,15 @@ mod tests {
             op,
             lhs: ValueId(lhs),
             rhs: ValueId(rhs),
+            span: ZERO,
+        }
+    }
+
+    fn unary(dest: u32, op: UnaryOp, operand: u32) -> Inst {
+        Inst::Unary {
+            dest: ValueId(dest),
+            op,
+            operand: ValueId(operand),
             span: ZERO,
         }
     }
@@ -435,6 +455,121 @@ mod tests {
                 unavailable("proto"),
                 unavailable("frame_bury"),
                 unavailable("frame_dig"),
+            ]
+        );
+    }
+
+    /// The five lines every hand-built program starts with, at version 10.
+    const PROLOGUE: &str = "#pragma version 10\n\
+                            callsub approval\n\
+                            return\n\
+                            approval:\n\
+                            proto 0 1\n";
+
+    #[test]
+    fn a_comparison_emits_its_mnemonic() {
+        let cases = [
+            (BinaryOp::Eq, "=="),
+            (BinaryOp::Ne, "!="),
+            (BinaryOp::Lt, "<"),
+            (BinaryOp::Le, "<="),
+            (BinaryOp::Gt, ">"),
+            (BinaryOp::Ge, ">="),
+        ];
+        for (op, mnemonic) in cases {
+            let insts = vec![constant(0, 1), constant(1, 2), binary(2, op, 0, 1), ret(2)];
+            assert_eq!(
+                hand_built_ok(Type::Bool, vec![], insts, 10),
+                format!("{PROLOGUE}pushint 1\npushint 2\n{mnemonic}\nretsub\n"),
+                "{op:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn logic_emits_its_mnemonic() {
+        for (op, mnemonic) in [(BinaryOp::And, "&&"), (BinaryOp::Or, "||")] {
+            let insts = vec![
+                constant_of(0, Type::Bool, 1),
+                constant_of(1, Type::Bool, 0),
+                binary(2, op, 0, 1),
+                ret(2),
+            ];
+            assert_eq!(
+                hand_built_ok(Type::Bool, vec![], insts, 10),
+                format!("{PROLOGUE}pushint 1\npushint 0\n{mnemonic}\nretsub\n"),
+                "{op:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn negation_emits_its_mnemonic() {
+        let insts = vec![
+            constant_of(0, Type::Bool, 1),
+            unary(1, UnaryOp::Not, 0),
+            ret(1),
+        ];
+        assert_eq!(
+            hand_built_ok(Type::Bool, vec![], insts, 10),
+            format!("{PROLOGUE}pushint 1\n!\nretsub\n")
+        );
+    }
+
+    #[test]
+    fn a_comparison_joined_by_logic() {
+        // `!(1 < 2 && true)`.
+        let insts = vec![
+            constant(0, 1),
+            constant(1, 2),
+            binary(2, BinaryOp::Lt, 0, 1),
+            constant_of(3, Type::Bool, 1),
+            binary(4, BinaryOp::And, 2, 3),
+            unary(5, UnaryOp::Not, 4),
+            ret(5),
+        ];
+        assert_eq!(
+            hand_built_ok(Type::Bool, vec![], insts, 10),
+            "#pragma version 10\n\
+             callsub approval\n\
+             return\n\
+             approval:\n\
+             proto 0 1\n\
+             pushint 1\n\
+             pushint 2\n\
+             <\n\
+             pushint 1\n\
+             &&\n\
+             !\n\
+             retsub\n"
+        );
+    }
+
+    #[test]
+    fn a_comparison_is_as_old_as_the_avm() {
+        // Only the opcodes around it are newer than version 2.
+        let unavailable = |opcode, min| Diagnostic {
+            kind: DiagnosticKind::OpcodeUnavailable {
+                opcode,
+                min,
+                target: 2,
+            },
+            span: ZERO,
+        };
+        let insts = vec![
+            constant(0, 1),
+            constant(1, 2),
+            binary(2, BinaryOp::Lt, 0, 1),
+            ret(2),
+        ];
+        assert_eq!(
+            hand_built_err(Type::Bool, vec![], insts, 2),
+            vec![
+                unavailable("callsub", 4),
+                unavailable("proto", 8),
+                unavailable("pushint", 3),
+                unavailable("pushint", 3),
+                unavailable("retsub", 4),
             ]
         );
     }

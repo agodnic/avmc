@@ -1,9 +1,9 @@
 //! The IR: a flat single-assignment instruction list, and the verifier that
 //! enforces its invariant.
 
-use crate::ast::BinaryOp;
+use crate::ast::{BinaryOp, UnaryOp};
 use crate::diagnostics::Span;
-use crate::typed_ast::{LocalId, Type};
+use crate::typed_ast::{LocalId, Type, operand_type, result_type};
 
 /// The value a defining instruction produces. Numbered per function.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -33,6 +33,17 @@ pub enum Inst {
         lhs: ValueId,
         /// The right operand, consumed second.
         rhs: ValueId,
+        /// The expression it came from.
+        span: Span,
+    },
+    /// Defines `dest` as `op operand`.
+    Unary {
+        /// The value it defines.
+        dest: ValueId,
+        /// The operator it applies.
+        op: UnaryOp,
+        /// The operand, consumed.
+        operand: ValueId,
         /// The expression it came from.
         span: Span,
     },
@@ -69,6 +80,7 @@ impl Inst {
         match self {
             Inst::Const { span, .. }
             | Inst::Binary { span, .. }
+            | Inst::Unary { span, .. }
             | Inst::Store { span, .. }
             | Inst::Load { span, .. }
             | Inst::Return { span, .. } => *span,
@@ -289,14 +301,30 @@ pub fn verify(func: &Function) -> Result<(), Violation> {
                 }
                 (dest, *ty)
             }
-            Inst::Binary { dest, lhs, rhs, .. } => {
-                consume(
-                    &mut stack,
-                    index,
-                    &[*lhs, *rhs],
-                    &[Type::Uint64, Type::Uint64],
-                )?;
-                (dest, Type::Uint64)
+            Inst::Binary {
+                dest, op, lhs, rhs, ..
+            } => {
+                // `Eq` and `Ne` need only that the operands agree, so the
+                // type to expect is the left operand's: the value second
+                // from the top. With no such value, `consume` reports the
+                // underflow before it looks at a type.
+                let ty = operand_type(*op).unwrap_or_else(|| {
+                    stack
+                        .iter()
+                        .rev()
+                        .nth(1)
+                        .map_or(Type::Uint64, |&(_, ty)| ty)
+                });
+                consume(&mut stack, index, &[*lhs, *rhs], &[ty, ty])?;
+                (dest, result_type(*op))
+            }
+            Inst::Unary {
+                dest, op, operand, ..
+            } => {
+                match op {
+                    UnaryOp::Not => consume(&mut stack, index, &[*operand], &[Type::Bool])?,
+                }
+                (dest, Type::Bool)
             }
             Inst::Store { local, value, .. } => {
                 let ty = slot(&func.locals, *local, index)?;
@@ -474,6 +502,15 @@ mod tests {
             op,
             lhs: ValueId(lhs),
             rhs: ValueId(rhs),
+            span: SPAN,
+        }
+    }
+
+    fn unary(dest: u32, op: UnaryOp, operand: u32) -> Inst {
+        Inst::Unary {
+            dest: ValueId(dest),
+            op,
+            operand: ValueId(operand),
             span: SPAN,
         }
     }
@@ -887,6 +924,315 @@ mod tests {
                 value: ValueId(0),
                 expected: ValueId(1),
             })
+        );
+    }
+
+    /// The six comparisons, which take two `uint64` and produce a `bool`.
+    const COMPARISONS: [BinaryOp; 6] = [
+        BinaryOp::Eq,
+        BinaryOp::Ne,
+        BinaryOp::Lt,
+        BinaryOp::Le,
+        BinaryOp::Gt,
+        BinaryOp::Ge,
+    ];
+
+    #[test]
+    fn a_comparison_of_two_uint64s_is_valid() {
+        for op in COMPARISONS {
+            assert_eq!(
+                verify(&shaped(
+                    Type::Bool,
+                    vec![],
+                    vec![constant(0, 1), constant(1, 2), binary(2, op, 0, 1), ret(2)]
+                )),
+                Ok(()),
+                "{op:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn returning_a_comparison_as_a_uint64_is_rejected() {
+        assert_eq!(
+            verify(&function(vec![
+                constant(0, 1),
+                constant(1, 2),
+                binary(2, BinaryOp::Lt, 0, 1),
+                ret(2),
+            ])),
+            Err(Violation::OperandType {
+                index: 3,
+                position: 0,
+                value: ValueId(2),
+                found: Type::Bool,
+                expected: Type::Uint64,
+            })
+        );
+    }
+
+    #[test]
+    fn equality_over_uint64s_still_yields_a_bool() {
+        assert_eq!(
+            verify(&function(vec![
+                constant(0, 1),
+                constant(1, 2),
+                binary(2, BinaryOp::Eq, 0, 1),
+                ret(2),
+            ])),
+            Err(Violation::OperandType {
+                index: 3,
+                position: 0,
+                value: ValueId(2),
+                found: Type::Bool,
+                expected: Type::Uint64,
+            })
+        );
+    }
+
+    #[test]
+    fn equality_over_two_bools_is_valid() {
+        for op in [BinaryOp::Eq, BinaryOp::Ne] {
+            assert_eq!(
+                verify(&shaped(
+                    Type::Bool,
+                    vec![],
+                    vec![
+                        constant_of(0, Type::Bool, 1),
+                        constant_of(1, Type::Bool, 0),
+                        binary(2, op, 0, 1),
+                        ret(2),
+                    ]
+                )),
+                Ok(()),
+                "{op:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn ordering_two_bools_is_rejected() {
+        assert_eq!(
+            verify(&shaped(
+                Type::Bool,
+                vec![],
+                vec![
+                    constant_of(0, Type::Bool, 1),
+                    constant_of(1, Type::Bool, 0),
+                    binary(2, BinaryOp::Lt, 0, 1),
+                    ret(2),
+                ]
+            )),
+            Err(Violation::OperandType {
+                index: 2,
+                position: 0,
+                value: ValueId(0),
+                found: Type::Bool,
+                expected: Type::Uint64,
+            })
+        );
+    }
+
+    #[test]
+    fn comparing_a_uint64_with_a_bool_is_rejected() {
+        assert_eq!(
+            verify(&shaped(
+                Type::Bool,
+                vec![],
+                vec![
+                    constant(0, 1),
+                    constant_of(1, Type::Bool, 1),
+                    binary(2, BinaryOp::Eq, 0, 1),
+                    ret(2),
+                ]
+            )),
+            Err(Violation::OperandType {
+                index: 2,
+                position: 1,
+                value: ValueId(1),
+                found: Type::Bool,
+                expected: Type::Uint64,
+            })
+        );
+    }
+
+    #[test]
+    fn comparing_a_bool_with_a_uint64_is_rejected() {
+        // The left operand fixes the type the right one must have.
+        assert_eq!(
+            verify(&shaped(
+                Type::Bool,
+                vec![],
+                vec![
+                    constant_of(0, Type::Bool, 1),
+                    constant(1, 1),
+                    binary(2, BinaryOp::Eq, 0, 1),
+                    ret(2),
+                ]
+            )),
+            Err(Violation::OperandType {
+                index: 2,
+                position: 1,
+                value: ValueId(1),
+                found: Type::Uint64,
+                expected: Type::Bool,
+            })
+        );
+    }
+
+    #[test]
+    fn an_equality_without_enough_live_values_is_rejected() {
+        assert_eq!(
+            verify(&shaped(
+                Type::Bool,
+                vec![],
+                vec![
+                    constant_of(0, Type::Bool, 1),
+                    binary(1, BinaryOp::Eq, 0, 1),
+                    ret(2),
+                ]
+            )),
+            Err(Violation::StackUnderflow {
+                index: 1,
+                needed: 2,
+                available: 1,
+            })
+        );
+    }
+
+    #[test]
+    fn logic_over_two_bools_is_valid() {
+        for op in [BinaryOp::And, BinaryOp::Or] {
+            assert_eq!(
+                verify(&shaped(
+                    Type::Bool,
+                    vec![],
+                    vec![
+                        constant_of(0, Type::Bool, 1),
+                        constant_of(1, Type::Bool, 0),
+                        binary(2, op, 0, 1),
+                        ret(2),
+                    ]
+                )),
+                Ok(()),
+                "{op:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn a_uint64_as_an_operand_of_logic_is_rejected() {
+        assert_eq!(
+            verify(&shaped(
+                Type::Bool,
+                vec![],
+                vec![
+                    constant(0, 1),
+                    constant_of(1, Type::Bool, 1),
+                    binary(2, BinaryOp::And, 0, 1),
+                    ret(2),
+                ]
+            )),
+            Err(Violation::OperandType {
+                index: 2,
+                position: 0,
+                value: ValueId(0),
+                found: Type::Uint64,
+                expected: Type::Bool,
+            })
+        );
+    }
+
+    #[test]
+    fn negating_a_bool_is_valid() {
+        assert_eq!(
+            verify(&shaped(
+                Type::Bool,
+                vec![],
+                vec![
+                    constant_of(0, Type::Bool, 1),
+                    unary(1, UnaryOp::Not, 0),
+                    ret(1),
+                ]
+            )),
+            Ok(())
+        );
+    }
+
+    #[test]
+    fn negating_a_uint64_is_rejected() {
+        assert_eq!(
+            verify(&shaped(
+                Type::Bool,
+                vec![],
+                vec![constant(0, 1), unary(1, UnaryOp::Not, 0), ret(1)]
+            )),
+            Err(Violation::OperandType {
+                index: 1,
+                position: 0,
+                value: ValueId(0),
+                found: Type::Uint64,
+                expected: Type::Bool,
+            })
+        );
+    }
+
+    #[test]
+    fn negating_without_a_live_value_is_rejected() {
+        assert_eq!(
+            verify(&shaped(
+                Type::Bool,
+                vec![],
+                vec![unary(0, UnaryOp::Not, 0), ret(1)]
+            )),
+            Err(Violation::StackUnderflow {
+                index: 0,
+                needed: 1,
+                available: 0,
+            })
+        );
+    }
+
+    #[test]
+    fn negating_a_value_that_is_not_on_top_is_rejected() {
+        assert_eq!(
+            verify(&shaped(
+                Type::Bool,
+                vec![],
+                vec![
+                    constant_of(0, Type::Bool, 1),
+                    constant_of(1, Type::Bool, 0),
+                    unary(2, UnaryOp::Not, 0),
+                    ret(2),
+                ]
+            )),
+            Err(Violation::UseOutOfOrder {
+                index: 2,
+                position: 0,
+                value: ValueId(0),
+                expected: ValueId(1),
+            })
+        );
+    }
+
+    #[test]
+    fn a_comparison_joined_by_logic_is_valid() {
+        // `!(1 < 2 && true)`.
+        assert_eq!(
+            verify(&shaped(
+                Type::Bool,
+                vec![],
+                vec![
+                    constant(0, 1),
+                    constant(1, 2),
+                    binary(2, BinaryOp::Lt, 0, 1),
+                    constant_of(3, Type::Bool, 1),
+                    binary(4, BinaryOp::And, 2, 3),
+                    unary(5, UnaryOp::Not, 4),
+                    ret(5),
+                ]
+            )),
+            Ok(())
         );
     }
 

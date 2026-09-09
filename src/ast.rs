@@ -120,7 +120,7 @@ impl Expr {
     }
 }
 
-/// A binary arithmetic operator.
+/// A binary operator.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum BinaryOp {
     /// `+`
@@ -133,4 +133,27 @@ pub enum BinaryOp {
     Div,
     /// `%`
     Mod,
+    /// `==`
+    Eq,
+    /// `!=`
+    Ne,
+    /// `<`
+    Lt,
+    /// `<=`
+    Le,
+    /// `>`
+    Gt,
+    /// `>=`
+    Ge,
+    /// `&&`
+    And,
+    /// `||`
+    Or,
+}
+
+/// A prefix operator.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum UnaryOp {
+    /// `!`
+    Not,
 }

@@ -24,6 +24,41 @@ impl std::fmt::Display for Type {
     }
 }
 
+/// The type both operands of `op` must have, or `None` if they need only
+/// agree with each other.
+pub fn operand_type(op: BinaryOp) -> Option<Type> {
+    match op {
+        BinaryOp::Add
+        | BinaryOp::Sub
+        | BinaryOp::Mul
+        | BinaryOp::Div
+        | BinaryOp::Mod
+        | BinaryOp::Lt
+        | BinaryOp::Le
+        | BinaryOp::Gt
+        | BinaryOp::Ge => Some(Type::Uint64),
+        BinaryOp::Eq | BinaryOp::Ne => None,
+        BinaryOp::And | BinaryOp::Or => Some(Type::Bool),
+    }
+}
+
+/// The type `op` produces.
+pub fn result_type(op: BinaryOp) -> Type {
+    match op {
+        BinaryOp::Add | BinaryOp::Sub | BinaryOp::Mul | BinaryOp::Div | BinaryOp::Mod => {
+            Type::Uint64
+        }
+        BinaryOp::Eq
+        | BinaryOp::Ne
+        | BinaryOp::Lt
+        | BinaryOp::Le
+        | BinaryOp::Gt
+        | BinaryOp::Ge
+        | BinaryOp::And
+        | BinaryOp::Or => Type::Bool,
+    }
+}
+
 /// A variable's position in its function's frame: declarations counted
 /// from 0.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -120,5 +155,48 @@ impl Expr {
     /// Where it was written.
     pub fn span(&self) -> Span {
         self.span
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn arithmetic_takes_and_produces_uint64() {
+        for op in [
+            BinaryOp::Add,
+            BinaryOp::Sub,
+            BinaryOp::Mul,
+            BinaryOp::Div,
+            BinaryOp::Mod,
+        ] {
+            assert_eq!(operand_type(op), Some(Type::Uint64), "{op:?}");
+            assert_eq!(result_type(op), Type::Uint64, "{op:?}");
+        }
+    }
+
+    #[test]
+    fn equality_takes_operands_that_agree() {
+        for op in [BinaryOp::Eq, BinaryOp::Ne] {
+            assert_eq!(operand_type(op), None, "{op:?}");
+            assert_eq!(result_type(op), Type::Bool, "{op:?}");
+        }
+    }
+
+    #[test]
+    fn ordering_takes_uint64_and_produces_bool() {
+        for op in [BinaryOp::Lt, BinaryOp::Le, BinaryOp::Gt, BinaryOp::Ge] {
+            assert_eq!(operand_type(op), Some(Type::Uint64), "{op:?}");
+            assert_eq!(result_type(op), Type::Bool, "{op:?}");
+        }
+    }
+
+    #[test]
+    fn logic_takes_and_produces_bool() {
+        for op in [BinaryOp::And, BinaryOp::Or] {
+            assert_eq!(operand_type(op), Some(Type::Bool), "{op:?}");
+            assert_eq!(result_type(op), Type::Bool, "{op:?}");
+        }
     }
 }
