@@ -251,6 +251,15 @@ fn describe(kind: TokenKind) -> &'static str {
         TokenKind::Slash => "`/`",
         TokenKind::Percent => "`%`",
         TokenKind::Equals => "`=`",
+        TokenKind::EqEq => "`==`",
+        TokenKind::BangEq => "`!=`",
+        TokenKind::Lt => "`<`",
+        TokenKind::LtEq => "`<=`",
+        TokenKind::Gt => "`>`",
+        TokenKind::GtEq => "`>=`",
+        TokenKind::Bang => "`!`",
+        TokenKind::AmpAmp => "`&&`",
+        TokenKind::PipePipe => "`||`",
     }
 }
 
@@ -637,6 +646,38 @@ mod tests {
                     found: "`+`",
                 },
                 span: span("+"),
+            }
+        );
+    }
+
+    #[test]
+    fn a_comparison_operator_is_not_an_operand() {
+        let source = "func f() uint64 { return == 1 }";
+        let mut span = spans(source);
+        assert_eq!(
+            parse_err(source),
+            Diagnostic {
+                kind: DiagnosticKind::UnexpectedToken {
+                    expected: OPERAND,
+                    found: "`==`",
+                },
+                span: span("=="),
+            }
+        );
+    }
+
+    #[test]
+    fn a_bang_is_not_an_operand() {
+        let source = "func f() uint64 { return ! }";
+        let mut span = spans(source);
+        assert_eq!(
+            parse_err(source),
+            Diagnostic {
+                kind: DiagnosticKind::UnexpectedToken {
+                    expected: OPERAND,
+                    found: "`!`",
+                },
+                span: span("!"),
             }
         );
     }
