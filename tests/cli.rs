@@ -142,6 +142,53 @@ fn compiles_variables_to_teal() {
 }
 
 #[test]
+fn compiles_booleans_to_teal() {
+    let file = SourceFile::new(
+        "compiles_booleans_to_teal",
+        "func approval() bool {\n  \
+           var ok bool = true\n  \
+           return ok\n\
+         }\n",
+    );
+    let output = run(&[file.path(), "--teal-version", "10"]);
+
+    assert_eq!(
+        stdout(&output),
+        "#pragma version 10\n\
+         callsub approval\n\
+         return\n\
+         approval:\n\
+         proto 0 1\n\
+         pushint 0\n\
+         pushint 1\n\
+         frame_bury 0\n\
+         frame_dig 0\n\
+         retsub\n"
+    );
+    assert_eq!(stderr(&output), "");
+    assert_eq!(code(&output), 0);
+}
+
+#[test]
+fn reports_a_boolean_in_arithmetic() {
+    let file = SourceFile::new(
+        "reports_a_boolean_in_arithmetic",
+        "func approval() uint64 {\n  return true + 1\n}\n",
+    );
+    let output = run(&[file.path(), "--teal-version", "10"]);
+
+    assert_eq!(stdout(&output), "");
+    assert_eq!(
+        stderr(&output),
+        format!(
+            "{}:2:10: error[E0015]: mismatched types: expected `uint64`, found `bool`\n",
+            file.path()
+        )
+    );
+    assert_eq!(code(&output), 1);
+}
+
+#[test]
 fn reports_an_undefined_variable() {
     let file = SourceFile::new(
         "reports_an_undefined_variable",

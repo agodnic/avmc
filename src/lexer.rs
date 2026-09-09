@@ -13,6 +13,10 @@ pub enum TokenKind {
     Return,
     /// The keyword `var`.
     Var,
+    /// The keyword `true`.
+    True,
+    /// The keyword `false`.
+    False,
     /// An identifier: `[A-Za-z_][A-Za-z0-9_]*`, keywords excluded.
     Ident,
     /// An integer literal: `[0-9]+`. The value is not parsed here.
@@ -81,6 +85,8 @@ pub fn lex(source: &str, diags: &mut Diagnostics) -> Option<Vec<Token>> {
                     Some("func") => TokenKind::Func,
                     Some("return") => TokenKind::Return,
                     Some("var") => TokenKind::Var,
+                    Some("true") => TokenKind::True,
+                    Some("false") => TokenKind::False,
                     _ => TokenKind::Ident,
                 };
                 tokens.push(token(kind, start, end));
@@ -330,6 +336,43 @@ mod tests {
                 token(TokenKind::Ident, 5, 13)
             ]
         );
+    }
+
+    #[test]
+    fn lexes_the_boolean_literals() {
+        let source = "return true";
+        let expected = spans(
+            source,
+            &[(TokenKind::Return, "return"), (TokenKind::True, "true")],
+        );
+        assert_eq!(lex_ok(source), expected);
+
+        let source = "var ok bool = false";
+        let expected = spans(
+            source,
+            &[
+                (TokenKind::Var, "var"),
+                (TokenKind::Ident, "ok"),
+                (TokenKind::Ident, "bool"),
+                (TokenKind::Equals, "="),
+                (TokenKind::False, "false"),
+            ],
+        );
+        assert_eq!(lex_ok(source), expected);
+    }
+
+    #[test]
+    fn only_the_whole_lowercase_keyword_is_a_boolean_literal() {
+        let source = "truest false_ True";
+        let expected = spans(
+            source,
+            &[
+                (TokenKind::Ident, "truest"),
+                (TokenKind::Ident, "false_"),
+                (TokenKind::Ident, "True"),
+            ],
+        );
+        assert_eq!(lex_ok(source), expected);
     }
 
     #[test]

@@ -372,6 +372,30 @@ mod tests {
     }
 
     #[test]
+    fn a_boolean_literal_is_compiled() {
+        assert_eq!(
+            emit_ok("func approval() bool { return true }", 10),
+            "#pragma version 10\n\
+             callsub approval\n\
+             return\n\
+             approval:\n\
+             proto 0 1\n\
+             pushint 1\n\
+             retsub\n"
+        );
+        assert_eq!(
+            emit_ok("func approval() bool { return false }", 10),
+            "#pragma version 10\n\
+             callsub approval\n\
+             return\n\
+             approval:\n\
+             proto 0 1\n\
+             pushint 0\n\
+             retsub\n"
+        );
+    }
+
+    #[test]
     fn a_bool_slot_starts_as_false() {
         // `var ok bool = true; return ok`, as a later slice will lower it.
         let insts = vec![

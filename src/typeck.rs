@@ -209,7 +209,8 @@ fn declare<'a>(
 }
 
 /// Checks one expression, giving it its type. A name that resolves to no
-/// variable is the one thing that can fail.
+/// variable and an operand of arithmetic that is not a `uint64` are what can
+/// fail.
 fn check_expr(
     expr: &ast::Expr,
     locals: &[(&str, Option<Type>)],
@@ -217,10 +218,16 @@ fn check_expr(
 ) -> Option<Expr> {
     let (kind, ty, span) = match expr {
         ast::Expr::IntLit { value, span } => (ExprKind::IntLit(*value), Type::Uint64, *span),
+        ast::Expr::BoolLit { value, span } => (ExprKind::BoolLit(*value), Type::Bool, *span),
         ast::Expr::Binary { op, lhs, rhs, span } => {
             // Both operands are checked, so both report.
             let lhs = check_expr(lhs, locals, diags);
             let rhs = check_expr(rhs, locals, diags);
+            // Arithmetic is on `uint64` alone.
+            let operand = Some(Type::Uint64);
+            let lhs_agrees = check_type(lhs.as_ref(), operand, diags);
+            let rhs_agrees = check_type(rhs.as_ref(), operand, diags);
+            (lhs_agrees && rhs_agrees).then_some(())?;
             (
                 ExprKind::Binary {
                     op: *op,
@@ -847,6 +854,180 @@ mod tests {
                     name: "bytes".to_string(),
                 },
                 span: span_of(&source, "bytes", 0),
+            }]
+        );
+    }
+
+    /// The example program of the booleans milestone.
+    const BOOLEANS: &str = "func approval() bool {\n  var ok bool = true\n  return ok\n}\n";
+
+    #[test]
+    fn checks_the_booleans_program() {
+        let source = BOOLEANS;
+        let mut span = spans(source);
+
+        span("func");
+        span("approval");
+        span("bool");
+
+        let var_start = span("var").start;
+        span("ok");
+        span("bool");
+        let literal = span("true");
+
+        let return_start = span("return").start;
+        let returned = span("ok");
+
+        assert_eq!(
+            check_ok(source).funcs[0].body,
+            vec![
+                Stmt::Var {
+                    local: LocalId(0),
+                    ty: Type::Bool,
+                    init: Expr {
+                        kind: ExprKind::BoolLit(true),
+                        ty: Type::Bool,
+                        span: literal,
+                    },
+                    span: Span {
+                        start: var_start,
+                        end: literal.end,
+                    },
+                },
+                Stmt::Return {
+                    expr: Expr {
+                        kind: ExprKind::Var(LocalId(0)),
+                        ty: Type::Bool,
+                        span: returned,
+                    },
+                    span: Span {
+                        start: return_start,
+                        end: returned.end,
+                    },
+                },
+            ]
+        );
+        assert_eq!(check_ok(source).funcs[0].ret, Type::Bool);
+    }
+
+    #[test]
+    fn a_returned_boolean_literal_may_be_the_return_type() {
+        let source = "func approval() bool { return false }";
+        assert_eq!(
+            check_ok(source).funcs[0].body,
+            vec![Stmt::Return {
+                expr: Expr {
+                    kind: ExprKind::BoolLit(false),
+                    ty: Type::Bool,
+                    span: span_of(source, "false", 0),
+                },
+                span: span_of(source, "return false", 0),
+            }]
+        );
+    }
+
+    #[test]
+    fn a_returned_boolean_literal_must_have_the_return_type() {
+        let source = wrap("return true");
+        assert_eq!(
+            check_err(&source),
+            vec![Diagnostic {
+                kind: DiagnosticKind::TypeMismatch {
+                    expected: Type::Uint64,
+                    found: Type::Bool,
+                },
+                span: span_of(&source, "true", 0),
+            }]
+        );
+    }
+
+    #[test]
+    fn a_boolean_left_operand_of_arithmetic_is_reported() {
+        let source = wrap("return true + 1");
+        assert_eq!(
+            check_err(&source),
+            vec![Diagnostic {
+                kind: DiagnosticKind::TypeMismatch {
+                    expected: Type::Uint64,
+                    found: Type::Bool,
+                },
+                span: span_of(&source, "true", 0),
+            }]
+        );
+    }
+
+    #[test]
+    fn a_boolean_right_operand_of_arithmetic_is_reported() {
+        let source = wrap("return 1 + true");
+        assert_eq!(
+            check_err(&source),
+            vec![Diagnostic {
+                kind: DiagnosticKind::TypeMismatch {
+                    expected: Type::Uint64,
+                    found: Type::Bool,
+                },
+                span: span_of(&source, "true", 0),
+            }]
+        );
+    }
+
+    #[test]
+    fn both_operands_of_arithmetic_are_reported_in_source_order() {
+        let source = wrap("return true * false");
+        let mut span = spans(&source);
+        let left = span("true");
+        let right = span("false");
+
+        let mismatch = Diagnostic {
+            kind: DiagnosticKind::TypeMismatch {
+                expected: Type::Uint64,
+                found: Type::Bool,
+            },
+            span: left,
+        };
+
+        assert_eq!(
+            check_err(&source),
+            vec![
+                mismatch.clone(),
+                Diagnostic {
+                    span: right,
+                    ..mismatch
+                },
+            ]
+        );
+    }
+
+    #[test]
+    fn a_failed_operand_reports_no_return_mismatch() {
+        let source = "func approval() bool { return true + 1 }";
+        assert_eq!(
+            check_err(source),
+            vec![Diagnostic {
+                kind: DiagnosticKind::TypeMismatch {
+                    expected: Type::Uint64,
+                    found: Type::Bool,
+                },
+                span: span_of(source, "true", 0),
+            }]
+        );
+    }
+
+    #[test]
+    fn a_boolean_variable_in_arithmetic_is_reported() {
+        let source = wrap("var x bool = true var y uint64 = x + 1 return y");
+        let mut span = spans(&source);
+        span("x");
+        span("true");
+
+        assert_eq!(
+            check_err(&source),
+            vec![Diagnostic {
+                kind: DiagnosticKind::TypeMismatch {
+                    expected: Type::Uint64,
+                    found: Type::Bool,
+                },
+                span: span("x"),
             }]
         );
     }
