@@ -1,8 +1,8 @@
 //! The typed AST: the type checker's output, an AST in which every expression
 //! has a resolved type.
 
-use crate::ast::{BinaryOp, Name, UnaryOp};
-use crate::diagnostics::Span;
+use crate::ast;
+use crate::diagnostics;
 
 /// A resolved type.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -26,36 +26,38 @@ impl std::fmt::Display for Type {
 
 /// The type both operands of `op` must have, or `None` if they need only
 /// agree with each other.
-pub fn operand_type(op: BinaryOp) -> Option<Type> {
+pub fn operand_type(op: ast::BinaryOp) -> Option<Type> {
     match op {
-        BinaryOp::Add
-        | BinaryOp::Sub
-        | BinaryOp::Mul
-        | BinaryOp::Div
-        | BinaryOp::Mod
-        | BinaryOp::Lt
-        | BinaryOp::Le
-        | BinaryOp::Gt
-        | BinaryOp::Ge => Some(Type::Uint64),
-        BinaryOp::Eq | BinaryOp::Ne => None,
-        BinaryOp::And | BinaryOp::Or => Some(Type::Bool),
+        ast::BinaryOp::Add
+        | ast::BinaryOp::Sub
+        | ast::BinaryOp::Mul
+        | ast::BinaryOp::Div
+        | ast::BinaryOp::Mod
+        | ast::BinaryOp::Lt
+        | ast::BinaryOp::Le
+        | ast::BinaryOp::Gt
+        | ast::BinaryOp::Ge => Some(Type::Uint64),
+        ast::BinaryOp::Eq | ast::BinaryOp::Ne => None,
+        ast::BinaryOp::And | ast::BinaryOp::Or => Some(Type::Bool),
     }
 }
 
 /// The type `op` produces.
-pub fn result_type(op: BinaryOp) -> Type {
+pub fn result_type(op: ast::BinaryOp) -> Type {
     match op {
-        BinaryOp::Add | BinaryOp::Sub | BinaryOp::Mul | BinaryOp::Div | BinaryOp::Mod => {
-            Type::Uint64
-        }
-        BinaryOp::Eq
-        | BinaryOp::Ne
-        | BinaryOp::Lt
-        | BinaryOp::Le
-        | BinaryOp::Gt
-        | BinaryOp::Ge
-        | BinaryOp::And
-        | BinaryOp::Or => Type::Bool,
+        ast::BinaryOp::Add
+        | ast::BinaryOp::Sub
+        | ast::BinaryOp::Mul
+        | ast::BinaryOp::Div
+        | ast::BinaryOp::Mod => Type::Uint64,
+        ast::BinaryOp::Eq
+        | ast::BinaryOp::Ne
+        | ast::BinaryOp::Lt
+        | ast::BinaryOp::Le
+        | ast::BinaryOp::Gt
+        | ast::BinaryOp::Ge
+        | ast::BinaryOp::And
+        | ast::BinaryOp::Or => Type::Bool,
     }
 }
 
@@ -88,13 +90,13 @@ pub struct Program {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct FuncDecl {
     /// The declared name.
-    pub name: Name,
+    pub name: ast::Name,
     /// The resolved return type.
     pub ret: Type,
     /// The statements in the body, in source order.
     pub body: Vec<Stmt>,
     /// From `func` through the closing `}`.
-    pub span: Span,
+    pub span: diagnostics::Span,
 }
 
 /// A statement.
@@ -109,14 +111,14 @@ pub enum Stmt {
         /// The initializer.
         init: Expr,
         /// From `var` through the initializer.
-        span: Span,
+        span: diagnostics::Span,
     },
     /// `return expr`.
     Return {
         /// The returned expression.
         expr: Expr,
         /// From `return` through the expression.
-        span: Span,
+        span: diagnostics::Span,
     },
 }
 
@@ -128,7 +130,7 @@ pub struct Expr {
     /// The type it has.
     pub ty: Type,
     /// Where it was written.
-    pub span: Span,
+    pub span: diagnostics::Span,
 }
 
 /// The kinds of expression.
@@ -141,7 +143,7 @@ pub enum ExprKind {
     /// A binary operation.
     Binary {
         /// The operator it applies.
-        op: BinaryOp,
+        op: ast::BinaryOp,
         /// The left operand.
         lhs: Box<Expr>,
         /// The right operand.
@@ -150,7 +152,7 @@ pub enum ExprKind {
     /// A prefix operation.
     Unary {
         /// The operator it applies.
-        op: UnaryOp,
+        op: ast::UnaryOp,
         /// The operand.
         operand: Box<Expr>,
     },
@@ -160,7 +162,7 @@ pub enum ExprKind {
 
 impl Expr {
     /// Where it was written.
-    pub fn span(&self) -> Span {
+    pub fn span(&self) -> diagnostics::Span {
         self.span
     }
 }
@@ -172,11 +174,11 @@ mod tests {
     #[test]
     fn arithmetic_takes_and_produces_uint64() {
         for op in [
-            BinaryOp::Add,
-            BinaryOp::Sub,
-            BinaryOp::Mul,
-            BinaryOp::Div,
-            BinaryOp::Mod,
+            ast::BinaryOp::Add,
+            ast::BinaryOp::Sub,
+            ast::BinaryOp::Mul,
+            ast::BinaryOp::Div,
+            ast::BinaryOp::Mod,
         ] {
             assert_eq!(operand_type(op), Some(Type::Uint64), "{op:?}");
             assert_eq!(result_type(op), Type::Uint64, "{op:?}");
@@ -185,7 +187,7 @@ mod tests {
 
     #[test]
     fn equality_takes_operands_that_agree() {
-        for op in [BinaryOp::Eq, BinaryOp::Ne] {
+        for op in [ast::BinaryOp::Eq, ast::BinaryOp::Ne] {
             assert_eq!(operand_type(op), None, "{op:?}");
             assert_eq!(result_type(op), Type::Bool, "{op:?}");
         }
@@ -193,7 +195,12 @@ mod tests {
 
     #[test]
     fn ordering_takes_uint64_and_produces_bool() {
-        for op in [BinaryOp::Lt, BinaryOp::Le, BinaryOp::Gt, BinaryOp::Ge] {
+        for op in [
+            ast::BinaryOp::Lt,
+            ast::BinaryOp::Le,
+            ast::BinaryOp::Gt,
+            ast::BinaryOp::Ge,
+        ] {
             assert_eq!(operand_type(op), Some(Type::Uint64), "{op:?}");
             assert_eq!(result_type(op), Type::Bool, "{op:?}");
         }
@@ -201,7 +208,7 @@ mod tests {
 
     #[test]
     fn logic_takes_and_produces_bool() {
-        for op in [BinaryOp::And, BinaryOp::Or] {
+        for op in [ast::BinaryOp::And, ast::BinaryOp::Or] {
             assert_eq!(operand_type(op), Some(Type::Bool), "{op:?}");
             assert_eq!(result_type(op), Type::Bool, "{op:?}");
         }

@@ -3,8 +3,8 @@
 use std::io::{self, Write};
 use std::process::ExitCode;
 
-use avmc::diagnostics::Diagnostics;
-use avmc::driver::{compile, render};
+use avmc::diagnostics;
+use avmc::driver;
 
 /// The usage line the binary reports for any bad argument list.
 const USAGE: &str = "usage: avmc <file>";
@@ -29,11 +29,11 @@ fn main() -> ExitCode {
         }
     };
 
-    let mut diags = Diagnostics::default();
-    let teal = compile(&source, &mut diags);
+    let mut diags = diagnostics::Diagnostics::default();
+    let teal = driver::compile(&source, &mut diags);
     // Warnings are reported for a source file that compiles too.
     for diagnostic in diags.iter() {
-        report(&render(diagnostic, &path, &source));
+        report(&driver::render(diagnostic, &path, &source));
     }
     let Some(teal) = teal else {
         return ExitCode::from(COMPILE_ERRORS);

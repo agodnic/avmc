@@ -1,6 +1,6 @@
 //! The AST: the parser's output, mirroring the surface syntax.
 
-use crate::diagnostics::Span;
+use crate::diagnostics;
 
 /// A whole source file.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -19,7 +19,7 @@ pub struct FuncDecl {
     /// The statements in the body, in source order.
     pub body: Vec<Stmt>,
     /// From `func` through the closing `}`.
-    pub span: Span,
+    pub span: diagnostics::Span,
 }
 
 /// An identifier and where it was written.
@@ -28,7 +28,7 @@ pub struct Name {
     /// The identifier text, sliced from the source.
     pub text: String,
     /// Where it was written.
-    pub span: Span,
+    pub span: diagnostics::Span,
 }
 
 /// A written type. Unresolved: nothing checks that the name names a type.
@@ -50,14 +50,14 @@ pub enum Stmt {
         /// The initializer.
         init: Expr,
         /// From `var` through the initializer.
-        span: Span,
+        span: diagnostics::Span,
     },
     /// `return expr`.
     Return {
         /// The returned expression.
         expr: Expr,
         /// From `return` through the expression.
-        span: Span,
+        span: diagnostics::Span,
     },
 }
 
@@ -69,14 +69,14 @@ pub enum Expr {
         /// Its value.
         value: u64,
         /// Where it was written.
-        span: Span,
+        span: diagnostics::Span,
     },
     /// A boolean literal.
     BoolLit {
         /// Its value.
         value: bool,
         /// Where it was written.
-        span: Span,
+        span: diagnostics::Span,
     },
     /// Two operands joined by a binary operator.
     Binary {
@@ -87,7 +87,7 @@ pub enum Expr {
         /// The right operand.
         rhs: Box<Expr>,
         /// From the first byte of `lhs` through the last byte of `rhs`.
-        span: Span,
+        span: diagnostics::Span,
     },
     /// A prefix operator applied to an operand.
     Unary {
@@ -96,20 +96,20 @@ pub enum Expr {
         /// The operand.
         operand: Box<Expr>,
         /// From the operator through the last byte of `operand`.
-        span: Span,
+        span: diagnostics::Span,
     },
     /// A variable, by name.
     Var {
         /// The name it was written as.
         name: Name,
         /// `name.span`, unless parentheses widened it.
-        span: Span,
+        span: diagnostics::Span,
     },
 }
 
 impl Expr {
     /// Where it was written.
-    pub fn span(&self) -> Span {
+    pub fn span(&self) -> diagnostics::Span {
         match self {
             Expr::IntLit { span, .. }
             | Expr::BoolLit { span, .. }
@@ -120,7 +120,7 @@ impl Expr {
     }
 
     /// The same expression, written at `span`.
-    pub fn with_span(self, span: Span) -> Expr {
+    pub fn with_span(self, span: diagnostics::Span) -> Expr {
         match self {
             Expr::IntLit { value, .. } => Expr::IntLit { value, span },
             Expr::BoolLit { value, .. } => Expr::BoolLit { value, span },

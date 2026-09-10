@@ -1,9 +1,9 @@
 //! Emission: IR to TEAL text, in a single linear pass.
 
-use crate::ast::{BinaryOp, UnaryOp};
-use crate::diagnostics::{Diagnostic, DiagnosticKind, Diagnostics, Span};
-use crate::ir::{self, Function, Inst};
-use crate::typed_ast::Type;
+use crate::ast;
+use crate::diagnostics;
+use crate::ir;
+use crate::typed_ast;
 
 /// The TEAL version the output targets: the one MainNet runs.
 const TEAL_VERSION: u8 = 13;
@@ -16,7 +16,7 @@ const ENTRY_POINT: &str = "approval";
 ///
 /// Any other function is dead code — nothing can call it yet — and is not
 /// emitted.
-pub fn emit(program: &ir::Program, diags: &mut Diagnostics) -> Option<String> {
+pub fn emit(program: &ir::Program, diags: &mut diagnostics::Diagnostics) -> Option<String> {
     let entry = entry_point(program, diags)?;
 
     let mut teal = format!("#pragma version {TEAL_VERSION}\ncallsub {ENTRY_POINT}\nreturn\n");
@@ -25,7 +25,7 @@ pub fn emit(program: &ir::Program, diags: &mut Diagnostics) -> Option<String> {
 }
 
 /// The subroutine for `func`: its label, its frame, and its body.
-fn function(func: &Function) -> String {
+fn function(func: &ir::Function) -> String {
     let mut teal = format!("{}:\nproto 0 1\n", func.name);
     for ty in &func.locals {
         teal.push_str(placeholder(*ty));
@@ -39,52 +39,55 @@ fn function(func: &Function) -> String {
 }
 
 /// The line that allocates a frame slot of type `ty`.
-fn placeholder(ty: Type) -> &'static str {
+fn placeholder(ty: typed_ast::Type) -> &'static str {
     match ty {
-        Type::Uint64 => "pushint 0",
-        Type::Bool => "pushint 0",
+        typed_ast::Type::Uint64 => "pushint 0",
+        typed_ast::Type::Bool => "pushint 0",
     }
 }
 
 /// Finds the entry point, reporting it if there is none.
-fn entry_point<'a>(program: &'a ir::Program, diags: &mut Diagnostics) -> Option<&'a Function> {
+fn entry_point<'a>(
+    program: &'a ir::Program,
+    diags: &mut diagnostics::Diagnostics,
+) -> Option<&'a ir::Function> {
     let entry = program.funcs.iter().find(|func| func.name == ENTRY_POINT);
 
     if entry.is_none() {
-        diags.push(Diagnostic {
-            kind: DiagnosticKind::MissingEntryPoint { name: ENTRY_POINT },
+        diags.push(diagnostics::Diagnostic {
+            kind: diagnostics::DiagnosticKind::MissingEntryPoint { name: ENTRY_POINT },
             // There is no token to point at.
-            span: Span { start: 0, end: 0 },
+            span: diagnostics::Span { start: 0, end: 0 },
         });
     }
     entry
 }
 
 /// The opcode an instruction emits.
-fn opcode(inst: &Inst) -> &'static str {
+fn opcode(inst: &ir::Inst) -> &'static str {
     match inst {
-        Inst::Const { .. } => "pushint",
-        Inst::Binary { op, .. } => match op {
-            BinaryOp::Add => "+",
-            BinaryOp::Sub => "-",
-            BinaryOp::Mul => "*",
-            BinaryOp::Div => "/",
-            BinaryOp::Mod => "%",
-            BinaryOp::Eq => "==",
-            BinaryOp::Ne => "!=",
-            BinaryOp::Lt => "<",
-            BinaryOp::Le => "<=",
-            BinaryOp::Gt => ">",
-            BinaryOp::Ge => ">=",
-            BinaryOp::And => "&&",
-            BinaryOp::Or => "||",
+        ir::Inst::Const { .. } => "pushint",
+        ir::Inst::Binary { op, .. } => match op {
+            ast::BinaryOp::Add => "+",
+            ast::BinaryOp::Sub => "-",
+            ast::BinaryOp::Mul => "*",
+            ast::BinaryOp::Div => "/",
+            ast::BinaryOp::Mod => "%",
+            ast::BinaryOp::Eq => "==",
+            ast::BinaryOp::Ne => "!=",
+            ast::BinaryOp::Lt => "<",
+            ast::BinaryOp::Le => "<=",
+            ast::BinaryOp::Gt => ">",
+            ast::BinaryOp::Ge => ">=",
+            ast::BinaryOp::And => "&&",
+            ast::BinaryOp::Or => "||",
         },
-        Inst::Unary { op, .. } => match op {
-            UnaryOp::Not => "!",
+        ir::Inst::Unary { op, .. } => match op {
+            ast::UnaryOp::Not => "!",
         },
-        Inst::Store { .. } => "frame_bury",
-        Inst::Load { .. } => "frame_dig",
-        Inst::Return { .. } => "retsub",
+        ir::Inst::Store { .. } => "frame_bury",
+        ir::Inst::Load { .. } => "frame_dig",
+        ir::Inst::Return { .. } => "retsub",
     }
 }
 
@@ -92,30 +95,30 @@ fn opcode(inst: &Inst) -> &'static str {
 ///
 /// `ValueId`s are not consulted: every instruction consumes its operands from
 /// the top of the stack, where the instructions that defined them left them.
-fn line(inst: &Inst) -> String {
+fn line(inst: &ir::Inst) -> String {
     match inst {
-        Inst::Const { value, .. } => format!("{} {value}", opcode(inst)),
-        Inst::Store { local, .. } | Inst::Load { local, .. } => {
+        ir::Inst::Const { value, .. } => format!("{} {value}", opcode(inst)),
+        ir::Inst::Store { local, .. } | ir::Inst::Load { local, .. } => {
             format!("{} {}", opcode(inst), local.0)
         }
-        Inst::Binary { .. } | Inst::Unary { .. } | Inst::Return { .. } => opcode(inst).to_string(),
+        ir::Inst::Binary { .. } | ir::Inst::Unary { .. } | ir::Inst::Return { .. } => {
+            opcode(inst).to_string()
+        }
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::ir::ValueId;
-    use crate::lower::lower;
-    use crate::testing::{EXAMPLE, lex_parse_check};
-    use crate::typed_ast::LocalId;
+    use crate::lower;
+    use crate::testing;
 
     /// The span every hand-built instruction carries.
-    const ZERO: Span = Span { start: 0, end: 0 };
+    const ZERO: diagnostics::Span = diagnostics::Span { start: 0, end: 0 };
 
     /// Emits `source`, asserting that it produced no diagnostics.
     fn emit_ok(source: &str) -> String {
-        let mut diags = Diagnostics::default();
+        let mut diags = diagnostics::Diagnostics::default();
         let teal = pipeline(source, &mut diags);
         assert!(diags.is_empty());
         teal.expect("emission succeeded")
@@ -123,14 +126,15 @@ mod tests {
 
     /// Emits `source`, asserting that it emitted nothing, and returning the
     /// diagnostics in the order they were reported.
-    fn emit_err(source: &str) -> Vec<Diagnostic> {
-        let mut diags = Diagnostics::default();
+    fn emit_err(source: &str) -> Vec<diagnostics::Diagnostic> {
+        let mut diags = diagnostics::Diagnostics::default();
         assert_eq!(pipeline(source, &mut diags), None);
         diags.iter().cloned().collect()
     }
 
-    fn pipeline(source: &str, diags: &mut Diagnostics) -> Option<String> {
-        let ir = lower(&lex_parse_check(source), diags).expect("lowering succeeded");
+    fn pipeline(source: &str, diags: &mut diagnostics::Diagnostics) -> Option<String> {
+        let ir =
+            lower::lower(&testing::lex_parse_check(source), diags).expect("lowering succeeded");
         emit(&ir, diags)
     }
 
@@ -138,9 +142,13 @@ mod tests {
     /// `ret`, with `locals` as its frame and `insts` as its body, at the zero
     /// span throughout. `emit_ok` and `emit_err` go through source, which
     /// cannot produce a frame yet.
-    fn hand_built(ret: Type, locals: Vec<Type>, insts: Vec<Inst>) -> String {
+    fn hand_built(
+        ret: typed_ast::Type,
+        locals: Vec<typed_ast::Type>,
+        insts: Vec<ir::Inst>,
+    ) -> String {
         let program = ir::Program {
-            funcs: vec![Function {
+            funcs: vec![ir::Function {
                 name: ENTRY_POINT.to_string(),
                 ret,
                 locals,
@@ -148,76 +156,80 @@ mod tests {
                 span: ZERO,
             }],
         };
-        let mut diags = Diagnostics::default();
+        let mut diags = diagnostics::Diagnostics::default();
         let teal = emit(&program, &mut diags);
         assert!(diags.is_empty());
         teal.expect("emission succeeded")
     }
 
-    fn constant(dest: u32, value: u64) -> Inst {
-        constant_of(dest, Type::Uint64, value)
+    fn constant(dest: u32, value: u64) -> ir::Inst {
+        constant_of(dest, typed_ast::Type::Uint64, value)
     }
 
-    fn constant_of(dest: u32, ty: Type, value: u64) -> Inst {
-        Inst::Const {
-            dest: ValueId(dest),
+    fn constant_of(dest: u32, ty: typed_ast::Type, value: u64) -> ir::Inst {
+        ir::Inst::Const {
+            dest: ir::ValueId(dest),
             ty,
             value,
             span: ZERO,
         }
     }
 
-    fn binary(dest: u32, op: BinaryOp, lhs: u32, rhs: u32) -> Inst {
-        Inst::Binary {
-            dest: ValueId(dest),
+    fn binary(dest: u32, op: ast::BinaryOp, lhs: u32, rhs: u32) -> ir::Inst {
+        ir::Inst::Binary {
+            dest: ir::ValueId(dest),
             op,
-            lhs: ValueId(lhs),
-            rhs: ValueId(rhs),
+            lhs: ir::ValueId(lhs),
+            rhs: ir::ValueId(rhs),
             span: ZERO,
         }
     }
 
-    fn unary(dest: u32, op: UnaryOp, operand: u32) -> Inst {
-        Inst::Unary {
-            dest: ValueId(dest),
+    fn unary(dest: u32, op: ast::UnaryOp, operand: u32) -> ir::Inst {
+        ir::Inst::Unary {
+            dest: ir::ValueId(dest),
             op,
-            operand: ValueId(operand),
+            operand: ir::ValueId(operand),
             span: ZERO,
         }
     }
 
-    fn store(local: u8, value: u32) -> Inst {
-        Inst::Store {
-            local: LocalId(local),
-            value: ValueId(value),
+    fn store(local: u8, value: u32) -> ir::Inst {
+        ir::Inst::Store {
+            local: typed_ast::LocalId(local),
+            value: ir::ValueId(value),
             span: ZERO,
         }
     }
 
-    fn load(dest: u32, local: u8) -> Inst {
-        Inst::Load {
-            dest: ValueId(dest),
-            local: LocalId(local),
+    fn load(dest: u32, local: u8) -> ir::Inst {
+        ir::Inst::Load {
+            dest: ir::ValueId(dest),
+            local: typed_ast::LocalId(local),
             span: ZERO,
         }
     }
 
-    fn ret(value: u32) -> Inst {
-        Inst::Return {
-            value: ValueId(value),
+    fn ret(value: u32) -> ir::Inst {
+        ir::Inst::Return {
+            value: ir::ValueId(value),
             span: ZERO,
         }
     }
 
     /// `var x uint64 = 1; return x`, as the next slice will lower it.
-    fn one_slot() -> Vec<Inst> {
+    fn one_slot() -> Vec<ir::Inst> {
         vec![constant(0, 1), store(0, 0), load(1, 0), ret(1)]
     }
 
     #[test]
     fn a_frame_slot_is_allocated_and_addressed() {
         assert_eq!(
-            hand_built(Type::Uint64, vec![Type::Uint64], one_slot()),
+            hand_built(
+                typed_ast::Type::Uint64,
+                vec![typed_ast::Type::Uint64],
+                one_slot()
+            ),
             "#pragma version 13\n\
              callsub approval\n\
              return\n\
@@ -237,19 +249,23 @@ mod tests {
         let insts = vec![
             constant(0, 1),
             constant(1, 2),
-            binary(2, BinaryOp::Add, 0, 1),
+            binary(2, ast::BinaryOp::Add, 0, 1),
             store(0, 2),
             load(3, 0),
             constant(4, 3),
-            binary(5, BinaryOp::Mul, 3, 4),
+            binary(5, ast::BinaryOp::Mul, 3, 4),
             store(1, 5),
             load(6, 1),
             load(7, 0),
-            binary(8, BinaryOp::Sub, 6, 7),
+            binary(8, ast::BinaryOp::Sub, 6, 7),
             ret(8),
         ];
         assert_eq!(
-            hand_built(Type::Uint64, vec![Type::Uint64; 2], insts),
+            hand_built(
+                typed_ast::Type::Uint64,
+                vec![typed_ast::Type::Uint64; 2],
+                insts
+            ),
             "#pragma version 13\n\
              callsub approval\n\
              return\n\
@@ -276,9 +292,9 @@ mod tests {
     fn a_bool_constant_is_returned() {
         assert_eq!(
             hand_built(
-                Type::Bool,
+                typed_ast::Type::Bool,
                 vec![],
-                vec![constant_of(0, Type::Bool, 1), ret(0)]
+                vec![constant_of(0, typed_ast::Type::Bool, 1), ret(0)]
             ),
             "#pragma version 13\n\
              callsub approval\n\
@@ -318,13 +334,13 @@ mod tests {
     fn a_bool_slot_starts_as_false() {
         // `var ok bool = true; return ok`, as a later slice will lower it.
         let insts = vec![
-            constant_of(0, Type::Bool, 1),
+            constant_of(0, typed_ast::Type::Bool, 1),
             store(0, 0),
             load(1, 0),
             ret(1),
         ];
         assert_eq!(
-            hand_built(Type::Bool, vec![Type::Bool], insts),
+            hand_built(typed_ast::Type::Bool, vec![typed_ast::Type::Bool], insts),
             "#pragma version 13\n\
              callsub approval\n\
              return\n\
@@ -348,17 +364,17 @@ mod tests {
     #[test]
     fn a_comparison_emits_its_mnemonic() {
         let cases = [
-            (BinaryOp::Eq, "=="),
-            (BinaryOp::Ne, "!="),
-            (BinaryOp::Lt, "<"),
-            (BinaryOp::Le, "<="),
-            (BinaryOp::Gt, ">"),
-            (BinaryOp::Ge, ">="),
+            (ast::BinaryOp::Eq, "=="),
+            (ast::BinaryOp::Ne, "!="),
+            (ast::BinaryOp::Lt, "<"),
+            (ast::BinaryOp::Le, "<="),
+            (ast::BinaryOp::Gt, ">"),
+            (ast::BinaryOp::Ge, ">="),
         ];
         for (op, mnemonic) in cases {
             let insts = vec![constant(0, 1), constant(1, 2), binary(2, op, 0, 1), ret(2)];
             assert_eq!(
-                hand_built(Type::Bool, vec![], insts),
+                hand_built(typed_ast::Type::Bool, vec![], insts),
                 format!("{PROLOGUE}pushint 1\npushint 2\n{mnemonic}\nretsub\n"),
                 "{op:?}"
             );
@@ -367,15 +383,15 @@ mod tests {
 
     #[test]
     fn logic_emits_its_mnemonic() {
-        for (op, mnemonic) in [(BinaryOp::And, "&&"), (BinaryOp::Or, "||")] {
+        for (op, mnemonic) in [(ast::BinaryOp::And, "&&"), (ast::BinaryOp::Or, "||")] {
             let insts = vec![
-                constant_of(0, Type::Bool, 1),
-                constant_of(1, Type::Bool, 0),
+                constant_of(0, typed_ast::Type::Bool, 1),
+                constant_of(1, typed_ast::Type::Bool, 0),
                 binary(2, op, 0, 1),
                 ret(2),
             ];
             assert_eq!(
-                hand_built(Type::Bool, vec![], insts),
+                hand_built(typed_ast::Type::Bool, vec![], insts),
                 format!("{PROLOGUE}pushint 1\npushint 0\n{mnemonic}\nretsub\n"),
                 "{op:?}"
             );
@@ -385,12 +401,12 @@ mod tests {
     #[test]
     fn negation_emits_its_mnemonic() {
         let insts = vec![
-            constant_of(0, Type::Bool, 1),
-            unary(1, UnaryOp::Not, 0),
+            constant_of(0, typed_ast::Type::Bool, 1),
+            unary(1, ast::UnaryOp::Not, 0),
             ret(1),
         ];
         assert_eq!(
-            hand_built(Type::Bool, vec![], insts),
+            hand_built(typed_ast::Type::Bool, vec![], insts),
             format!("{PROLOGUE}pushint 1\n!\nretsub\n")
         );
     }
@@ -401,14 +417,14 @@ mod tests {
         let insts = vec![
             constant(0, 1),
             constant(1, 2),
-            binary(2, BinaryOp::Lt, 0, 1),
-            constant_of(3, Type::Bool, 1),
-            binary(4, BinaryOp::And, 2, 3),
-            unary(5, UnaryOp::Not, 4),
+            binary(2, ast::BinaryOp::Lt, 0, 1),
+            constant_of(3, typed_ast::Type::Bool, 1),
+            binary(4, ast::BinaryOp::And, 2, 3),
+            unary(5, ast::UnaryOp::Not, 4),
             ret(5),
         ];
         assert_eq!(
-            hand_built(Type::Bool, vec![], insts),
+            hand_built(typed_ast::Type::Bool, vec![], insts),
             "#pragma version 13\n\
              callsub approval\n\
              return\n\
@@ -427,7 +443,7 @@ mod tests {
     #[test]
     fn example_program() {
         assert_eq!(
-            emit_ok(EXAMPLE),
+            emit_ok(testing::EXAMPLE),
             "#pragma version 13\ncallsub approval\nreturn\napproval:\nproto 0 1\npushint 1\nretsub\n"
         );
     }
@@ -490,9 +506,9 @@ mod tests {
     fn missing_entry_point() {
         assert_eq!(
             emit_err("func f() uint64 { return 1 }"),
-            vec![Diagnostic {
-                kind: DiagnosticKind::MissingEntryPoint { name: "approval" },
-                span: Span { start: 0, end: 0 },
+            vec![diagnostics::Diagnostic {
+                kind: diagnostics::DiagnosticKind::MissingEntryPoint { name: "approval" },
+                span: diagnostics::Span { start: 0, end: 0 },
             }]
         );
     }
@@ -501,9 +517,9 @@ mod tests {
     fn empty_input() {
         assert_eq!(
             emit_err(""),
-            vec![Diagnostic {
-                kind: DiagnosticKind::MissingEntryPoint { name: "approval" },
-                span: Span { start: 0, end: 0 },
+            vec![diagnostics::Diagnostic {
+                kind: diagnostics::DiagnosticKind::MissingEntryPoint { name: "approval" },
+                span: diagnostics::Span { start: 0, end: 0 },
             }]
         );
     }
