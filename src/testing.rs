@@ -47,7 +47,8 @@ pub(crate) fn name(text: &str, span: diag::Span) -> ast::Name {
 pub(crate) fn lex_parse(source: &str) -> ast::Program {
     let mut diags = diag::Sink::default();
     let tokens = token::lex(source, &mut diags).expect("lexing succeeded");
-    let program = parser::parse(source, &tokens, &mut diags).expect("parsing succeeded");
+    let parsed = parser::parse(&tokens, &mut diags).expect("parsing succeeded");
+    let program = ast::from_cst(source, &parsed, &mut diags).expect("the AST was built");
     assert!(diags.is_empty());
     program
 }

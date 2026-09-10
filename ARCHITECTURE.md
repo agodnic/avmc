@@ -16,7 +16,9 @@ the features built on it — a new feature is not a reason to extend it.
    ┌────▼─────┐
    │  token   │  text ──────────────► tokens + spans
    ├──────────┤
-   │  parser  │  tokens ────────────► AST
+   │  parser  │  tokens ────────────► CST
+   ├──────────┤
+   │   ast    │  CST ───────────────► AST
    ├──────────┤
    │  typeck  │  AST ───────────────► typed AST
    ├──────────┤
@@ -29,8 +31,10 @@ the features built on it — a new feature is not a reason to extend it.
 ```
 
 **Lexer and parser.** Both hand-written, chosen over generated ones for
-error-message quality. The AST mirrors the surface syntax; desugaring happens
-in lowering, not here.
+error-message quality. The parser produces a concrete syntax tree that holds
+every token, parentheses included, and reads no source text. The AST stage
+drops what only the formatter needs and reads names and literals from the
+source; desugaring happens in lowering, not here.
 
 **Type checking.** Produces a typed AST in which every expression has a
 resolved type. Types are checked, not inferred. This stage
@@ -77,9 +81,9 @@ These hold across every stage. Agents and contributors must not violate them.
 
 - **Spans everywhere.** Every token, AST node, IR instruction, and emitted
   opcode carries a source span. A diagnostic without a span is a bug.
-- **Tokens are lossless.** Every byte of the source is inside some token's
-  span or some token's trivia, so the source can be rebuilt from the tokens
-  alone. Comments are trivia; no stage after the lexer sees them.
+- **Tokens and the CST are lossless.** Every byte of the source is inside some
+  token's span or some token's trivia, so the source can be rebuilt from the
+  tokens alone, and the CST's tokens, in order, are the lexer's. Comments are trivia; no stage after the lexer sees them.
 - **Determinism.** For a fixed compiler version and input, output is
   byte-identical. No hash-map iteration order, no timestamps, no absolute
   paths, no parallelism-dependent ordering.
