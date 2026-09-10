@@ -14,7 +14,7 @@ the features built on it — a new feature is not a reason to extend it.
    source text
         │
    ┌────▼─────┐
-   │  lexer   │  text ──────────────► tokens + spans
+   │  token   │  text ──────────────► tokens + spans
    ├──────────┤
    │  parser  │  tokens ────────────► AST
    ├──────────┤

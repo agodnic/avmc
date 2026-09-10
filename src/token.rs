@@ -1,4 +1,4 @@
-//! The lexer: source text to a flat token stream.
+//! Tokens, and the lexer that produces them.
 
 use crate::diag;
 use std::iter::Peekable;
@@ -6,7 +6,7 @@ use std::str::CharIndices;
 
 /// The kind of a lexical token.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum TokenKind {
+pub enum Kind {
     /// The keyword `func`.
     Func,
     /// The keyword `return`.
@@ -67,7 +67,7 @@ pub enum TokenKind {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Token {
     /// What was matched.
-    pub kind: TokenKind,
+    pub kind: Kind,
     /// Where it was matched.
     pub span: diag::Span,
 }
@@ -87,41 +87,41 @@ pub fn lex(source: &str, diags: &mut diag::Sink) -> Option<Vec<Token>> {
 
         match c {
             ' ' | '\t' | '\n' | '\r' => {}
-            '(' => tokens.push(token(TokenKind::LParen, start, single)),
-            ')' => tokens.push(token(TokenKind::RParen, start, single)),
-            '{' => tokens.push(token(TokenKind::LBrace, start, single)),
-            '}' => tokens.push(token(TokenKind::RBrace, start, single)),
-            '+' => tokens.push(token(TokenKind::Plus, start, single)),
-            '-' => tokens.push(token(TokenKind::Minus, start, single)),
-            '*' => tokens.push(token(TokenKind::Star, start, single)),
-            '/' => tokens.push(token(TokenKind::Slash, start, single)),
-            '%' => tokens.push(token(TokenKind::Percent, start, single)),
+            '(' => tokens.push(token(Kind::LParen, start, single)),
+            ')' => tokens.push(token(Kind::RParen, start, single)),
+            '{' => tokens.push(token(Kind::LBrace, start, single)),
+            '}' => tokens.push(token(Kind::RBrace, start, single)),
+            '+' => tokens.push(token(Kind::Plus, start, single)),
+            '-' => tokens.push(token(Kind::Minus, start, single)),
+            '*' => tokens.push(token(Kind::Star, start, single)),
+            '/' => tokens.push(token(Kind::Slash, start, single)),
+            '%' => tokens.push(token(Kind::Percent, start, single)),
             '=' => match consume_if(&mut chars, '=') {
-                Some(end) => tokens.push(token(TokenKind::EqEq, start, end)),
-                None => tokens.push(token(TokenKind::Equals, start, single)),
+                Some(end) => tokens.push(token(Kind::EqEq, start, end)),
+                None => tokens.push(token(Kind::Equals, start, single)),
             },
             '!' => match consume_if(&mut chars, '=') {
-                Some(end) => tokens.push(token(TokenKind::BangEq, start, end)),
-                None => tokens.push(token(TokenKind::Bang, start, single)),
+                Some(end) => tokens.push(token(Kind::BangEq, start, end)),
+                None => tokens.push(token(Kind::Bang, start, single)),
             },
             '<' => match consume_if(&mut chars, '=') {
-                Some(end) => tokens.push(token(TokenKind::LtEq, start, end)),
-                None => tokens.push(token(TokenKind::Lt, start, single)),
+                Some(end) => tokens.push(token(Kind::LtEq, start, end)),
+                None => tokens.push(token(Kind::Lt, start, single)),
             },
             '>' => match consume_if(&mut chars, '=') {
-                Some(end) => tokens.push(token(TokenKind::GtEq, start, end)),
-                None => tokens.push(token(TokenKind::Gt, start, single)),
+                Some(end) => tokens.push(token(Kind::GtEq, start, end)),
+                None => tokens.push(token(Kind::Gt, start, single)),
             },
             // `&` and `|` are tokens only in pairs.
             '&' => match consume_if(&mut chars, '&') {
-                Some(end) => tokens.push(token(TokenKind::AmpAmp, start, end)),
+                Some(end) => tokens.push(token(Kind::AmpAmp, start, end)),
                 None => {
                     diags.push(unexpected_character(start, single));
                     return None;
                 }
             },
             '|' => match consume_if(&mut chars, '|') {
-                Some(end) => tokens.push(token(TokenKind::PipePipe, start, end)),
+                Some(end) => tokens.push(token(Kind::PipePipe, start, end)),
                 None => {
                     diags.push(unexpected_character(start, single));
                     return None;
@@ -130,18 +130,18 @@ pub fn lex(source: &str, diags: &mut diag::Sink) -> Option<Vec<Token>> {
             _ if is_ident_start(c) => {
                 let end = consume_while(&mut chars, source.len(), is_ident_continue);
                 let kind = match source.get(start..end) {
-                    Some("func") => TokenKind::Func,
-                    Some("return") => TokenKind::Return,
-                    Some("var") => TokenKind::Var,
-                    Some("true") => TokenKind::True,
-                    Some("false") => TokenKind::False,
-                    _ => TokenKind::Ident,
+                    Some("func") => Kind::Func,
+                    Some("return") => Kind::Return,
+                    Some("var") => Kind::Var,
+                    Some("true") => Kind::True,
+                    Some("false") => Kind::False,
+                    _ => Kind::Ident,
                 };
                 tokens.push(token(kind, start, end));
             }
             _ if c.is_ascii_digit() => {
                 let end = consume_while(&mut chars, source.len(), |c| c.is_ascii_digit());
-                tokens.push(token(TokenKind::IntLit, start, end));
+                tokens.push(token(Kind::IntLit, start, end));
             }
             _ => {
                 diags.push(unexpected_character(start, single));
@@ -153,7 +153,7 @@ pub fn lex(source: &str, diags: &mut diag::Sink) -> Option<Vec<Token>> {
     Some(tokens)
 }
 
-fn token(kind: TokenKind, start: usize, end: usize) -> Token {
+fn token(kind: Kind, start: usize, end: usize) -> Token {
     Token {
         kind,
         span: diag::Span { start, end },
@@ -215,7 +215,7 @@ mod tests {
         diags.iter().cloned().collect()
     }
 
-    fn spans(source: &str, kinds: &[(TokenKind, &str)]) -> Vec<Token> {
+    fn spans(source: &str, kinds: &[(Kind, &str)]) -> Vec<Token> {
         let mut offset = 0;
         let mut expected = Vec::new();
         for &(kind, text) in kinds {
@@ -236,15 +236,15 @@ mod tests {
         let expected = spans(
             source,
             &[
-                (TokenKind::Func, "func"),
-                (TokenKind::Ident, "approval"),
-                (TokenKind::LParen, "("),
-                (TokenKind::RParen, ")"),
-                (TokenKind::Ident, "uint64"),
-                (TokenKind::LBrace, "{"),
-                (TokenKind::Return, "return"),
-                (TokenKind::IntLit, "1"),
-                (TokenKind::RBrace, "}"),
+                (Kind::Func, "func"),
+                (Kind::Ident, "approval"),
+                (Kind::LParen, "("),
+                (Kind::RParen, ")"),
+                (Kind::Ident, "uint64"),
+                (Kind::LBrace, "{"),
+                (Kind::Return, "return"),
+                (Kind::IntLit, "1"),
+                (Kind::RBrace, "}"),
             ],
         );
         assert_eq!(lex_ok(source), expected);
@@ -256,15 +256,15 @@ mod tests {
         let expected = spans(
             source,
             &[
-                (TokenKind::Func, "func"),
-                (TokenKind::Ident, "approval"),
-                (TokenKind::LParen, "("),
-                (TokenKind::RParen, ")"),
-                (TokenKind::Ident, "uint64"),
-                (TokenKind::LBrace, "{"),
-                (TokenKind::Return, "return"),
-                (TokenKind::IntLit, "1"),
-                (TokenKind::RBrace, "}"),
+                (Kind::Func, "func"),
+                (Kind::Ident, "approval"),
+                (Kind::LParen, "("),
+                (Kind::RParen, ")"),
+                (Kind::Ident, "uint64"),
+                (Kind::LBrace, "{"),
+                (Kind::Return, "return"),
+                (Kind::IntLit, "1"),
+                (Kind::RBrace, "}"),
             ],
         );
         assert_eq!(lex_ok(source), expected);
@@ -279,10 +279,7 @@ mod tests {
     fn keyword_prefixes_are_identifiers() {
         assert_eq!(
             lex_ok("func_ returns"),
-            vec![
-                token(TokenKind::Ident, 0, 5),
-                token(TokenKind::Ident, 6, 13)
-            ]
+            vec![token(Kind::Ident, 0, 5), token(Kind::Ident, 6, 13)]
         );
     }
 
@@ -290,10 +287,7 @@ mod tests {
     fn adjacent_integers_stay_separate() {
         assert_eq!(
             lex_ok("1 2"),
-            vec![
-                token(TokenKind::IntLit, 0, 1),
-                token(TokenKind::IntLit, 2, 3)
-            ]
+            vec![token(Kind::IntLit, 0, 1), token(Kind::IntLit, 2, 3)]
         );
     }
 
@@ -303,25 +297,25 @@ mod tests {
         let expected = spans(
             source,
             &[
-                (TokenKind::Func, "func"),
-                (TokenKind::Ident, "approval"),
-                (TokenKind::LParen, "("),
-                (TokenKind::RParen, ")"),
-                (TokenKind::Ident, "uint64"),
-                (TokenKind::LBrace, "{"),
-                (TokenKind::Return, "return"),
-                (TokenKind::LParen, "("),
-                (TokenKind::IntLit, "1"),
-                (TokenKind::Plus, "+"),
-                (TokenKind::IntLit, "2"),
-                (TokenKind::RParen, ")"),
-                (TokenKind::Star, "*"),
-                (TokenKind::IntLit, "3"),
-                (TokenKind::Minus, "-"),
-                (TokenKind::IntLit, "4"),
-                (TokenKind::Slash, "/"),
-                (TokenKind::IntLit, "5"),
-                (TokenKind::RBrace, "}"),
+                (Kind::Func, "func"),
+                (Kind::Ident, "approval"),
+                (Kind::LParen, "("),
+                (Kind::RParen, ")"),
+                (Kind::Ident, "uint64"),
+                (Kind::LBrace, "{"),
+                (Kind::Return, "return"),
+                (Kind::LParen, "("),
+                (Kind::IntLit, "1"),
+                (Kind::Plus, "+"),
+                (Kind::IntLit, "2"),
+                (Kind::RParen, ")"),
+                (Kind::Star, "*"),
+                (Kind::IntLit, "3"),
+                (Kind::Minus, "-"),
+                (Kind::IntLit, "4"),
+                (Kind::Slash, "/"),
+                (Kind::IntLit, "5"),
+                (Kind::RBrace, "}"),
             ],
         );
         assert_eq!(lex_ok(source), expected);
@@ -332,15 +326,15 @@ mod tests {
         assert_eq!(
             lex_ok("1+2*3-4/5"),
             vec![
-                token(TokenKind::IntLit, 0, 1),
-                token(TokenKind::Plus, 1, 2),
-                token(TokenKind::IntLit, 2, 3),
-                token(TokenKind::Star, 3, 4),
-                token(TokenKind::IntLit, 4, 5),
-                token(TokenKind::Minus, 5, 6),
-                token(TokenKind::IntLit, 6, 7),
-                token(TokenKind::Slash, 7, 8),
-                token(TokenKind::IntLit, 8, 9),
+                token(Kind::IntLit, 0, 1),
+                token(Kind::Plus, 1, 2),
+                token(Kind::IntLit, 2, 3),
+                token(Kind::Star, 3, 4),
+                token(Kind::IntLit, 4, 5),
+                token(Kind::Minus, 5, 6),
+                token(Kind::IntLit, 6, 7),
+                token(Kind::Slash, 7, 8),
+                token(Kind::IntLit, 8, 9),
             ]
         );
     }
@@ -349,10 +343,7 @@ mod tests {
     fn a_minus_is_never_part_of_a_literal() {
         assert_eq!(
             lex_ok("-1"),
-            vec![
-                token(TokenKind::Minus, 0, 1),
-                token(TokenKind::IntLit, 1, 2)
-            ]
+            vec![token(Kind::Minus, 0, 1), token(Kind::IntLit, 1, 2)]
         );
     }
 
@@ -360,23 +351,23 @@ mod tests {
     fn repeated_operators_are_separate_tokens() {
         assert_eq!(
             lex_ok("--"),
-            vec![token(TokenKind::Minus, 0, 1), token(TokenKind::Minus, 1, 2)]
+            vec![token(Kind::Minus, 0, 1), token(Kind::Minus, 1, 2)]
         );
         assert_eq!(
             lex_ok("//"),
-            vec![token(TokenKind::Slash, 0, 1), token(TokenKind::Slash, 1, 2)]
+            vec![token(Kind::Slash, 0, 1), token(Kind::Slash, 1, 2)]
         );
     }
 
     #[test]
     fn a_percent_is_a_token() {
-        assert_eq!(lex_ok("%"), vec![token(TokenKind::Percent, 0, 1)]);
+        assert_eq!(lex_ok("%"), vec![token(Kind::Percent, 0, 1)]);
         assert_eq!(
             lex_ok("1%2"),
             vec![
-                token(TokenKind::IntLit, 0, 1),
-                token(TokenKind::Percent, 1, 2),
-                token(TokenKind::IntLit, 2, 3),
+                token(Kind::IntLit, 0, 1),
+                token(Kind::Percent, 1, 2),
+                token(Kind::IntLit, 2, 3),
             ]
         );
     }
@@ -387,11 +378,11 @@ mod tests {
         let expected = spans(
             source,
             &[
-                (TokenKind::Var, "var"),
-                (TokenKind::Ident, "x"),
-                (TokenKind::Ident, "uint64"),
-                (TokenKind::Equals, "="),
-                (TokenKind::IntLit, "1"),
+                (Kind::Var, "var"),
+                (Kind::Ident, "x"),
+                (Kind::Ident, "uint64"),
+                (Kind::Equals, "="),
+                (Kind::IntLit, "1"),
             ],
         );
         assert_eq!(lex_ok(source), expected);
@@ -401,31 +392,25 @@ mod tests {
     fn var_prefixes_are_identifiers() {
         assert_eq!(
             lex_ok("var_ variable"),
-            vec![
-                token(TokenKind::Ident, 0, 4),
-                token(TokenKind::Ident, 5, 13)
-            ]
+            vec![token(Kind::Ident, 0, 4), token(Kind::Ident, 5, 13)]
         );
     }
 
     #[test]
     fn lexes_the_boolean_literals() {
         let source = "return true";
-        let expected = spans(
-            source,
-            &[(TokenKind::Return, "return"), (TokenKind::True, "true")],
-        );
+        let expected = spans(source, &[(Kind::Return, "return"), (Kind::True, "true")]);
         assert_eq!(lex_ok(source), expected);
 
         let source = "var ok bool = false";
         let expected = spans(
             source,
             &[
-                (TokenKind::Var, "var"),
-                (TokenKind::Ident, "ok"),
-                (TokenKind::Ident, "bool"),
-                (TokenKind::Equals, "="),
-                (TokenKind::False, "false"),
+                (Kind::Var, "var"),
+                (Kind::Ident, "ok"),
+                (Kind::Ident, "bool"),
+                (Kind::Equals, "="),
+                (Kind::False, "false"),
             ],
         );
         assert_eq!(lex_ok(source), expected);
@@ -437,9 +422,9 @@ mod tests {
         let expected = spans(
             source,
             &[
-                (TokenKind::Ident, "truest"),
-                (TokenKind::Ident, "false_"),
-                (TokenKind::Ident, "True"),
+                (Kind::Ident, "truest"),
+                (Kind::Ident, "false_"),
+                (Kind::Ident, "True"),
             ],
         );
         assert_eq!(lex_ok(source), expected);
@@ -450,9 +435,9 @@ mod tests {
         assert_eq!(
             lex_ok("x=1"),
             vec![
-                token(TokenKind::Ident, 0, 1),
-                token(TokenKind::Equals, 1, 2),
-                token(TokenKind::IntLit, 2, 3),
+                token(Kind::Ident, 0, 1),
+                token(Kind::Equals, 1, 2),
+                token(Kind::IntLit, 2, 3),
             ]
         );
     }
@@ -463,35 +448,35 @@ mod tests {
         let expected = spans(
             source,
             &[
-                (TokenKind::Func, "func"),
-                (TokenKind::Ident, "approval"),
-                (TokenKind::LParen, "("),
-                (TokenKind::RParen, ")"),
-                (TokenKind::Ident, "bool"),
-                (TokenKind::LBrace, "{"),
-                (TokenKind::Var, "var"),
-                (TokenKind::Ident, "x"),
-                (TokenKind::Ident, "uint64"),
-                (TokenKind::Equals, "="),
-                (TokenKind::IntLit, "1"),
-                (TokenKind::Plus, "+"),
-                (TokenKind::IntLit, "2"),
-                (TokenKind::Return, "return"),
-                (TokenKind::Ident, "x"),
-                (TokenKind::GtEq, ">="),
-                (TokenKind::IntLit, "3"),
-                (TokenKind::AmpAmp, "&&"),
-                (TokenKind::Bang, "!"),
-                (TokenKind::LParen, "("),
-                (TokenKind::Ident, "x"),
-                (TokenKind::EqEq, "=="),
-                (TokenKind::IntLit, "4"),
-                (TokenKind::RParen, ")"),
-                (TokenKind::PipePipe, "||"),
-                (TokenKind::Ident, "x"),
-                (TokenKind::BangEq, "!="),
-                (TokenKind::IntLit, "5"),
-                (TokenKind::RBrace, "}"),
+                (Kind::Func, "func"),
+                (Kind::Ident, "approval"),
+                (Kind::LParen, "("),
+                (Kind::RParen, ")"),
+                (Kind::Ident, "bool"),
+                (Kind::LBrace, "{"),
+                (Kind::Var, "var"),
+                (Kind::Ident, "x"),
+                (Kind::Ident, "uint64"),
+                (Kind::Equals, "="),
+                (Kind::IntLit, "1"),
+                (Kind::Plus, "+"),
+                (Kind::IntLit, "2"),
+                (Kind::Return, "return"),
+                (Kind::Ident, "x"),
+                (Kind::GtEq, ">="),
+                (Kind::IntLit, "3"),
+                (Kind::AmpAmp, "&&"),
+                (Kind::Bang, "!"),
+                (Kind::LParen, "("),
+                (Kind::Ident, "x"),
+                (Kind::EqEq, "=="),
+                (Kind::IntLit, "4"),
+                (Kind::RParen, ")"),
+                (Kind::PipePipe, "||"),
+                (Kind::Ident, "x"),
+                (Kind::BangEq, "!="),
+                (Kind::IntLit, "5"),
+                (Kind::RBrace, "}"),
             ],
         );
         assert_eq!(lex_ok(source), expected);
@@ -502,19 +487,19 @@ mod tests {
         assert_eq!(
             lex_ok("1==2!=3<4<=5>6>=7"),
             vec![
-                token(TokenKind::IntLit, 0, 1),
-                token(TokenKind::EqEq, 1, 3),
-                token(TokenKind::IntLit, 3, 4),
-                token(TokenKind::BangEq, 4, 6),
-                token(TokenKind::IntLit, 6, 7),
-                token(TokenKind::Lt, 7, 8),
-                token(TokenKind::IntLit, 8, 9),
-                token(TokenKind::LtEq, 9, 11),
-                token(TokenKind::IntLit, 11, 12),
-                token(TokenKind::Gt, 12, 13),
-                token(TokenKind::IntLit, 13, 14),
-                token(TokenKind::GtEq, 14, 16),
-                token(TokenKind::IntLit, 16, 17),
+                token(Kind::IntLit, 0, 1),
+                token(Kind::EqEq, 1, 3),
+                token(Kind::IntLit, 3, 4),
+                token(Kind::BangEq, 4, 6),
+                token(Kind::IntLit, 6, 7),
+                token(Kind::Lt, 7, 8),
+                token(Kind::IntLit, 8, 9),
+                token(Kind::LtEq, 9, 11),
+                token(Kind::IntLit, 11, 12),
+                token(Kind::Gt, 12, 13),
+                token(Kind::IntLit, 13, 14),
+                token(Kind::GtEq, 14, 16),
+                token(Kind::IntLit, 16, 17),
             ]
         );
     }
@@ -524,12 +509,12 @@ mod tests {
         assert_eq!(
             lex_ok("a&&b||!c"),
             vec![
-                token(TokenKind::Ident, 0, 1),
-                token(TokenKind::AmpAmp, 1, 3),
-                token(TokenKind::Ident, 3, 4),
-                token(TokenKind::PipePipe, 4, 6),
-                token(TokenKind::Bang, 6, 7),
-                token(TokenKind::Ident, 7, 8),
+                token(Kind::Ident, 0, 1),
+                token(Kind::AmpAmp, 1, 3),
+                token(Kind::Ident, 3, 4),
+                token(Kind::PipePipe, 4, 6),
+                token(Kind::Bang, 6, 7),
+                token(Kind::Ident, 7, 8),
             ]
         );
     }
@@ -538,23 +523,23 @@ mod tests {
     fn two_character_tokens_are_matched_greedily() {
         assert_eq!(
             lex_ok("==="),
-            vec![token(TokenKind::EqEq, 0, 2), token(TokenKind::Equals, 2, 3)]
+            vec![token(Kind::EqEq, 0, 2), token(Kind::Equals, 2, 3)]
         );
         assert_eq!(
             lex_ok("!!"),
-            vec![token(TokenKind::Bang, 0, 1), token(TokenKind::Bang, 1, 2)]
+            vec![token(Kind::Bang, 0, 1), token(Kind::Bang, 1, 2)]
         );
         assert_eq!(
             lex_ok("<=="),
-            vec![token(TokenKind::LtEq, 0, 2), token(TokenKind::Equals, 2, 3)]
+            vec![token(Kind::LtEq, 0, 2), token(Kind::Equals, 2, 3)]
         );
         assert_eq!(
             lex_ok("=!"),
-            vec![token(TokenKind::Equals, 0, 1), token(TokenKind::Bang, 1, 2)]
+            vec![token(Kind::Equals, 0, 1), token(Kind::Bang, 1, 2)]
         );
         assert_eq!(
             lex_ok("<>"),
-            vec![token(TokenKind::Lt, 0, 1), token(TokenKind::Gt, 1, 2)]
+            vec![token(Kind::Lt, 0, 1), token(Kind::Gt, 1, 2)]
         );
     }
 
@@ -562,10 +547,7 @@ mod tests {
     fn whitespace_breaks_a_two_character_token() {
         assert_eq!(
             lex_ok("= ="),
-            vec![
-                token(TokenKind::Equals, 0, 1),
-                token(TokenKind::Equals, 2, 3)
-            ]
+            vec![token(Kind::Equals, 0, 1), token(Kind::Equals, 2, 3)]
         );
     }
 

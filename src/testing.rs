@@ -2,8 +2,8 @@
 
 use crate::ast;
 use crate::diag;
-use crate::lexer;
 use crate::parser;
+use crate::token;
 use crate::typeck;
 use crate::typed_ast;
 
@@ -46,7 +46,7 @@ pub(crate) fn name(text: &str, span: diag::Span) -> ast::Name {
 /// Asserts that lexing and parsing succeeded without diagnostics.
 pub(crate) fn lex_parse(source: &str) -> ast::Program {
     let mut diags = diag::Sink::default();
-    let tokens = lexer::lex(source, &mut diags).expect("lexing succeeded");
+    let tokens = token::lex(source, &mut diags).expect("lexing succeeded");
     let program = parser::parse(source, &tokens, &mut diags).expect("parsing succeeded");
     assert!(diags.is_empty());
     program

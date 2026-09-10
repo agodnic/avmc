@@ -4,14 +4,14 @@
 
 use crate::diag;
 use crate::emit;
-use crate::lexer;
 use crate::lower;
 use crate::parser;
+use crate::token;
 use crate::typeck;
 
 /// Compiles `source` to TEAL text, stopping at the first stage that fails.
 pub fn compile(source: &str, diags: &mut diag::Sink) -> Option<String> {
-    let tokens = lexer::lex(source, diags)?;
+    let tokens = token::lex(source, diags)?;
     let parsed = parser::parse(source, &tokens, diags)?;
     let checked = typeck::check(&parsed, diags)?;
     let ir = lower::lower(&checked, diags)?;
