@@ -1,6 +1,6 @@
 //! Spans and diagnostics, shared by every compiler stage.
 
-use crate::typed_ast::Type;
+use crate::typed_ast;
 use std::fmt;
 
 /// A half-open range of byte offsets into the source text.
@@ -55,8 +55,8 @@ pub enum DiagnosticKind {
         max: usize,
     },
     TypeMismatch {
-        expected: Type,
-        found: Type,
+        expected: typed_ast::Type,
+        found: typed_ast::Type,
     },
 }
 
@@ -255,8 +255,8 @@ mod tests {
             ),
             (
                 DiagnosticKind::TypeMismatch {
-                    expected: Type::Bool,
-                    found: Type::Uint64,
+                    expected: typed_ast::Type::Bool,
+                    found: typed_ast::Type::Uint64,
                 },
                 "E0013",
                 "mismatched types: expected `bool`, found `uint64`",

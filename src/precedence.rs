@@ -3,7 +3,7 @@
 //! Two operators the order does not relate are a compile error rather than a
 //! silent grouping, so this module knows nothing about tokens or parsing.
 
-use crate::ast::{BinaryOp, UnaryOp};
+use crate::ast;
 
 /// A node in the precedence graph. Operators in one group share a precedence.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -36,23 +36,26 @@ pub enum Priority {
 }
 
 /// The group an operator belongs to.
-pub fn group(op: BinaryOp) -> Group {
+pub fn group(op: ast::BinaryOp) -> Group {
     match op {
-        BinaryOp::Add | BinaryOp::Sub => Group::Additive,
-        BinaryOp::Mul | BinaryOp::Div => Group::Multiplicative,
-        BinaryOp::Mod => Group::Modulo,
-        BinaryOp::Eq | BinaryOp::Ne | BinaryOp::Lt | BinaryOp::Le | BinaryOp::Gt | BinaryOp::Ge => {
-            Group::Comparison
-        }
-        BinaryOp::And => Group::And,
-        BinaryOp::Or => Group::Or,
+        ast::BinaryOp::Add | ast::BinaryOp::Sub => Group::Additive,
+        ast::BinaryOp::Mul | ast::BinaryOp::Div => Group::Multiplicative,
+        ast::BinaryOp::Mod => Group::Modulo,
+        ast::BinaryOp::Eq
+        | ast::BinaryOp::Ne
+        | ast::BinaryOp::Lt
+        | ast::BinaryOp::Le
+        | ast::BinaryOp::Gt
+        | ast::BinaryOp::Ge => Group::Comparison,
+        ast::BinaryOp::And => Group::And,
+        ast::BinaryOp::Or => Group::Or,
     }
 }
 
 /// The group a prefix operator belongs to.
-pub fn unary_group(op: UnaryOp) -> Group {
+pub fn unary_group(op: ast::UnaryOp) -> Group {
     match op {
-        UnaryOp::Not => Group::Not,
+        ast::UnaryOp::Not => Group::Not,
     }
 }
 
@@ -133,24 +136,24 @@ mod tests {
 
     #[test]
     fn every_operator_has_its_group() {
-        assert_eq!(group(BinaryOp::Add), Group::Additive);
-        assert_eq!(group(BinaryOp::Sub), Group::Additive);
-        assert_eq!(group(BinaryOp::Mul), Group::Multiplicative);
-        assert_eq!(group(BinaryOp::Div), Group::Multiplicative);
-        assert_eq!(group(BinaryOp::Mod), Group::Modulo);
+        assert_eq!(group(ast::BinaryOp::Add), Group::Additive);
+        assert_eq!(group(ast::BinaryOp::Sub), Group::Additive);
+        assert_eq!(group(ast::BinaryOp::Mul), Group::Multiplicative);
+        assert_eq!(group(ast::BinaryOp::Div), Group::Multiplicative);
+        assert_eq!(group(ast::BinaryOp::Mod), Group::Modulo);
         for op in [
-            BinaryOp::Eq,
-            BinaryOp::Ne,
-            BinaryOp::Lt,
-            BinaryOp::Le,
-            BinaryOp::Gt,
-            BinaryOp::Ge,
+            ast::BinaryOp::Eq,
+            ast::BinaryOp::Ne,
+            ast::BinaryOp::Lt,
+            ast::BinaryOp::Le,
+            ast::BinaryOp::Gt,
+            ast::BinaryOp::Ge,
         ] {
             assert_eq!(group(op), Group::Comparison, "{op:?}");
         }
-        assert_eq!(group(BinaryOp::And), Group::And);
-        assert_eq!(group(BinaryOp::Or), Group::Or);
-        assert_eq!(unary_group(UnaryOp::Not), Group::Not);
+        assert_eq!(group(ast::BinaryOp::And), Group::And);
+        assert_eq!(group(ast::BinaryOp::Or), Group::Or);
+        assert_eq!(unary_group(ast::UnaryOp::Not), Group::Not);
     }
 
     #[test]

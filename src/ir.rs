@@ -1,9 +1,9 @@
 //! The IR: a flat single-assignment instruction list, and the verifier that
 //! enforces its invariant.
 
-use crate::ast::{BinaryOp, UnaryOp};
-use crate::diagnostics::Span;
-use crate::typed_ast::{LocalId, Type, operand_type, result_type};
+use crate::ast;
+use crate::diagnostics;
+use crate::typed_ast;
 
 /// The value a defining instruction produces. Numbered per function.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -17,66 +17,66 @@ pub enum Inst {
         /// The value it defines.
         dest: ValueId,
         /// The type it has.
-        ty: Type,
+        ty: typed_ast::Type,
         /// The constant it holds: for a `Bool`, `0` or `1`.
         value: u64,
         /// The literal it came from.
-        span: Span,
+        span: diagnostics::Span,
     },
     /// Defines `dest` as `lhs op rhs`.
     Binary {
         /// The value it defines.
         dest: ValueId,
         /// The operator it applies.
-        op: BinaryOp,
+        op: ast::BinaryOp,
         /// The left operand, consumed first.
         lhs: ValueId,
         /// The right operand, consumed second.
         rhs: ValueId,
         /// The expression it came from.
-        span: Span,
+        span: diagnostics::Span,
     },
     /// Defines `dest` as `op operand`.
     Unary {
         /// The value it defines.
         dest: ValueId,
         /// The operator it applies.
-        op: UnaryOp,
+        op: ast::UnaryOp,
         /// The operand, consumed.
         operand: ValueId,
         /// The expression it came from.
-        span: Span,
+        span: diagnostics::Span,
     },
     /// Writes `value` into frame slot `local`.
     Store {
         /// The slot it writes.
-        local: LocalId,
+        local: typed_ast::LocalId,
         /// The value it writes, consumed.
         value: ValueId,
         /// The declaration it came from.
-        span: Span,
+        span: diagnostics::Span,
     },
     /// Defines `dest` as a copy of frame slot `local`.
     Load {
         /// The value it defines.
         dest: ValueId,
         /// The slot it reads.
-        local: LocalId,
+        local: typed_ast::LocalId,
         /// The expression it came from.
-        span: Span,
+        span: diagnostics::Span,
     },
     /// Returns `value` from the enclosing function.
     Return {
         /// The value it returns.
         value: ValueId,
         /// The `return` statement it came from.
-        span: Span,
+        span: diagnostics::Span,
     },
 }
 
 impl Inst {
     /// The source it came from.
-    pub fn span(&self) -> Span {
+    pub fn span(&self) -> diagnostics::Span {
         match self {
             Inst::Const { span, .. }
             | Inst::Binary { span, .. }
@@ -94,13 +94,13 @@ pub struct Function {
     /// The declared name.
     pub name: String,
     /// The return type.
-    pub ret: Type,
+    pub ret: typed_ast::Type,
     /// The frame: one slot per variable, indexed by `LocalId`.
-    pub locals: Vec<Type>,
+    pub locals: Vec<typed_ast::Type>,
     /// The instructions, in execution order.
     pub insts: Vec<Inst>,
     /// From `func` through the closing `}`.
-    pub span: Span,
+    pub span: diagnostics::Span,
 }
 
 /// A whole compilation unit.
@@ -165,7 +165,7 @@ pub enum Violation {
         /// The offending instruction's position.
         index: usize,
         /// The slot it names.
-        local: LocalId,
+        local: typed_ast::LocalId,
         /// How many slots the frame holds.
         count: usize,
     },
@@ -178,9 +178,9 @@ pub enum Violation {
         /// The value it uses.
         value: ValueId,
         /// The type that value has.
-        found: Type,
+        found: typed_ast::Type,
         /// The type the instruction needs.
-        expected: Type,
+        expected: typed_ast::Type,
     },
     /// A `Bool` constant holds something other than `0` or `1`.
     BoolOutOfRange {
@@ -238,7 +238,7 @@ impl std::fmt::Display for Violation {
             Violation::FrameTooLarge { count } => write!(
                 f,
                 "addressed within the frame: {count} locals exceed the capacity of {}",
-                LocalId::CAPACITY
+                typed_ast::LocalId::CAPACITY
             ),
             Violation::LocalOutOfRange {
                 index,
@@ -275,7 +275,7 @@ impl std::fmt::Display for Violation {
 pub fn verify(func: &Function) -> Result<(), Violation> {
     verify_return(func)?;
 
-    if func.locals.len() > LocalId::CAPACITY {
+    if func.locals.len() > typed_ast::LocalId::CAPACITY {
         return Err(Violation::FrameTooLarge {
             count: func.locals.len(),
         });
@@ -283,7 +283,7 @@ pub fn verify(func: &Function) -> Result<(), Violation> {
 
     // The values defined and not yet consumed, most recent last, each with
     // its type.
-    let mut stack: Vec<(ValueId, Type)> = Vec::new();
+    let mut stack: Vec<(ValueId, typed_ast::Type)> = Vec::new();
     // The number of values defined so far: the next definition must be
     // `ValueId(defs)`.
     let mut defs = 0;
@@ -293,7 +293,7 @@ pub fn verify(func: &Function) -> Result<(), Violation> {
             Inst::Const {
                 dest, ty, value, ..
             } => {
-                if *ty == Type::Bool && *value > 1 {
+                if *ty == typed_ast::Type::Bool && *value > 1 {
                     return Err(Violation::BoolOutOfRange {
                         index,
                         value: *value,
@@ -308,23 +308,25 @@ pub fn verify(func: &Function) -> Result<(), Violation> {
                 // type to expect is the left operand's: the value second
                 // from the top. With no such value, `consume` reports the
                 // underflow before it looks at a type.
-                let ty = operand_type(*op).unwrap_or_else(|| {
+                let ty = typed_ast::operand_type(*op).unwrap_or_else(|| {
                     stack
                         .iter()
                         .rev()
                         .nth(1)
-                        .map_or(Type::Uint64, |&(_, ty)| ty)
+                        .map_or(typed_ast::Type::Uint64, |&(_, ty)| ty)
                 });
                 consume(&mut stack, index, &[*lhs, *rhs], &[ty, ty])?;
-                (dest, result_type(*op))
+                (dest, typed_ast::result_type(*op))
             }
             Inst::Unary {
                 dest, op, operand, ..
             } => {
                 match op {
-                    UnaryOp::Not => consume(&mut stack, index, &[*operand], &[Type::Bool])?,
+                    ast::UnaryOp::Not => {
+                        consume(&mut stack, index, &[*operand], &[typed_ast::Type::Bool])?
+                    }
                 }
-                (dest, Type::Bool)
+                (dest, typed_ast::Type::Bool)
             }
             Inst::Store { local, value, .. } => {
                 let ty = slot(&func.locals, *local, index)?;
@@ -361,10 +363,10 @@ pub fn verify(func: &Function) -> Result<(), Violation> {
 /// Consumes `operands` off `stack`, checking that they are the values on top
 /// of it, in order, and that they have the types `expected`.
 fn consume(
-    stack: &mut Vec<(ValueId, Type)>,
+    stack: &mut Vec<(ValueId, typed_ast::Type)>,
     index: usize,
     operands: &[ValueId],
-    expected: &[Type],
+    expected: &[typed_ast::Type],
 ) -> Result<(), Violation> {
     let available = stack.len();
     let top = available
@@ -405,7 +407,11 @@ fn consume(
 }
 
 /// Checks that `local` is a slot of the frame, returning its type.
-fn slot(locals: &[Type], local: LocalId, index: usize) -> Result<Type, Violation> {
+fn slot(
+    locals: &[typed_ast::Type],
+    local: typed_ast::LocalId,
+    index: usize,
+) -> Result<typed_ast::Type, Violation> {
     locals
         .get(usize::from(local.0))
         .copied()
@@ -436,7 +442,7 @@ mod tests {
 
     /// The span every hand-built instruction carries: the verifier ignores
     /// spans, so which one it is does not matter.
-    const SPAN: Span = Span { start: 0, end: 0 };
+    const SPAN: diagnostics::Span = diagnostics::Span { start: 0, end: 0 };
 
     /// A function with an empty frame.
     fn function(insts: Vec<Inst>) -> Function {
@@ -446,11 +452,15 @@ mod tests {
     /// A function whose frame is `locals` slots of `Type::Uint64`, returning
     /// `Type::Uint64`.
     fn framed(locals: usize, insts: Vec<Inst>) -> Function {
-        shaped(Type::Uint64, vec![Type::Uint64; locals], insts)
+        shaped(
+            typed_ast::Type::Uint64,
+            vec![typed_ast::Type::Uint64; locals],
+            insts,
+        )
     }
 
     /// A function returning `ret`, with `locals` as its frame.
-    fn shaped(ret: Type, locals: Vec<Type>, insts: Vec<Inst>) -> Function {
+    fn shaped(ret: typed_ast::Type, locals: Vec<typed_ast::Type>, insts: Vec<Inst>) -> Function {
         Function {
             name: "approval".to_string(),
             ret,
@@ -461,10 +471,10 @@ mod tests {
     }
 
     fn constant(dest: u32, value: u64) -> Inst {
-        constant_of(dest, Type::Uint64, value)
+        constant_of(dest, typed_ast::Type::Uint64, value)
     }
 
-    fn constant_of(dest: u32, ty: Type, value: u64) -> Inst {
+    fn constant_of(dest: u32, ty: typed_ast::Type, value: u64) -> Inst {
         Inst::Const {
             dest: ValueId(dest),
             ty,
@@ -482,7 +492,7 @@ mod tests {
 
     fn store(local: u8, value: u32) -> Inst {
         Inst::Store {
-            local: LocalId(local),
+            local: typed_ast::LocalId(local),
             value: ValueId(value),
             span: SPAN,
         }
@@ -491,12 +501,12 @@ mod tests {
     fn load(dest: u32, local: u8) -> Inst {
         Inst::Load {
             dest: ValueId(dest),
-            local: LocalId(local),
+            local: typed_ast::LocalId(local),
             span: SPAN,
         }
     }
 
-    fn binary(dest: u32, op: BinaryOp, lhs: u32, rhs: u32) -> Inst {
+    fn binary(dest: u32, op: ast::BinaryOp, lhs: u32, rhs: u32) -> Inst {
         Inst::Binary {
             dest: ValueId(dest),
             op,
@@ -506,7 +516,7 @@ mod tests {
         }
     }
 
-    fn unary(dest: u32, op: UnaryOp, operand: u32) -> Inst {
+    fn unary(dest: u32, op: ast::UnaryOp, operand: u32) -> Inst {
         Inst::Unary {
             dest: ValueId(dest),
             op,
@@ -526,7 +536,7 @@ mod tests {
             verify(&function(vec![
                 constant(0, 1),
                 constant(1, 2),
-                binary(2, BinaryOp::Add, 0, 1),
+                binary(2, ast::BinaryOp::Add, 0, 1),
                 ret(2),
             ])),
             Ok(())
@@ -541,8 +551,8 @@ mod tests {
                 constant(0, 1),
                 constant(1, 2),
                 constant(2, 3),
-                binary(3, BinaryOp::Mul, 1, 2),
-                binary(4, BinaryOp::Add, 0, 3),
+                binary(3, ast::BinaryOp::Mul, 1, 2),
+                binary(4, ast::BinaryOp::Add, 0, 3),
                 ret(4),
             ])),
             Ok(())
@@ -555,7 +565,7 @@ mod tests {
             verify(&function(vec![
                 constant(0, 1),
                 constant(1, 2),
-                binary(2, BinaryOp::Sub, 1, 0),
+                binary(2, ast::BinaryOp::Sub, 1, 0),
                 ret(2),
             ])),
             Err(Violation::UseOutOfOrder {
@@ -572,7 +582,7 @@ mod tests {
         assert_eq!(
             verify(&function(vec![
                 constant(0, 1),
-                binary(1, BinaryOp::Add, 0, 0),
+                binary(1, ast::BinaryOp::Add, 0, 0),
                 ret(1),
             ])),
             Err(Violation::StackUnderflow {
@@ -664,15 +674,15 @@ mod tests {
                 vec![
                     constant(0, 1),
                     constant(1, 2),
-                    binary(2, BinaryOp::Add, 0, 1),
+                    binary(2, ast::BinaryOp::Add, 0, 1),
                     store(0, 2),
                     load(3, 0),
                     constant(4, 3),
-                    binary(5, BinaryOp::Mul, 3, 4),
+                    binary(5, ast::BinaryOp::Mul, 3, 4),
                     store(1, 5),
                     load(6, 1),
                     load(7, 0),
-                    binary(8, BinaryOp::Sub, 6, 7),
+                    binary(8, ast::BinaryOp::Sub, 6, 7),
                     ret(8),
                 ]
             )),
@@ -714,7 +724,7 @@ mod tests {
             verify(&function(vec![load(0, 0), ret(0)])),
             Err(Violation::LocalOutOfRange {
                 index: 0,
-                local: LocalId(0),
+                local: typed_ast::LocalId(0),
                 count: 0,
             })
         );
@@ -729,7 +739,7 @@ mod tests {
             )),
             Err(Violation::LocalOutOfRange {
                 index: 1,
-                local: LocalId(2),
+                local: typed_ast::LocalId(2),
                 count: 2,
             })
         );
@@ -737,7 +747,7 @@ mod tests {
 
     #[test]
     fn a_frame_past_the_capacity_is_rejected() {
-        let count = LocalId::CAPACITY + 1;
+        let count = typed_ast::LocalId::CAPACITY + 1;
         assert_eq!(
             verify(&framed(count, vec![constant(0, 1), ret(0)])),
             Err(Violation::FrameTooLarge { count })
@@ -747,7 +757,10 @@ mod tests {
     #[test]
     fn a_frame_at_the_capacity_is_valid() {
         assert_eq!(
-            verify(&framed(LocalId::CAPACITY, vec![constant(0, 1), ret(0)])),
+            verify(&framed(
+                typed_ast::LocalId::CAPACITY,
+                vec![constant(0, 1), ret(0)]
+            )),
             Ok(())
         );
     }
@@ -757,9 +770,9 @@ mod tests {
         for value in [0, 1] {
             assert_eq!(
                 verify(&shaped(
-                    Type::Bool,
+                    typed_ast::Type::Bool,
                     vec![],
-                    vec![constant_of(0, Type::Bool, value), ret(0)]
+                    vec![constant_of(0, typed_ast::Type::Bool, value), ret(0)]
                 )),
                 Ok(())
             );
@@ -770,9 +783,9 @@ mod tests {
     fn a_bool_constant_outside_its_range_is_rejected() {
         assert_eq!(
             verify(&shaped(
-                Type::Bool,
+                typed_ast::Type::Bool,
                 vec![],
-                vec![constant_of(0, Type::Bool, 2), ret(0)]
+                vec![constant_of(0, typed_ast::Type::Bool, 2), ret(0)]
             )),
             Err(Violation::BoolOutOfRange { index: 0, value: 2 })
         );
@@ -781,13 +794,17 @@ mod tests {
     #[test]
     fn returning_a_uint64_as_a_bool_is_rejected() {
         assert_eq!(
-            verify(&shaped(Type::Bool, vec![], vec![constant(0, 1), ret(0)])),
+            verify(&shaped(
+                typed_ast::Type::Bool,
+                vec![],
+                vec![constant(0, 1), ret(0)]
+            )),
             Err(Violation::OperandType {
                 index: 1,
                 position: 0,
                 value: ValueId(0),
-                found: Type::Uint64,
-                expected: Type::Bool,
+                found: typed_ast::Type::Uint64,
+                expected: typed_ast::Type::Bool,
             })
         );
     }
@@ -795,13 +812,16 @@ mod tests {
     #[test]
     fn returning_a_bool_as_a_uint64_is_rejected() {
         assert_eq!(
-            verify(&function(vec![constant_of(0, Type::Bool, 1), ret(0)])),
+            verify(&function(vec![
+                constant_of(0, typed_ast::Type::Bool, 1),
+                ret(0)
+            ])),
             Err(Violation::OperandType {
                 index: 1,
                 position: 0,
                 value: ValueId(0),
-                found: Type::Bool,
-                expected: Type::Uint64,
+                found: typed_ast::Type::Bool,
+                expected: typed_ast::Type::Uint64,
             })
         );
     }
@@ -810,10 +830,10 @@ mod tests {
     fn storing_and_loading_a_bool_slot_is_valid() {
         assert_eq!(
             verify(&shaped(
-                Type::Bool,
-                vec![Type::Bool],
+                typed_ast::Type::Bool,
+                vec![typed_ast::Type::Bool],
                 vec![
-                    constant_of(0, Type::Bool, 1),
+                    constant_of(0, typed_ast::Type::Bool, 1),
                     store(0, 0),
                     load(1, 0),
                     ret(1),
@@ -829,7 +849,7 @@ mod tests {
             verify(&framed(
                 1,
                 vec![
-                    constant_of(0, Type::Bool, 1),
+                    constant_of(0, typed_ast::Type::Bool, 1),
                     store(0, 0),
                     load(1, 0),
                     ret(1),
@@ -839,8 +859,8 @@ mod tests {
                 index: 1,
                 position: 0,
                 value: ValueId(0),
-                found: Type::Bool,
-                expected: Type::Uint64,
+                found: typed_ast::Type::Bool,
+                expected: typed_ast::Type::Uint64,
             })
         );
     }
@@ -849,10 +869,10 @@ mod tests {
     fn a_load_carries_its_slots_type() {
         assert_eq!(
             verify(&shaped(
-                Type::Uint64,
-                vec![Type::Bool],
+                typed_ast::Type::Uint64,
+                vec![typed_ast::Type::Bool],
                 vec![
-                    constant_of(0, Type::Bool, 1),
+                    constant_of(0, typed_ast::Type::Bool, 1),
                     store(0, 0),
                     load(1, 0),
                     ret(1),
@@ -862,8 +882,8 @@ mod tests {
                 index: 3,
                 position: 0,
                 value: ValueId(1),
-                found: Type::Bool,
-                expected: Type::Uint64,
+                found: typed_ast::Type::Bool,
+                expected: typed_ast::Type::Uint64,
             })
         );
     }
@@ -872,17 +892,17 @@ mod tests {
     fn a_bool_as_the_left_operand_of_a_binary_is_rejected() {
         assert_eq!(
             verify(&function(vec![
-                constant_of(0, Type::Bool, 1),
+                constant_of(0, typed_ast::Type::Bool, 1),
                 constant(1, 2),
-                binary(2, BinaryOp::Add, 0, 1),
+                binary(2, ast::BinaryOp::Add, 0, 1),
                 ret(2),
             ])),
             Err(Violation::OperandType {
                 index: 2,
                 position: 0,
                 value: ValueId(0),
-                found: Type::Bool,
-                expected: Type::Uint64,
+                found: typed_ast::Type::Bool,
+                expected: typed_ast::Type::Uint64,
             })
         );
     }
@@ -892,16 +912,16 @@ mod tests {
         assert_eq!(
             verify(&function(vec![
                 constant(0, 1),
-                constant_of(1, Type::Bool, 1),
-                binary(2, BinaryOp::Add, 0, 1),
+                constant_of(1, typed_ast::Type::Bool, 1),
+                binary(2, ast::BinaryOp::Add, 0, 1),
                 ret(2),
             ])),
             Err(Violation::OperandType {
                 index: 2,
                 position: 1,
                 value: ValueId(1),
-                found: Type::Bool,
-                expected: Type::Uint64,
+                found: typed_ast::Type::Bool,
+                expected: typed_ast::Type::Uint64,
             })
         );
     }
@@ -913,7 +933,7 @@ mod tests {
                 1,
                 vec![
                     constant(0, 1),
-                    constant_of(1, Type::Bool, 0),
+                    constant_of(1, typed_ast::Type::Bool, 0),
                     store(0, 0),
                     ret(1),
                 ]
@@ -928,13 +948,13 @@ mod tests {
     }
 
     /// The six comparisons, which take two `uint64` and produce a `bool`.
-    const COMPARISONS: [BinaryOp; 6] = [
-        BinaryOp::Eq,
-        BinaryOp::Ne,
-        BinaryOp::Lt,
-        BinaryOp::Le,
-        BinaryOp::Gt,
-        BinaryOp::Ge,
+    const COMPARISONS: [ast::BinaryOp; 6] = [
+        ast::BinaryOp::Eq,
+        ast::BinaryOp::Ne,
+        ast::BinaryOp::Lt,
+        ast::BinaryOp::Le,
+        ast::BinaryOp::Gt,
+        ast::BinaryOp::Ge,
     ];
 
     #[test]
@@ -942,7 +962,7 @@ mod tests {
         for op in COMPARISONS {
             assert_eq!(
                 verify(&shaped(
-                    Type::Bool,
+                    typed_ast::Type::Bool,
                     vec![],
                     vec![constant(0, 1), constant(1, 2), binary(2, op, 0, 1), ret(2)]
                 )),
@@ -958,15 +978,15 @@ mod tests {
             verify(&function(vec![
                 constant(0, 1),
                 constant(1, 2),
-                binary(2, BinaryOp::Lt, 0, 1),
+                binary(2, ast::BinaryOp::Lt, 0, 1),
                 ret(2),
             ])),
             Err(Violation::OperandType {
                 index: 3,
                 position: 0,
                 value: ValueId(2),
-                found: Type::Bool,
-                expected: Type::Uint64,
+                found: typed_ast::Type::Bool,
+                expected: typed_ast::Type::Uint64,
             })
         );
     }
@@ -977,29 +997,29 @@ mod tests {
             verify(&function(vec![
                 constant(0, 1),
                 constant(1, 2),
-                binary(2, BinaryOp::Eq, 0, 1),
+                binary(2, ast::BinaryOp::Eq, 0, 1),
                 ret(2),
             ])),
             Err(Violation::OperandType {
                 index: 3,
                 position: 0,
                 value: ValueId(2),
-                found: Type::Bool,
-                expected: Type::Uint64,
+                found: typed_ast::Type::Bool,
+                expected: typed_ast::Type::Uint64,
             })
         );
     }
 
     #[test]
     fn equality_over_two_bools_is_valid() {
-        for op in [BinaryOp::Eq, BinaryOp::Ne] {
+        for op in [ast::BinaryOp::Eq, ast::BinaryOp::Ne] {
             assert_eq!(
                 verify(&shaped(
-                    Type::Bool,
+                    typed_ast::Type::Bool,
                     vec![],
                     vec![
-                        constant_of(0, Type::Bool, 1),
-                        constant_of(1, Type::Bool, 0),
+                        constant_of(0, typed_ast::Type::Bool, 1),
+                        constant_of(1, typed_ast::Type::Bool, 0),
                         binary(2, op, 0, 1),
                         ret(2),
                     ]
@@ -1014,12 +1034,12 @@ mod tests {
     fn ordering_two_bools_is_rejected() {
         assert_eq!(
             verify(&shaped(
-                Type::Bool,
+                typed_ast::Type::Bool,
                 vec![],
                 vec![
-                    constant_of(0, Type::Bool, 1),
-                    constant_of(1, Type::Bool, 0),
-                    binary(2, BinaryOp::Lt, 0, 1),
+                    constant_of(0, typed_ast::Type::Bool, 1),
+                    constant_of(1, typed_ast::Type::Bool, 0),
+                    binary(2, ast::BinaryOp::Lt, 0, 1),
                     ret(2),
                 ]
             )),
@@ -1027,8 +1047,8 @@ mod tests {
                 index: 2,
                 position: 0,
                 value: ValueId(0),
-                found: Type::Bool,
-                expected: Type::Uint64,
+                found: typed_ast::Type::Bool,
+                expected: typed_ast::Type::Uint64,
             })
         );
     }
@@ -1037,12 +1057,12 @@ mod tests {
     fn comparing_a_uint64_with_a_bool_is_rejected() {
         assert_eq!(
             verify(&shaped(
-                Type::Bool,
+                typed_ast::Type::Bool,
                 vec![],
                 vec![
                     constant(0, 1),
-                    constant_of(1, Type::Bool, 1),
-                    binary(2, BinaryOp::Eq, 0, 1),
+                    constant_of(1, typed_ast::Type::Bool, 1),
+                    binary(2, ast::BinaryOp::Eq, 0, 1),
                     ret(2),
                 ]
             )),
@@ -1050,8 +1070,8 @@ mod tests {
                 index: 2,
                 position: 1,
                 value: ValueId(1),
-                found: Type::Bool,
-                expected: Type::Uint64,
+                found: typed_ast::Type::Bool,
+                expected: typed_ast::Type::Uint64,
             })
         );
     }
@@ -1061,12 +1081,12 @@ mod tests {
         // The left operand fixes the type the right one must have.
         assert_eq!(
             verify(&shaped(
-                Type::Bool,
+                typed_ast::Type::Bool,
                 vec![],
                 vec![
-                    constant_of(0, Type::Bool, 1),
+                    constant_of(0, typed_ast::Type::Bool, 1),
                     constant(1, 1),
-                    binary(2, BinaryOp::Eq, 0, 1),
+                    binary(2, ast::BinaryOp::Eq, 0, 1),
                     ret(2),
                 ]
             )),
@@ -1074,8 +1094,8 @@ mod tests {
                 index: 2,
                 position: 1,
                 value: ValueId(1),
-                found: Type::Uint64,
-                expected: Type::Bool,
+                found: typed_ast::Type::Uint64,
+                expected: typed_ast::Type::Bool,
             })
         );
     }
@@ -1084,11 +1104,11 @@ mod tests {
     fn an_equality_without_enough_live_values_is_rejected() {
         assert_eq!(
             verify(&shaped(
-                Type::Bool,
+                typed_ast::Type::Bool,
                 vec![],
                 vec![
-                    constant_of(0, Type::Bool, 1),
-                    binary(1, BinaryOp::Eq, 0, 1),
+                    constant_of(0, typed_ast::Type::Bool, 1),
+                    binary(1, ast::BinaryOp::Eq, 0, 1),
                     ret(2),
                 ]
             )),
@@ -1102,14 +1122,14 @@ mod tests {
 
     #[test]
     fn logic_over_two_bools_is_valid() {
-        for op in [BinaryOp::And, BinaryOp::Or] {
+        for op in [ast::BinaryOp::And, ast::BinaryOp::Or] {
             assert_eq!(
                 verify(&shaped(
-                    Type::Bool,
+                    typed_ast::Type::Bool,
                     vec![],
                     vec![
-                        constant_of(0, Type::Bool, 1),
-                        constant_of(1, Type::Bool, 0),
+                        constant_of(0, typed_ast::Type::Bool, 1),
+                        constant_of(1, typed_ast::Type::Bool, 0),
                         binary(2, op, 0, 1),
                         ret(2),
                     ]
@@ -1124,12 +1144,12 @@ mod tests {
     fn a_uint64_as_an_operand_of_logic_is_rejected() {
         assert_eq!(
             verify(&shaped(
-                Type::Bool,
+                typed_ast::Type::Bool,
                 vec![],
                 vec![
                     constant(0, 1),
-                    constant_of(1, Type::Bool, 1),
-                    binary(2, BinaryOp::And, 0, 1),
+                    constant_of(1, typed_ast::Type::Bool, 1),
+                    binary(2, ast::BinaryOp::And, 0, 1),
                     ret(2),
                 ]
             )),
@@ -1137,8 +1157,8 @@ mod tests {
                 index: 2,
                 position: 0,
                 value: ValueId(0),
-                found: Type::Uint64,
-                expected: Type::Bool,
+                found: typed_ast::Type::Uint64,
+                expected: typed_ast::Type::Bool,
             })
         );
     }
@@ -1147,11 +1167,11 @@ mod tests {
     fn negating_a_bool_is_valid() {
         assert_eq!(
             verify(&shaped(
-                Type::Bool,
+                typed_ast::Type::Bool,
                 vec![],
                 vec![
-                    constant_of(0, Type::Bool, 1),
-                    unary(1, UnaryOp::Not, 0),
+                    constant_of(0, typed_ast::Type::Bool, 1),
+                    unary(1, ast::UnaryOp::Not, 0),
                     ret(1),
                 ]
             )),
@@ -1163,16 +1183,16 @@ mod tests {
     fn negating_a_uint64_is_rejected() {
         assert_eq!(
             verify(&shaped(
-                Type::Bool,
+                typed_ast::Type::Bool,
                 vec![],
-                vec![constant(0, 1), unary(1, UnaryOp::Not, 0), ret(1)]
+                vec![constant(0, 1), unary(1, ast::UnaryOp::Not, 0), ret(1)]
             )),
             Err(Violation::OperandType {
                 index: 1,
                 position: 0,
                 value: ValueId(0),
-                found: Type::Uint64,
-                expected: Type::Bool,
+                found: typed_ast::Type::Uint64,
+                expected: typed_ast::Type::Bool,
             })
         );
     }
@@ -1181,9 +1201,9 @@ mod tests {
     fn negating_without_a_live_value_is_rejected() {
         assert_eq!(
             verify(&shaped(
-                Type::Bool,
+                typed_ast::Type::Bool,
                 vec![],
-                vec![unary(0, UnaryOp::Not, 0), ret(1)]
+                vec![unary(0, ast::UnaryOp::Not, 0), ret(1)]
             )),
             Err(Violation::StackUnderflow {
                 index: 0,
@@ -1197,12 +1217,12 @@ mod tests {
     fn negating_a_value_that_is_not_on_top_is_rejected() {
         assert_eq!(
             verify(&shaped(
-                Type::Bool,
+                typed_ast::Type::Bool,
                 vec![],
                 vec![
-                    constant_of(0, Type::Bool, 1),
-                    constant_of(1, Type::Bool, 0),
-                    unary(2, UnaryOp::Not, 0),
+                    constant_of(0, typed_ast::Type::Bool, 1),
+                    constant_of(1, typed_ast::Type::Bool, 0),
+                    unary(2, ast::UnaryOp::Not, 0),
                     ret(2),
                 ]
             )),
@@ -1220,15 +1240,15 @@ mod tests {
         // `!(1 < 2 && true)`.
         assert_eq!(
             verify(&shaped(
-                Type::Bool,
+                typed_ast::Type::Bool,
                 vec![],
                 vec![
                     constant(0, 1),
                     constant(1, 2),
-                    binary(2, BinaryOp::Lt, 0, 1),
-                    constant_of(3, Type::Bool, 1),
-                    binary(4, BinaryOp::And, 2, 3),
-                    unary(5, UnaryOp::Not, 4),
+                    binary(2, ast::BinaryOp::Lt, 0, 1),
+                    constant_of(3, typed_ast::Type::Bool, 1),
+                    binary(4, ast::BinaryOp::And, 2, 3),
+                    unary(5, ast::UnaryOp::Not, 4),
                     ret(5),
                 ]
             )),
@@ -1268,7 +1288,7 @@ mod tests {
         assert_eq!(
             Violation::LocalOutOfRange {
                 index: 3,
-                local: LocalId(2),
+                local: typed_ast::LocalId(2),
                 count: 2,
             }
             .to_string(),
@@ -1279,8 +1299,8 @@ mod tests {
                 index: 2,
                 position: 0,
                 value: ValueId(0),
-                found: Type::Bool,
-                expected: Type::Uint64,
+                found: typed_ast::Type::Bool,
+                expected: typed_ast::Type::Uint64,
             }
             .to_string(),
             "well typed: instruction 2 uses %0 of type bool as operand 0, expected uint64"
