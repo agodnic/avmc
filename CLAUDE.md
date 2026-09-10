@@ -19,5 +19,6 @@ The items in this section are not hard rules - they can be broken if there is a 
 
 # Usage
 ```sh
-cargo run -- program.txt
+cargo run --bin compiler -- program.txt
+cargo run --bin formatter -- program.txt
 ```
