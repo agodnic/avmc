@@ -1,4 +1,4 @@
-//! The `avmc` command line interface: a source file in, TEAL text out.
+//! The `compiler` command line interface: a source file in, TEAL text out.
 
 use std::io::{self, Write};
 use std::process::ExitCode;
@@ -7,7 +7,7 @@ use avmc::diag;
 use avmc::driver;
 
 /// The usage line the binary reports for any bad argument list.
-const USAGE: &str = "usage: avmc <file>";
+const USAGE: &str = "usage: compiler <file>";
 
 /// Exit code for a usage, read, or write failure.
 const FAILURE: u8 = 2;
@@ -24,7 +24,7 @@ fn main() -> ExitCode {
     let source = match std::fs::read_to_string(&path) {
         Ok(source) => source,
         Err(error) => {
-            report(&format!("avmc: cannot read {path}: {error}"));
+            report(&format!("compiler: cannot read {path}: {error}"));
             return ExitCode::from(FAILURE);
         }
     };
@@ -42,7 +42,7 @@ fn main() -> ExitCode {
     match io::stdout().write_all(teal.as_bytes()) {
         Ok(()) => ExitCode::SUCCESS,
         Err(error) => {
-            report(&format!("avmc: cannot write to stdout: {error}"));
+            report(&format!("compiler: cannot write to stdout: {error}"));
             ExitCode::from(FAILURE)
         }
     }

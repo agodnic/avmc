@@ -62,7 +62,7 @@ pub fn stage(input: Input, diags: &mut diag::Sink) -> Option<Output>;
 ```
 
 - **Stages are pure functions.** No file I/O, no network, no environment
-  access, no global mutable state. All I/O lives in the binary. Purity is what
+  access, no global mutable state. All I/O lives in the binaries. Purity is what
   makes every stage trivially testable in isolation.
 - **Errors never silently degrade.** A stage that reports an error produces no
   output that a later stage will consume; `None` is how that is expressed.

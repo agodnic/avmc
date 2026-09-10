@@ -1,6 +1,6 @@
 //! The driver: chains the stages and renders diagnostics for display.
 //!
-//! Both functions are pure; all I/O lives in `src/main.rs`.
+//! Both functions are pure; all I/O lives in `src/bin`.
 
 use crate::diag;
 use crate::emit;

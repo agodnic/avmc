@@ -1,4 +1,4 @@
-//! End-to-end tests of the `avmc` binary.
+//! End-to-end tests of the `compiler` binary.
 
 // The test helpers here are neither `#[test]` functions nor a `cfg(test)`
 // module, so `clippy.toml` does not exempt them: a panic in test setup is a
@@ -16,7 +16,7 @@ const EXAMPLE_TEAL: &str =
     "#pragma version 13\ncallsub approval\nreturn\napproval:\nproto 0 1\npushint 1\nretsub\n";
 
 /// The usage line the binary reports for any bad argument list.
-const USAGE: &str = "usage: avmc <file>\n";
+const USAGE: &str = "usage: compiler <file>\n";
 
 /// A source file that lives for as long as one test, named after it so that
 /// tests running in parallel never share a path.
@@ -44,10 +44,10 @@ impl Drop for SourceFile {
 
 /// Runs the binary with `args`.
 fn run(args: &[&str]) -> Output {
-    Command::new(env!("CARGO_BIN_EXE_avmc"))
+    Command::new(env!("CARGO_BIN_EXE_compiler"))
         .args(args)
         .output()
-        .expect("running avmc")
+        .expect("running the compiler")
 }
 
 /// The exit code of `output`, which is never a signal here.
@@ -292,7 +292,7 @@ fn reports_a_file_it_cannot_read() {
 
     assert_eq!(stdout(&output), "");
     assert!(
-        stderr(&output).starts_with("avmc: cannot read "),
+        stderr(&output).starts_with("compiler: cannot read "),
         "unexpected stderr: {}",
         stderr(&output)
     );
