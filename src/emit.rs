@@ -17,10 +17,10 @@ const ENTRY_POINT: &str = "approval";
 /// Any other function is dead code — nothing can call it yet — and is not
 /// emitted.
 pub fn emit(program: &ir::Program, diags: &mut diag::Sink) -> Option<String> {
-    let entry = entry_point(program, diags)?;
+    let func = entry_point(program, diags)?;
 
     let mut teal = format!("#pragma version {TEAL_VERSION}\ncallsub {ENTRY_POINT}\nreturn\n");
-    teal.push_str(&function(entry));
+    teal.push_str(&function(func));
     Some(teal)
 }
 
@@ -48,16 +48,16 @@ fn placeholder(ty: typed_ast::Type) -> &'static str {
 
 /// Finds the entry point, reporting it if there is none.
 fn entry_point<'a>(program: &'a ir::Program, diags: &mut diag::Sink) -> Option<&'a ir::Function> {
-    let entry = program.funcs.iter().find(|func| func.name == ENTRY_POINT);
+    let found = program.funcs.iter().find(|func| func.name == ENTRY_POINT);
 
-    if entry.is_none() {
+    if found.is_none() {
         diags.push(diag::Entry {
             kind: diag::Kind::MissingEntryPoint { name: ENTRY_POINT },
             // There is no token to point at.
             span: diag::Span { start: 0, end: 0 },
         });
     }
-    entry
+    found
 }
 
 /// The opcode an instruction emits.
