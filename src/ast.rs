@@ -81,7 +81,7 @@ pub enum Expr {
     /// Two operands joined by a binary operator.
     Binary {
         /// The operator.
-        op: BinaryOp,
+        op: BinOp,
         /// The left operand.
         lhs: Box<Expr>,
         /// The right operand.
@@ -92,7 +92,7 @@ pub enum Expr {
     /// A prefix operator applied to an operand.
     Unary {
         /// The operator.
-        op: UnaryOp,
+        op: UnOp,
         /// The operand.
         operand: Box<Expr>,
         /// From the operator through the last byte of `operand`.
@@ -133,7 +133,7 @@ impl Expr {
 
 /// A binary operator.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum BinaryOp {
+pub enum BinOp {
     /// `+`
     Add,
     /// `-`
@@ -164,7 +164,7 @@ pub enum BinaryOp {
 
 /// A prefix operator.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum UnaryOp {
+pub enum UnOp {
     /// `!`
     Not,
 }

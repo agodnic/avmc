@@ -28,7 +28,7 @@ pub enum Inst {
         /// The value it defines.
         dest: ValueId,
         /// The operator it applies.
-        op: ast::BinaryOp,
+        op: ast::BinOp,
         /// The left operand, consumed first.
         lhs: ValueId,
         /// The right operand, consumed second.
@@ -41,7 +41,7 @@ pub enum Inst {
         /// The value it defines.
         dest: ValueId,
         /// The operator it applies.
-        op: ast::UnaryOp,
+        op: ast::UnOp,
         /// The operand, consumed.
         operand: ValueId,
         /// The expression it came from.
@@ -322,7 +322,7 @@ pub fn verify(func: &Function) -> Result<(), Violation> {
                 dest, op, operand, ..
             } => {
                 match op {
-                    ast::UnaryOp::Not => {
+                    ast::UnOp::Not => {
                         consume(&mut stack, index, &[*operand], &[typed_ast::Type::Bool])?
                     }
                 }
@@ -506,7 +506,7 @@ mod tests {
         }
     }
 
-    fn binary(dest: u32, op: ast::BinaryOp, lhs: u32, rhs: u32) -> Inst {
+    fn binary(dest: u32, op: ast::BinOp, lhs: u32, rhs: u32) -> Inst {
         Inst::Binary {
             dest: ValueId(dest),
             op,
@@ -516,7 +516,7 @@ mod tests {
         }
     }
 
-    fn unary(dest: u32, op: ast::UnaryOp, operand: u32) -> Inst {
+    fn unary(dest: u32, op: ast::UnOp, operand: u32) -> Inst {
         Inst::Unary {
             dest: ValueId(dest),
             op,
@@ -536,7 +536,7 @@ mod tests {
             verify(&function(vec![
                 constant(0, 1),
                 constant(1, 2),
-                binary(2, ast::BinaryOp::Add, 0, 1),
+                binary(2, ast::BinOp::Add, 0, 1),
                 ret(2),
             ])),
             Ok(())
@@ -551,8 +551,8 @@ mod tests {
                 constant(0, 1),
                 constant(1, 2),
                 constant(2, 3),
-                binary(3, ast::BinaryOp::Mul, 1, 2),
-                binary(4, ast::BinaryOp::Add, 0, 3),
+                binary(3, ast::BinOp::Mul, 1, 2),
+                binary(4, ast::BinOp::Add, 0, 3),
                 ret(4),
             ])),
             Ok(())
@@ -565,7 +565,7 @@ mod tests {
             verify(&function(vec![
                 constant(0, 1),
                 constant(1, 2),
-                binary(2, ast::BinaryOp::Sub, 1, 0),
+                binary(2, ast::BinOp::Sub, 1, 0),
                 ret(2),
             ])),
             Err(Violation::UseOutOfOrder {
@@ -582,7 +582,7 @@ mod tests {
         assert_eq!(
             verify(&function(vec![
                 constant(0, 1),
-                binary(1, ast::BinaryOp::Add, 0, 0),
+                binary(1, ast::BinOp::Add, 0, 0),
                 ret(1),
             ])),
             Err(Violation::StackUnderflow {
@@ -674,15 +674,15 @@ mod tests {
                 vec![
                     constant(0, 1),
                     constant(1, 2),
-                    binary(2, ast::BinaryOp::Add, 0, 1),
+                    binary(2, ast::BinOp::Add, 0, 1),
                     store(0, 2),
                     load(3, 0),
                     constant(4, 3),
-                    binary(5, ast::BinaryOp::Mul, 3, 4),
+                    binary(5, ast::BinOp::Mul, 3, 4),
                     store(1, 5),
                     load(6, 1),
                     load(7, 0),
-                    binary(8, ast::BinaryOp::Sub, 6, 7),
+                    binary(8, ast::BinOp::Sub, 6, 7),
                     ret(8),
                 ]
             )),
@@ -894,7 +894,7 @@ mod tests {
             verify(&function(vec![
                 constant_of(0, typed_ast::Type::Bool, 1),
                 constant(1, 2),
-                binary(2, ast::BinaryOp::Add, 0, 1),
+                binary(2, ast::BinOp::Add, 0, 1),
                 ret(2),
             ])),
             Err(Violation::OperandType {
@@ -913,7 +913,7 @@ mod tests {
             verify(&function(vec![
                 constant(0, 1),
                 constant_of(1, typed_ast::Type::Bool, 1),
-                binary(2, ast::BinaryOp::Add, 0, 1),
+                binary(2, ast::BinOp::Add, 0, 1),
                 ret(2),
             ])),
             Err(Violation::OperandType {
@@ -948,13 +948,13 @@ mod tests {
     }
 
     /// The six comparisons, which take two `uint64` and produce a `bool`.
-    const COMPARISONS: [ast::BinaryOp; 6] = [
-        ast::BinaryOp::Eq,
-        ast::BinaryOp::Ne,
-        ast::BinaryOp::Lt,
-        ast::BinaryOp::Le,
-        ast::BinaryOp::Gt,
-        ast::BinaryOp::Ge,
+    const COMPARISONS: [ast::BinOp; 6] = [
+        ast::BinOp::Eq,
+        ast::BinOp::Ne,
+        ast::BinOp::Lt,
+        ast::BinOp::Le,
+        ast::BinOp::Gt,
+        ast::BinOp::Ge,
     ];
 
     #[test]
@@ -978,7 +978,7 @@ mod tests {
             verify(&function(vec![
                 constant(0, 1),
                 constant(1, 2),
-                binary(2, ast::BinaryOp::Lt, 0, 1),
+                binary(2, ast::BinOp::Lt, 0, 1),
                 ret(2),
             ])),
             Err(Violation::OperandType {
@@ -997,7 +997,7 @@ mod tests {
             verify(&function(vec![
                 constant(0, 1),
                 constant(1, 2),
-                binary(2, ast::BinaryOp::Eq, 0, 1),
+                binary(2, ast::BinOp::Eq, 0, 1),
                 ret(2),
             ])),
             Err(Violation::OperandType {
@@ -1012,7 +1012,7 @@ mod tests {
 
     #[test]
     fn equality_over_two_bools_is_valid() {
-        for op in [ast::BinaryOp::Eq, ast::BinaryOp::Ne] {
+        for op in [ast::BinOp::Eq, ast::BinOp::Ne] {
             assert_eq!(
                 verify(&shaped(
                     typed_ast::Type::Bool,
@@ -1039,7 +1039,7 @@ mod tests {
                 vec![
                     constant_of(0, typed_ast::Type::Bool, 1),
                     constant_of(1, typed_ast::Type::Bool, 0),
-                    binary(2, ast::BinaryOp::Lt, 0, 1),
+                    binary(2, ast::BinOp::Lt, 0, 1),
                     ret(2),
                 ]
             )),
@@ -1062,7 +1062,7 @@ mod tests {
                 vec![
                     constant(0, 1),
                     constant_of(1, typed_ast::Type::Bool, 1),
-                    binary(2, ast::BinaryOp::Eq, 0, 1),
+                    binary(2, ast::BinOp::Eq, 0, 1),
                     ret(2),
                 ]
             )),
@@ -1086,7 +1086,7 @@ mod tests {
                 vec![
                     constant_of(0, typed_ast::Type::Bool, 1),
                     constant(1, 1),
-                    binary(2, ast::BinaryOp::Eq, 0, 1),
+                    binary(2, ast::BinOp::Eq, 0, 1),
                     ret(2),
                 ]
             )),
@@ -1108,7 +1108,7 @@ mod tests {
                 vec![],
                 vec![
                     constant_of(0, typed_ast::Type::Bool, 1),
-                    binary(1, ast::BinaryOp::Eq, 0, 1),
+                    binary(1, ast::BinOp::Eq, 0, 1),
                     ret(2),
                 ]
             )),
@@ -1122,7 +1122,7 @@ mod tests {
 
     #[test]
     fn logic_over_two_bools_is_valid() {
-        for op in [ast::BinaryOp::And, ast::BinaryOp::Or] {
+        for op in [ast::BinOp::And, ast::BinOp::Or] {
             assert_eq!(
                 verify(&shaped(
                     typed_ast::Type::Bool,
@@ -1149,7 +1149,7 @@ mod tests {
                 vec![
                     constant(0, 1),
                     constant_of(1, typed_ast::Type::Bool, 1),
-                    binary(2, ast::BinaryOp::And, 0, 1),
+                    binary(2, ast::BinOp::And, 0, 1),
                     ret(2),
                 ]
             )),
@@ -1171,7 +1171,7 @@ mod tests {
                 vec![],
                 vec![
                     constant_of(0, typed_ast::Type::Bool, 1),
-                    unary(1, ast::UnaryOp::Not, 0),
+                    unary(1, ast::UnOp::Not, 0),
                     ret(1),
                 ]
             )),
@@ -1185,7 +1185,7 @@ mod tests {
             verify(&shaped(
                 typed_ast::Type::Bool,
                 vec![],
-                vec![constant(0, 1), unary(1, ast::UnaryOp::Not, 0), ret(1)]
+                vec![constant(0, 1), unary(1, ast::UnOp::Not, 0), ret(1)]
             )),
             Err(Violation::OperandType {
                 index: 1,
@@ -1203,7 +1203,7 @@ mod tests {
             verify(&shaped(
                 typed_ast::Type::Bool,
                 vec![],
-                vec![unary(0, ast::UnaryOp::Not, 0), ret(1)]
+                vec![unary(0, ast::UnOp::Not, 0), ret(1)]
             )),
             Err(Violation::StackUnderflow {
                 index: 0,
@@ -1222,7 +1222,7 @@ mod tests {
                 vec![
                     constant_of(0, typed_ast::Type::Bool, 1),
                     constant_of(1, typed_ast::Type::Bool, 0),
-                    unary(2, ast::UnaryOp::Not, 0),
+                    unary(2, ast::UnOp::Not, 0),
                     ret(2),
                 ]
             )),
@@ -1245,10 +1245,10 @@ mod tests {
                 vec![
                     constant(0, 1),
                     constant(1, 2),
-                    binary(2, ast::BinaryOp::Lt, 0, 1),
+                    binary(2, ast::BinOp::Lt, 0, 1),
                     constant_of(3, typed_ast::Type::Bool, 1),
-                    binary(4, ast::BinaryOp::And, 2, 3),
-                    unary(5, ast::UnaryOp::Not, 4),
+                    binary(4, ast::BinOp::And, 2, 3),
+                    unary(5, ast::UnOp::Not, 4),
                     ret(5),
                 ]
             )),

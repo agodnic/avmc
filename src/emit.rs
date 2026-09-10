@@ -65,22 +65,22 @@ fn opcode(inst: &ir::Inst) -> &'static str {
     match inst {
         ir::Inst::Const { .. } => "pushint",
         ir::Inst::Binary { op, .. } => match op {
-            ast::BinaryOp::Add => "+",
-            ast::BinaryOp::Sub => "-",
-            ast::BinaryOp::Mul => "*",
-            ast::BinaryOp::Div => "/",
-            ast::BinaryOp::Mod => "%",
-            ast::BinaryOp::Eq => "==",
-            ast::BinaryOp::Ne => "!=",
-            ast::BinaryOp::Lt => "<",
-            ast::BinaryOp::Le => "<=",
-            ast::BinaryOp::Gt => ">",
-            ast::BinaryOp::Ge => ">=",
-            ast::BinaryOp::And => "&&",
-            ast::BinaryOp::Or => "||",
+            ast::BinOp::Add => "+",
+            ast::BinOp::Sub => "-",
+            ast::BinOp::Mul => "*",
+            ast::BinOp::Div => "/",
+            ast::BinOp::Mod => "%",
+            ast::BinOp::Eq => "==",
+            ast::BinOp::Ne => "!=",
+            ast::BinOp::Lt => "<",
+            ast::BinOp::Le => "<=",
+            ast::BinOp::Gt => ">",
+            ast::BinOp::Ge => ">=",
+            ast::BinOp::And => "&&",
+            ast::BinOp::Or => "||",
         },
         ir::Inst::Unary { op, .. } => match op {
-            ast::UnaryOp::Not => "!",
+            ast::UnOp::Not => "!",
         },
         ir::Inst::Store { .. } => "frame_bury",
         ir::Inst::Load { .. } => "frame_dig",
@@ -172,7 +172,7 @@ mod tests {
         }
     }
 
-    fn binary(dest: u32, op: ast::BinaryOp, lhs: u32, rhs: u32) -> ir::Inst {
+    fn binary(dest: u32, op: ast::BinOp, lhs: u32, rhs: u32) -> ir::Inst {
         ir::Inst::Binary {
             dest: ir::ValueId(dest),
             op,
@@ -182,7 +182,7 @@ mod tests {
         }
     }
 
-    fn unary(dest: u32, op: ast::UnaryOp, operand: u32) -> ir::Inst {
+    fn unary(dest: u32, op: ast::UnOp, operand: u32) -> ir::Inst {
         ir::Inst::Unary {
             dest: ir::ValueId(dest),
             op,
@@ -246,15 +246,15 @@ mod tests {
         let insts = vec![
             constant(0, 1),
             constant(1, 2),
-            binary(2, ast::BinaryOp::Add, 0, 1),
+            binary(2, ast::BinOp::Add, 0, 1),
             store(0, 2),
             load(3, 0),
             constant(4, 3),
-            binary(5, ast::BinaryOp::Mul, 3, 4),
+            binary(5, ast::BinOp::Mul, 3, 4),
             store(1, 5),
             load(6, 1),
             load(7, 0),
-            binary(8, ast::BinaryOp::Sub, 6, 7),
+            binary(8, ast::BinOp::Sub, 6, 7),
             ret(8),
         ];
         assert_eq!(
@@ -361,12 +361,12 @@ mod tests {
     #[test]
     fn a_comparison_emits_its_mnemonic() {
         let cases = [
-            (ast::BinaryOp::Eq, "=="),
-            (ast::BinaryOp::Ne, "!="),
-            (ast::BinaryOp::Lt, "<"),
-            (ast::BinaryOp::Le, "<="),
-            (ast::BinaryOp::Gt, ">"),
-            (ast::BinaryOp::Ge, ">="),
+            (ast::BinOp::Eq, "=="),
+            (ast::BinOp::Ne, "!="),
+            (ast::BinOp::Lt, "<"),
+            (ast::BinOp::Le, "<="),
+            (ast::BinOp::Gt, ">"),
+            (ast::BinOp::Ge, ">="),
         ];
         for (op, mnemonic) in cases {
             let insts = vec![constant(0, 1), constant(1, 2), binary(2, op, 0, 1), ret(2)];
@@ -380,7 +380,7 @@ mod tests {
 
     #[test]
     fn logic_emits_its_mnemonic() {
-        for (op, mnemonic) in [(ast::BinaryOp::And, "&&"), (ast::BinaryOp::Or, "||")] {
+        for (op, mnemonic) in [(ast::BinOp::And, "&&"), (ast::BinOp::Or, "||")] {
             let insts = vec![
                 constant_of(0, typed_ast::Type::Bool, 1),
                 constant_of(1, typed_ast::Type::Bool, 0),
@@ -399,7 +399,7 @@ mod tests {
     fn negation_emits_its_mnemonic() {
         let insts = vec![
             constant_of(0, typed_ast::Type::Bool, 1),
-            unary(1, ast::UnaryOp::Not, 0),
+            unary(1, ast::UnOp::Not, 0),
             ret(1),
         ];
         assert_eq!(
@@ -414,10 +414,10 @@ mod tests {
         let insts = vec![
             constant(0, 1),
             constant(1, 2),
-            binary(2, ast::BinaryOp::Lt, 0, 1),
+            binary(2, ast::BinOp::Lt, 0, 1),
             constant_of(3, typed_ast::Type::Bool, 1),
-            binary(4, ast::BinaryOp::And, 2, 3),
-            unary(5, ast::UnaryOp::Not, 4),
+            binary(4, ast::BinOp::And, 2, 3),
+            unary(5, ast::UnOp::Not, 4),
             ret(5),
         ];
         assert_eq!(

@@ -413,7 +413,7 @@ mod tests {
                     local: typed_ast::LocalId(0),
                     ty: typed_ast::Type::Uint64,
                     init: binary(
-                        ast::BinaryOp::Add,
+                        ast::BinOp::Add,
                         uint64(typed_ast::ExprKind::IntLit(1), one),
                         uint64(typed_ast::ExprKind::IntLit(2), two),
                     ),
@@ -426,7 +426,7 @@ mod tests {
                     local: typed_ast::LocalId(1),
                     ty: typed_ast::Type::Uint64,
                     init: binary(
-                        ast::BinaryOp::Mul,
+                        ast::BinOp::Mul,
                         uint64(typed_ast::ExprKind::Var(typed_ast::LocalId(0)), x_times),
                         uint64(typed_ast::ExprKind::IntLit(3), three),
                     ),
@@ -437,7 +437,7 @@ mod tests {
                 },
                 typed_ast::Stmt::Return {
                     expr: binary(
-                        ast::BinaryOp::Sub,
+                        ast::BinOp::Sub,
                         uint64(typed_ast::ExprKind::Var(typed_ast::LocalId(1)), y_minus),
                         uint64(typed_ast::ExprKind::Var(typed_ast::LocalId(0)), x_minus),
                     ),
@@ -659,7 +659,7 @@ mod tests {
 
         let product = uint64(
             typed_ast::ExprKind::Binary {
-                op: ast::BinaryOp::Mul,
+                op: ast::BinOp::Mul,
                 lhs: Box::new(literal(2, 0)),
                 rhs: Box::new(literal(3, 0)),
             },
@@ -667,7 +667,7 @@ mod tests {
         );
         let sum = uint64(
             typed_ast::ExprKind::Binary {
-                op: ast::BinaryOp::Add,
+                op: ast::BinOp::Add,
                 lhs: Box::new(literal(1, 0)),
                 rhs: Box::new(product),
             },
@@ -1132,7 +1132,7 @@ mod tests {
             returned(source),
             typed_ast::Expr {
                 kind: typed_ast::ExprKind::Binary {
-                    op: ast::BinaryOp::Lt,
+                    op: ast::BinOp::Lt,
                     lhs: Box::new(typed_ast::Expr {
                         kind: typed_ast::ExprKind::IntLit(1),
                         ty: typed_ast::Type::Uint64,
@@ -1165,7 +1165,7 @@ mod tests {
             returned(source),
             typed_ast::Expr {
                 kind: typed_ast::ExprKind::Binary {
-                    op: ast::BinaryOp::Eq,
+                    op: ast::BinOp::Eq,
                     lhs: Box::new(typed_ast::Expr {
                         kind: typed_ast::ExprKind::BoolLit(true),
                         ty: typed_ast::Type::Bool,
@@ -1316,7 +1316,7 @@ mod tests {
             returned(source),
             typed_ast::Expr {
                 kind: typed_ast::ExprKind::Unary {
-                    op: ast::UnaryOp::Not,
+                    op: ast::UnOp::Not,
                     operand: Box::new(typed_ast::Expr {
                         kind: typed_ast::ExprKind::BoolLit(true),
                         ty: typed_ast::Type::Bool,
@@ -1334,11 +1334,11 @@ mod tests {
         for (source, op) in [
             (
                 "func approval() bool { return true && false }",
-                ast::BinaryOp::And,
+                ast::BinOp::And,
             ),
             (
                 "func approval() bool { return true || false }",
-                ast::BinaryOp::Or,
+                ast::BinOp::Or,
             ),
         ] {
             let mut span = testing::spans(source);
