@@ -1,21 +1,17 @@
-//! The parser: tokens to an AST by recursive descent.
+//! The parser: tokens to a concrete syntax tree by recursive descent.
 
 use crate::ast;
+use crate::cst;
 use crate::diag;
 use crate::precedence;
 use crate::token;
 
-/// Parses the token stream `lex` produced for `source`.
+/// Parses the token stream `lex` produced.
 ///
 /// Returns `None` as soon as anything is wrong; one run reports at most
 /// one diagnostic.
-pub fn parse(
-    source: &str,
-    tokens: &[token::Token],
-    diags: &mut diag::Sink,
-) -> Option<ast::Program> {
+pub fn parse(tokens: &[token::Token], diags: &mut diag::Sink) -> Option<cst::Program> {
     Parser {
-        source,
         tokens,
         next: 0,
         diags,
@@ -27,7 +23,6 @@ pub fn parse(
 const OPERAND: &str = "a literal, an identifier, `!`, or `(`";
 
 struct Parser<'a> {
-    source: &'a str,
     tokens: &'a [token::Token],
     /// Index of the token to be consumed next.
     next: usize,
@@ -35,66 +30,64 @@ struct Parser<'a> {
 }
 
 impl Parser<'_> {
-    fn program(&mut self) -> Option<ast::Program> {
+    fn program(&mut self) -> Option<cst::Program> {
         let mut funcs = Vec::new();
         while self.peek_kind() != Some(token::Kind::Eof) {
             funcs.push(self.func_decl()?);
         }
-        Some(ast::Program { funcs })
+        let eof = self.expect(token::Kind::Eof, "`func`")?;
+        Some(cst::Program { funcs, eof })
     }
 
-    fn func_decl(&mut self) -> Option<ast::FuncDecl> {
-        let start = self.expect(token::Kind::Func, "`func`")?.span.start;
+    fn func_decl(&mut self) -> Option<cst::FuncDecl> {
+        let func = self.expect(token::Kind::Func, "`func`")?;
         let name = self.name()?;
-        self.expect(token::Kind::LParen, "`(`")?;
-        self.expect(token::Kind::RParen, "`)`")?;
-        let ret = ast::TypeRef { name: self.name()? };
-        self.expect(token::Kind::LBrace, "`{`")?;
+        let lparen = self.expect(token::Kind::LParen, "`(`")?;
+        let rparen = self.expect(token::Kind::RParen, "`)`")?;
+        let ret = self.name()?;
+        let lbrace = self.expect(token::Kind::LBrace, "`{`")?;
 
         let mut body = Vec::new();
         while self.peek_kind() != Some(token::Kind::RBrace) {
             body.push(self.stmt()?);
         }
-        let end = self.expect(token::Kind::RBrace, "`}`")?.span.end;
+        let rbrace = self.expect(token::Kind::RBrace, "`}`")?;
 
-        Some(ast::FuncDecl {
+        Some(cst::FuncDecl {
+            func,
             name,
+            lparen,
+            rparen,
             ret,
+            lbrace,
             body,
-            span: diag::Span { start, end },
+            rbrace,
         })
     }
 
-    fn stmt(&mut self) -> Option<ast::Stmt> {
+    fn stmt(&mut self) -> Option<cst::Stmt> {
         if self.peek_kind() == Some(token::Kind::Var) {
             return self.var_stmt();
         }
 
-        let start = self
-            .expect(token::Kind::Return, "`var`, `return` or `}`")?
-            .span
-            .start;
+        let ret = self.expect(token::Kind::Return, "`var`, `return` or `}`")?;
         let expr = self.expr(None)?;
-        let end = expr.span().end;
-        Some(ast::Stmt::Return {
-            expr,
-            span: diag::Span { start, end },
-        })
+        Some(cst::Stmt::Return { ret, expr })
     }
 
     /// `var name type = init`.
-    fn var_stmt(&mut self) -> Option<ast::Stmt> {
-        let start = self.expect(token::Kind::Var, "`var`")?.span.start;
+    fn var_stmt(&mut self) -> Option<cst::Stmt> {
+        let var = self.expect(token::Kind::Var, "`var`")?;
         let name = self.name()?;
-        let ty = ast::TypeRef { name: self.name()? };
-        self.expect(token::Kind::Equals, "`=`")?;
+        let ty = self.name()?;
+        let equals = self.expect(token::Kind::Equals, "`=`")?;
         let init = self.expr(None)?;
-        let end = init.span().end;
-        Some(ast::Stmt::Var {
+        Some(cst::Stmt::Var {
+            var,
             name,
             ty,
+            equals,
             init,
-            span: diag::Span { start, end },
         })
     }
 
@@ -107,7 +100,7 @@ impl Parser<'_> {
     // diagnostic, and no hand-written source comes close to the limit. The
     // trade is deliberate and is not being revisited yet: do not add a bound,
     // and do not report this as a bug.
-    fn expr(&mut self, ambient: Option<token::Token>) -> Option<ast::Expr> {
+    fn expr(&mut self, ambient: Option<token::Token>) -> Option<cst::Expr> {
         let mut lhs = self.operand(ambient)?;
         // The caller only ever passes a token it consumed as an operator.
         let enclosing = ambient.and_then(|token| Some((token, operator_group(token.kind)?)));
@@ -130,15 +123,10 @@ impl Parser<'_> {
 
             self.next += 1;
             let rhs = self.expr(Some(token))?;
-            let span = diag::Span {
-                start: lhs.span().start,
-                end: rhs.span().end,
-            };
-            lhs = ast::Expr::Binary {
-                op,
+            lhs = cst::Expr::Binary {
                 lhs: Box::new(lhs),
+                op: token,
                 rhs: Box::new(rhs),
-                span,
             };
         }
 
@@ -147,44 +135,38 @@ impl Parser<'_> {
 
     /// A literal, a variable, a parenthesized expression, or `!` applied to
     /// one. `ambient` is the enclosing operator, as in `expr`.
-    fn operand(&mut self, ambient: Option<token::Token>) -> Option<ast::Expr> {
+    fn operand(&mut self, ambient: Option<token::Token>) -> Option<cst::Expr> {
         if let Some(&bang) = self.peek().filter(|token| token.kind == token::Kind::Bang) {
             return self.not(bang, ambient);
         }
 
         if self.peek_kind() == Some(token::Kind::LParen) {
-            let start = self.expect(token::Kind::LParen, OPERAND)?.span.start;
+            let lparen = self.expect(token::Kind::LParen, OPERAND)?;
             let inner = self.expr(None)?;
-            let end = self.expect(token::Kind::RParen, "`)`")?.span.end;
-            return Some(inner.with_span(diag::Span { start, end }));
-        }
-
-        if let Some(kind @ (token::Kind::True | token::Kind::False)) = self.peek_kind() {
-            let span = self.expect(kind, OPERAND)?.span;
-            return Some(ast::Expr::BoolLit {
-                value: kind == token::Kind::True,
-                span,
+            let rparen = self.expect(token::Kind::RParen, "`)`")?;
+            return Some(cst::Expr::Paren {
+                lparen,
+                inner: Box::new(inner),
+                rparen,
             });
         }
 
-        if self.peek_kind() == Some(token::Kind::Ident) {
-            let name = self.name()?;
-            let span = name.span;
-            return Some(ast::Expr::Var { name, span });
+        if let Some(kind @ (token::Kind::True | token::Kind::False)) = self.peek_kind() {
+            return Some(cst::Expr::BoolLit(self.expect(kind, OPERAND)?));
         }
 
-        let span = self.expect(token::Kind::IntLit, OPERAND)?.span;
-        match self.text(span).parse::<u64>() {
-            Ok(value) => Some(ast::Expr::IntLit { value, span }),
-            // The lexer only admits ASCII digits, so overflow is the one way
-            // parsing can fail here.
-            Err(_) => self.report(diag::Kind::IntegerLiteralOutOfRange, span),
+        if self.peek_kind() == Some(token::Kind::Ident) {
+            return Some(cst::Expr::Var(self.name()?));
         }
+
+        Some(cst::Expr::IntLit(
+            self.expect(token::Kind::IntLit, OPERAND)?,
+        ))
     }
 
     /// `!` applied to an operand, `bang` being the operator token, which is
     /// still to be consumed.
-    fn not(&mut self, bang: token::Token, ambient: Option<token::Token>) -> Option<ast::Expr> {
+    fn not(&mut self, bang: token::Token, ambient: Option<token::Token>) -> Option<cst::Expr> {
         // An enclosing operator the graph does not order against `!` is the
         // whole point of a partial order: the source must parenthesize.
         let enclosing = ambient.and_then(|token| Some((token, operator_group(token.kind)?)));
@@ -203,23 +185,14 @@ impl Parser<'_> {
         // Parsing the operand with `!` enclosing it is what places the
         // operators that follow it.
         let operand = self.expr(Some(bang))?;
-        let span = diag::Span {
-            start: bang.span.start,
-            end: operand.span().end,
-        };
-        Some(ast::Expr::Unary {
-            op: ast::UnOp::Not,
+        Some(cst::Expr::Unary {
+            op: bang,
             operand: Box::new(operand),
-            span,
         })
     }
 
-    fn name(&mut self) -> Option<ast::Name> {
-        let span = self.expect(token::Kind::Ident, "an identifier")?.span;
-        Some(ast::Name {
-            text: self.text(span).to_string(),
-            span,
-        })
+    fn name(&mut self) -> Option<token::Token> {
+        self.expect(token::Kind::Ident, "an identifier")
     }
 
     /// Consumes the next token if it is a `kind`, and reports the unexpected
@@ -233,13 +206,9 @@ impl Parser<'_> {
             found => {
                 let (found, span) = match found {
                     Some(token) => (describe(token.kind), token.span),
-                    None => (
-                        "end of input",
-                        diag::Span {
-                            start: self.source.len(),
-                            end: self.source.len(),
-                        },
-                    ),
+                    // A stream that ran out has no `Eof` to point at, so the
+                    // last token there is stands in for the end of input.
+                    None => ("end of input", self.last_span()),
                 };
                 self.report(diag::Kind::UnexpectedToken { expected, found }, span)
             }
@@ -263,13 +232,14 @@ impl Parser<'_> {
     /// The next token and the operator it denotes, if it denotes one.
     fn peek_binary_op(&self) -> Option<(token::Token, ast::BinOp)> {
         let &token = self.peek()?;
-        Some((token, binary_op(token.kind)?))
+        Some((token, ast::binary_op(token.kind)?))
     }
 
-    /// The source text a token covers. `lex` guarantees valid spans; the
-    /// fallback is the one place the parser trusts it.
-    fn text(&self, span: diag::Span) -> &str {
-        self.source.get(span.start..span.end).unwrap_or("")
+    /// The span of the last token in the stream, empty if there is none.
+    fn last_span(&self) -> diag::Span {
+        self.tokens
+            .last()
+            .map_or(diag::Span { start: 0, end: 0 }, |token| token.span)
     }
 }
 
@@ -309,40 +279,7 @@ fn describe(kind: token::Kind) -> &'static str {
 fn operator_group(kind: token::Kind) -> Option<precedence::Group> {
     match kind {
         token::Kind::Bang => Some(precedence::unary_group(ast::UnOp::Not)),
-        kind => binary_op(kind).map(precedence::group),
-    }
-}
-
-/// The operator a token denotes, if it denotes one.
-fn binary_op(kind: token::Kind) -> Option<ast::BinOp> {
-    match kind {
-        token::Kind::Plus => Some(ast::BinOp::Add),
-        token::Kind::Minus => Some(ast::BinOp::Sub),
-        token::Kind::Star => Some(ast::BinOp::Mul),
-        token::Kind::Slash => Some(ast::BinOp::Div),
-        token::Kind::Percent => Some(ast::BinOp::Mod),
-        token::Kind::EqEq => Some(ast::BinOp::Eq),
-        token::Kind::BangEq => Some(ast::BinOp::Ne),
-        token::Kind::Lt => Some(ast::BinOp::Lt),
-        token::Kind::LtEq => Some(ast::BinOp::Le),
-        token::Kind::Gt => Some(ast::BinOp::Gt),
-        token::Kind::GtEq => Some(ast::BinOp::Ge),
-        token::Kind::AmpAmp => Some(ast::BinOp::And),
-        token::Kind::PipePipe => Some(ast::BinOp::Or),
-        token::Kind::Func
-        | token::Kind::Return
-        | token::Kind::Var
-        | token::Kind::True
-        | token::Kind::False
-        | token::Kind::Ident
-        | token::Kind::IntLit
-        | token::Kind::LParen
-        | token::Kind::RParen
-        | token::Kind::LBrace
-        | token::Kind::RBrace
-        | token::Kind::Equals
-        | token::Kind::Bang
-        | token::Kind::Eof => None,
+        kind => ast::binary_op(kind).map(precedence::group),
     }
 }
 
@@ -351,21 +288,25 @@ mod tests {
     use super::*;
     use crate::testing;
 
-    /// Lexes and parses `source`, asserting that it produced no diagnostics.
+    /// Lexes `source`, parses it, and builds its AST, asserting that nothing
+    /// reported a diagnostic. The tests assert on the AST, not the CST.
     fn parse_ok(source: &str) -> ast::Program {
         let mut diags = diag::Sink::default();
         let tokens = token::lex(source, &mut diags).expect("lexing succeeded");
-        let program = parse(source, &tokens, &mut diags);
+        let parsed = parse(&tokens, &mut diags).expect("parsing succeeded");
+        let program = ast::from_cst(source, &parsed, &mut diags);
         assert!(diags.is_empty());
-        program.expect("parsing succeeded")
+        program.expect("the AST was built")
     }
 
-    /// Lexes and parses `source`, asserting that it reported exactly one
-    /// diagnostic and produced nothing.
+    /// The same, for a `source` that must report exactly one diagnostic and
+    /// produce no AST.
     fn parse_err(source: &str) -> diag::Entry {
         let mut diags = diag::Sink::default();
         let tokens = token::lex(source, &mut diags).expect("lexing succeeded");
-        assert_eq!(parse(source, &tokens, &mut diags), None);
+        let parsed = parse(&tokens, &mut diags);
+        let program = parsed.and_then(|parsed| ast::from_cst(source, &parsed, &mut diags));
+        assert_eq!(program, None);
         let mut reported = diags.iter();
         let diagnostic = reported.next().expect("one diagnostic").clone();
         assert!(reported.next().is_none());
@@ -555,23 +496,15 @@ mod tests {
     }
 
     #[test]
-    fn parentheses_around_a_variable_widen_its_span() {
+    fn parentheses_around_a_variable_are_dropped() {
         let source = wrap("(x)");
-        let mut span = testing::spans(&source);
-        span("(");
-        span(")");
-        let open = span("(");
-        let x = span("x");
-        let close = span(")");
+        let x = testing::span_of(&source, "x", 0);
 
         assert_eq!(
             returned(&source),
             ast::Expr::Var {
                 name: testing::name("x", x),
-                span: diag::Span {
-                    start: open.start,
-                    end: close.end
-                },
+                span: x,
             }
         );
     }
@@ -826,14 +759,14 @@ mod tests {
     }
 
     #[test]
-    fn parentheses_widen_a_boolean_literal() {
+    fn parentheses_around_a_boolean_literal_are_dropped() {
         let source = wrap("(false)");
 
         assert_eq!(
             returned(&source),
             ast::Expr::BoolLit {
                 value: false,
-                span: testing::span_of(&source, "(false)", 0),
+                span: testing::span_of(&source, "false", 0),
             }
         );
     }
@@ -1089,67 +1022,35 @@ mod tests {
     }
 
     #[test]
-    fn parentheses_regroup_and_widen_the_span() {
+    fn parentheses_regroup() {
         let source = wrap("(1 + 2) * 3");
         let mut span = testing::spans(&source);
         span("(");
         span(")");
-        let open = span("(");
         let one = span("1");
         let two = span("2");
-        let close = span(")");
-        span("*");
         let three = span("3");
 
+        let int = |value, span| ast::Expr::IntLit { value, span };
         assert_eq!(
             returned(&source),
-            ast::Expr::Binary {
-                op: ast::BinOp::Mul,
-                lhs: Box::new(ast::Expr::Binary {
-                    op: ast::BinOp::Add,
-                    lhs: Box::new(ast::Expr::IntLit {
-                        value: 1,
-                        span: one
-                    }),
-                    rhs: Box::new(ast::Expr::IntLit {
-                        value: 2,
-                        span: two
-                    }),
-                    span: diag::Span {
-                        start: open.start,
-                        end: close.end
-                    },
-                }),
-                rhs: Box::new(ast::Expr::IntLit {
-                    value: 3,
-                    span: three
-                }),
-                span: diag::Span {
-                    start: open.start,
-                    end: three.end
-                },
-            }
+            binary(
+                ast::BinOp::Mul,
+                binary(ast::BinOp::Add, int(1, one), int(2, two)),
+                int(3, three),
+            )
         );
     }
 
     #[test]
-    fn parentheses_around_a_literal_widen_its_span() {
+    fn parentheses_around_a_literal_are_dropped() {
         let source = wrap("(1)");
-        let mut span = testing::spans(&source);
-        span("(");
-        span(")");
-        let open = span("(");
-        span("1");
-        let close = span(")");
 
         assert_eq!(
             returned(&source),
             ast::Expr::IntLit {
                 value: 1,
-                span: diag::Span {
-                    start: open.start,
-                    end: close.end
-                },
+                span: testing::span_of(&source, "1", 0),
             }
         );
     }
@@ -1160,30 +1061,13 @@ mod tests {
         let mut span = testing::spans(&source);
         span("(");
         span(")");
-        let open = span("(");
-        span("(");
         let one = span("1");
         let two = span("2");
-        span(")");
-        let close = span(")");
 
+        let int = |value, span| ast::Expr::IntLit { value, span };
         assert_eq!(
             returned(&source),
-            ast::Expr::Binary {
-                op: ast::BinOp::Add,
-                lhs: Box::new(ast::Expr::IntLit {
-                    value: 1,
-                    span: one
-                }),
-                rhs: Box::new(ast::Expr::IntLit {
-                    value: 2,
-                    span: two
-                }),
-                span: diag::Span {
-                    start: open.start,
-                    end: close.end
-                },
-            }
+            binary(ast::BinOp::Add, int(1, one), int(2, two))
         );
     }
 
@@ -1219,40 +1103,18 @@ mod tests {
         let mut span = testing::spans(&source);
         span("(");
         span(")");
-        let open = span("(");
         let one = span("1");
         let two = span("2");
-        let close = span(")");
         let three = span("3");
 
+        let int = |value, span| ast::Expr::IntLit { value, span };
         assert_eq!(
             returned(&source),
-            ast::Expr::Binary {
-                op: ast::BinOp::Mod,
-                lhs: Box::new(ast::Expr::Binary {
-                    op: ast::BinOp::Mod,
-                    lhs: Box::new(ast::Expr::IntLit {
-                        value: 1,
-                        span: one
-                    }),
-                    rhs: Box::new(ast::Expr::IntLit {
-                        value: 2,
-                        span: two
-                    }),
-                    span: diag::Span {
-                        start: open.start,
-                        end: close.end
-                    },
-                }),
-                rhs: Box::new(ast::Expr::IntLit {
-                    value: 3,
-                    span: three
-                }),
-                span: diag::Span {
-                    start: open.start,
-                    end: three.end
-                },
-            }
+            binary(
+                ast::BinOp::Mod,
+                binary(ast::BinOp::Mod, int(1, one), int(2, two)),
+                int(3, three),
+            )
         );
     }
 
@@ -1509,27 +1371,12 @@ mod tests {
         let mut span = testing::spans(&source);
         span("(");
         span(")");
-        let open = span("(");
         let one = span("1");
         let two = span("2");
-        let close = span(")");
         let literal = span("true");
 
-        let parenthesized = ast::Expr::Binary {
-            op: ast::BinOp::Lt,
-            lhs: Box::new(ast::Expr::IntLit {
-                value: 1,
-                span: one,
-            }),
-            rhs: Box::new(ast::Expr::IntLit {
-                value: 2,
-                span: two,
-            }),
-            span: diag::Span {
-                start: open.start,
-                end: close.end,
-            },
-        };
+        let int = |value, span| ast::Expr::IntLit { value, span };
+        let parenthesized = binary(ast::BinOp::Lt, int(1, one), int(2, two));
 
         assert_eq!(
             returned(&source),
@@ -1584,31 +1431,21 @@ mod tests {
         let mut span = testing::spans(&source);
         span("(");
         span(")");
-        let open = span("(");
+        let bang = span("!");
         let one = span("1");
         let two = span("2");
-        let close = span(")");
 
+        let int = |value, span| ast::Expr::IntLit { value, span };
         assert_eq!(
             returned(&source),
-            unary(
-                ast::UnOp::Not,
-                ast::Expr::Binary {
-                    op: ast::BinOp::Lt,
-                    lhs: Box::new(ast::Expr::IntLit {
-                        value: 1,
-                        span: one,
-                    }),
-                    rhs: Box::new(ast::Expr::IntLit {
-                        value: 2,
-                        span: two,
-                    }),
-                    span: diag::Span {
-                        start: open.start,
-                        end: close.end,
-                    },
+            ast::Expr::Unary {
+                op: ast::UnOp::Not,
+                operand: Box::new(binary(ast::BinOp::Lt, int(1, one), int(2, two))),
+                span: diag::Span {
+                    start: bang.start,
+                    end: two.end,
                 },
-            )
+            }
         );
     }
 
@@ -1776,35 +1613,17 @@ mod tests {
         let mut span = testing::spans(&source);
         span("(");
         span(")");
-        let open = span("(");
         let yes = span("true");
         let no = span("false");
-        let close = span(")");
         let last = span("true");
 
+        let boolean = |value, span| ast::Expr::BoolLit { value, span };
         assert_eq!(
             returned(&source),
             binary(
                 ast::BinOp::Or,
-                ast::Expr::Binary {
-                    op: ast::BinOp::And,
-                    lhs: Box::new(ast::Expr::BoolLit {
-                        value: true,
-                        span: yes,
-                    }),
-                    rhs: Box::new(ast::Expr::BoolLit {
-                        value: false,
-                        span: no,
-                    }),
-                    span: diag::Span {
-                        start: open.start,
-                        end: close.end,
-                    },
-                },
-                ast::Expr::BoolLit {
-                    value: true,
-                    span: last,
-                },
+                binary(ast::BinOp::And, boolean(true, yes), boolean(false, no)),
+                boolean(true, last),
             )
         );
     }

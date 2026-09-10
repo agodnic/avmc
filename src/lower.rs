@@ -242,7 +242,7 @@ mod tests {
                     op: ast::BinOp::Add,
                     lhs: ir::ValueId(0),
                     rhs: ir::ValueId(1),
-                    span: testing::span_of(source, "(1 + 2)", 0),
+                    span: testing::span_of(source, "1 + 2", 0),
                 },
                 ir::Inst::Const {
                     dest: ir::ValueId(3),
@@ -255,7 +255,10 @@ mod tests {
                     op: ast::BinOp::Mul,
                     lhs: ir::ValueId(2),
                     rhs: ir::ValueId(3),
-                    span: testing::span_of(source, "(1 + 2) * 3", 0),
+                    span: diag::Span {
+                        start: testing::span_of(source, "1 + 2", 0).start,
+                        end: testing::span_of(source, "3", 0).end,
+                    },
                 },
                 ir::Inst::Const {
                     dest: ir::ValueId(5),
@@ -281,7 +284,10 @@ mod tests {
                     op: ast::BinOp::Sub,
                     lhs: ir::ValueId(4),
                     rhs: ir::ValueId(7),
-                    span: testing::span_of(source, "(1 + 2) * 3 - 4 / 5", 0),
+                    span: diag::Span {
+                        start: testing::span_of(source, "1 + 2", 0).start,
+                        end: testing::span_of(source, "5", 0).end,
+                    },
                 },
                 ir::Inst::Return {
                     value: ir::ValueId(8),
