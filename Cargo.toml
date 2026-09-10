@@ -4,6 +4,8 @@ version = "0.1.0"
 edition = "2024"
 rust-version = "1.98.0"
 license = "MIT"
+# `cargo run` has two binaries to choose from; the compiler is the default.
+default-run = "compiler"
 
 [lints.rust]
 unsafe_code = "forbid"
