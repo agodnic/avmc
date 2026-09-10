@@ -5,6 +5,7 @@ pub mod cst;
 pub mod diag;
 pub mod driver;
 pub mod emit;
+pub mod formatter;
 pub mod ir;
 pub mod lower;
 pub mod parser;
