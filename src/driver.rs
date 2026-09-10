@@ -145,4 +145,16 @@ mod tests {
             "a.txt:2:1: error[E0008]: missing entry point `approval`"
         );
     }
+
+    #[test]
+    fn comments_do_not_change_the_output() {
+        let commented = "// The approval program.\nfunc approval() uint64 {\n  var x uint64 = 1 + 2 // one more than two\n  return x\n}\n";
+        let bare = "func approval() uint64 {\n  var x uint64 = 1 + 2\n  return x\n}\n";
+
+        let mut diags = diag::Sink::default();
+        let expected = compile(bare, &mut diags);
+        assert_eq!(compile(commented, &mut diags), expected);
+        assert!(expected.is_some());
+        assert!(diags.is_empty());
+    }
 }
