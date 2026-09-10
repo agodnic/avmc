@@ -77,6 +77,9 @@ These hold across every stage. Agents and contributors must not violate them.
 
 - **Spans everywhere.** Every token, AST node, IR instruction, and emitted
   opcode carries a source span. A diagnostic without a span is a bug.
+- **Tokens are lossless.** Every byte of the source is inside some token's
+  span or some token's trivia, so the source can be rebuilt from the tokens
+  alone. Comments are trivia; no stage after the lexer sees them.
 - **Determinism.** For a fixed compiler version and input, output is
   byte-identical. No hash-map iteration order, no timestamps, no absolute
   paths, no parallelism-dependent ordering.

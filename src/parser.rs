@@ -37,7 +37,7 @@ struct Parser<'a> {
 impl Parser<'_> {
     fn program(&mut self) -> Option<ast::Program> {
         let mut funcs = Vec::new();
-        while self.peek().is_some() {
+        while self.peek_kind() != Some(token::Kind::Eof) {
             funcs.push(self.func_decl()?);
         }
         Some(ast::Program { funcs })
@@ -301,6 +301,7 @@ fn describe(kind: token::Kind) -> &'static str {
         token::Kind::Bang => "`!`",
         token::Kind::AmpAmp => "`&&`",
         token::Kind::PipePipe => "`||`",
+        token::Kind::Eof => "end of input",
     }
 }
 
@@ -340,7 +341,8 @@ fn binary_op(kind: token::Kind) -> Option<ast::BinOp> {
         | token::Kind::LBrace
         | token::Kind::RBrace
         | token::Kind::Equals
-        | token::Kind::Bang => None,
+        | token::Kind::Bang
+        | token::Kind::Eof => None,
     }
 }
 
@@ -1833,5 +1835,24 @@ mod tests {
                 "{source}"
             );
         }
+    }
+
+    /// `source` with every comment blanked out, so that the tokens around it
+    /// keep the spans they had.
+    fn blank_comments(source: &str) -> String {
+        let lines: Vec<String> = source
+            .split('\n')
+            .map(|line| match line.split_once("//") {
+                Some((before, comment)) => format!("{before}{}", " ".repeat(comment.len() + 2)),
+                None => line.to_string(),
+            })
+            .collect();
+        lines.join("\n")
+    }
+
+    #[test]
+    fn comments_are_ignored() {
+        let source = "// The approval program.\nfunc approval() uint64 {\n  var x uint64 = 1 + 2 // one more than two\n  return x\n}\n";
+        assert_eq!(parse_ok(source), parse_ok(&blank_comments(source)));
     }
 }
