@@ -1,7 +1,7 @@
 //! A compiler targeting the Algorand Virtual Machine (AVM).
 
 pub mod ast;
-pub mod diagnostics;
+pub mod diag;
 pub mod driver;
 pub mod emit;
 pub mod ir;

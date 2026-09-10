@@ -2,7 +2,7 @@
 //! has a resolved type.
 
 use crate::ast;
-use crate::diagnostics;
+use crate::diag;
 
 /// A resolved type.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -96,7 +96,7 @@ pub struct FuncDecl {
     /// The statements in the body, in source order.
     pub body: Vec<Stmt>,
     /// From `func` through the closing `}`.
-    pub span: diagnostics::Span,
+    pub span: diag::Span,
 }
 
 /// A statement.
@@ -111,14 +111,14 @@ pub enum Stmt {
         /// The initializer.
         init: Expr,
         /// From `var` through the initializer.
-        span: diagnostics::Span,
+        span: diag::Span,
     },
     /// `return expr`.
     Return {
         /// The returned expression.
         expr: Expr,
         /// From `return` through the expression.
-        span: diagnostics::Span,
+        span: diag::Span,
     },
 }
 
@@ -130,7 +130,7 @@ pub struct Expr {
     /// The type it has.
     pub ty: Type,
     /// Where it was written.
-    pub span: diagnostics::Span,
+    pub span: diag::Span,
 }
 
 /// The kinds of expression.
@@ -162,7 +162,7 @@ pub enum ExprKind {
 
 impl Expr {
     /// Where it was written.
-    pub fn span(&self) -> diagnostics::Span {
+    pub fn span(&self) -> diag::Span {
         self.span
     }
 }

@@ -1,6 +1,6 @@
 //! The lexer: source text to a flat token stream.
 
-use crate::diagnostics;
+use crate::diag;
 use std::iter::Peekable;
 use std::str::CharIndices;
 
@@ -69,14 +69,14 @@ pub struct Token {
     /// What was matched.
     pub kind: TokenKind,
     /// Where it was matched.
-    pub span: diagnostics::Span,
+    pub span: diag::Span,
 }
 
 /// Tokenises `source`.
 ///
 /// Stops at the first error and returns `None`: where a token ends after
 /// an error is not known, so nothing lexed past it is trustworthy.
-pub fn lex(source: &str, diags: &mut diagnostics::Diagnostics) -> Option<Vec<Token>> {
+pub fn lex(source: &str, diags: &mut diag::Sink) -> Option<Vec<Token>> {
     let mut tokens = Vec::new();
     let mut chars = source.char_indices().peekable();
 
@@ -156,14 +156,14 @@ pub fn lex(source: &str, diags: &mut diagnostics::Diagnostics) -> Option<Vec<Tok
 fn token(kind: TokenKind, start: usize, end: usize) -> Token {
     Token {
         kind,
-        span: diagnostics::Span { start, end },
+        span: diag::Span { start, end },
     }
 }
 
-fn unexpected_character(start: usize, end: usize) -> diagnostics::Diagnostic {
-    diagnostics::Diagnostic {
-        kind: diagnostics::DiagnosticKind::UnexpectedCharacter,
-        span: diagnostics::Span { start, end },
+fn unexpected_character(start: usize, end: usize) -> diag::Entry {
+    diag::Entry {
+        kind: diag::Kind::UnexpectedCharacter,
+        span: diag::Span { start, end },
     }
 }
 
@@ -201,7 +201,7 @@ mod tests {
 
     /// Lexes `source`, asserting that it produced no diagnostics.
     fn lex_ok(source: &str) -> Vec<Token> {
-        let mut diags = diagnostics::Diagnostics::default();
+        let mut diags = diag::Sink::default();
         let tokens = lex(source, &mut diags);
         assert!(diags.iter().next().is_none());
         tokens.expect("lexing succeeded")
@@ -209,8 +209,8 @@ mod tests {
 
     /// Lexes `source`, asserting that it produced no tokens, and returns the
     /// diagnostics it reported.
-    fn lex_err(source: &str) -> Vec<diagnostics::Diagnostic> {
-        let mut diags = diagnostics::Diagnostics::default();
+    fn lex_err(source: &str) -> Vec<diag::Entry> {
+        let mut diags = diag::Sink::default();
         assert_eq!(lex(source, &mut diags), None);
         diags.iter().cloned().collect()
     }

@@ -1,7 +1,7 @@
 //! Emission: IR to TEAL text, in a single linear pass.
 
 use crate::ast;
-use crate::diagnostics;
+use crate::diag;
 use crate::ir;
 use crate::typed_ast;
 
@@ -16,7 +16,7 @@ const ENTRY_POINT: &str = "approval";
 ///
 /// Any other function is dead code — nothing can call it yet — and is not
 /// emitted.
-pub fn emit(program: &ir::Program, diags: &mut diagnostics::Diagnostics) -> Option<String> {
+pub fn emit(program: &ir::Program, diags: &mut diag::Sink) -> Option<String> {
     let entry = entry_point(program, diags)?;
 
     let mut teal = format!("#pragma version {TEAL_VERSION}\ncallsub {ENTRY_POINT}\nreturn\n");
@@ -47,17 +47,14 @@ fn placeholder(ty: typed_ast::Type) -> &'static str {
 }
 
 /// Finds the entry point, reporting it if there is none.
-fn entry_point<'a>(
-    program: &'a ir::Program,
-    diags: &mut diagnostics::Diagnostics,
-) -> Option<&'a ir::Function> {
+fn entry_point<'a>(program: &'a ir::Program, diags: &mut diag::Sink) -> Option<&'a ir::Function> {
     let entry = program.funcs.iter().find(|func| func.name == ENTRY_POINT);
 
     if entry.is_none() {
-        diags.push(diagnostics::Diagnostic {
-            kind: diagnostics::DiagnosticKind::MissingEntryPoint { name: ENTRY_POINT },
+        diags.push(diag::Entry {
+            kind: diag::Kind::MissingEntryPoint { name: ENTRY_POINT },
             // There is no token to point at.
-            span: diagnostics::Span { start: 0, end: 0 },
+            span: diag::Span { start: 0, end: 0 },
         });
     }
     entry
@@ -114,11 +111,11 @@ mod tests {
     use crate::testing;
 
     /// The span every hand-built instruction carries.
-    const ZERO: diagnostics::Span = diagnostics::Span { start: 0, end: 0 };
+    const ZERO: diag::Span = diag::Span { start: 0, end: 0 };
 
     /// Emits `source`, asserting that it produced no diagnostics.
     fn emit_ok(source: &str) -> String {
-        let mut diags = diagnostics::Diagnostics::default();
+        let mut diags = diag::Sink::default();
         let teal = pipeline(source, &mut diags);
         assert!(diags.is_empty());
         teal.expect("emission succeeded")
@@ -126,13 +123,13 @@ mod tests {
 
     /// Emits `source`, asserting that it emitted nothing, and returning the
     /// diagnostics in the order they were reported.
-    fn emit_err(source: &str) -> Vec<diagnostics::Diagnostic> {
-        let mut diags = diagnostics::Diagnostics::default();
+    fn emit_err(source: &str) -> Vec<diag::Entry> {
+        let mut diags = diag::Sink::default();
         assert_eq!(pipeline(source, &mut diags), None);
         diags.iter().cloned().collect()
     }
 
-    fn pipeline(source: &str, diags: &mut diagnostics::Diagnostics) -> Option<String> {
+    fn pipeline(source: &str, diags: &mut diag::Sink) -> Option<String> {
         let ir =
             lower::lower(&testing::lex_parse_check(source), diags).expect("lowering succeeded");
         emit(&ir, diags)
@@ -156,7 +153,7 @@ mod tests {
                 span: ZERO,
             }],
         };
-        let mut diags = diagnostics::Diagnostics::default();
+        let mut diags = diag::Sink::default();
         let teal = emit(&program, &mut diags);
         assert!(diags.is_empty());
         teal.expect("emission succeeded")
@@ -506,9 +503,9 @@ mod tests {
     fn missing_entry_point() {
         assert_eq!(
             emit_err("func f() uint64 { return 1 }"),
-            vec![diagnostics::Diagnostic {
-                kind: diagnostics::DiagnosticKind::MissingEntryPoint { name: "approval" },
-                span: diagnostics::Span { start: 0, end: 0 },
+            vec![diag::Entry {
+                kind: diag::Kind::MissingEntryPoint { name: "approval" },
+                span: diag::Span { start: 0, end: 0 },
             }]
         );
     }
@@ -517,9 +514,9 @@ mod tests {
     fn empty_input() {
         assert_eq!(
             emit_err(""),
-            vec![diagnostics::Diagnostic {
-                kind: diagnostics::DiagnosticKind::MissingEntryPoint { name: "approval" },
-                span: diagnostics::Span { start: 0, end: 0 },
+            vec![diag::Entry {
+                kind: diag::Kind::MissingEntryPoint { name: "approval" },
+                span: diag::Span { start: 0, end: 0 },
             }]
         );
     }

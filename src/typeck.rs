@@ -1,17 +1,14 @@
 //! The type checker: an AST to a typed AST, resolving every type it names.
 
 use crate::ast;
-use crate::diagnostics;
+use crate::diag;
 use crate::typed_ast;
 use std::collections::HashSet;
 
 /// Checks `program`: its declared names, then every function in source order.
 ///
 /// Reports every problem it finds, and returns `None` if it found any.
-pub fn check(
-    program: &ast::Program,
-    diags: &mut diagnostics::Diagnostics,
-) -> Option<typed_ast::Program> {
+pub fn check(program: &ast::Program, diags: &mut diag::Sink) -> Option<typed_ast::Program> {
     let mut ok = check_duplicates(program, diags);
     let mut funcs = Vec::new();
 
@@ -27,14 +24,14 @@ pub fn check(
 
 /// Reports every declaration whose name was already declared, returning false
 /// if there was one.
-fn check_duplicates(program: &ast::Program, diags: &mut diagnostics::Diagnostics) -> bool {
+fn check_duplicates(program: &ast::Program, diags: &mut diag::Sink) -> bool {
     let mut seen = HashSet::new();
     let mut ok = true;
 
     for func in &program.funcs {
         if !seen.insert(func.name.text.as_str()) {
-            diags.push(diagnostics::Diagnostic {
-                kind: diagnostics::DiagnosticKind::DuplicateFunction {
+            diags.push(diag::Entry {
+                kind: diag::Kind::DuplicateFunction {
                     name: func.name.text.clone(),
                 },
                 span: func.name.span,
@@ -48,10 +45,7 @@ fn check_duplicates(program: &ast::Program, diags: &mut diagnostics::Diagnostics
 
 /// Checks one function. The three rules are independent: a return type that
 /// does not resolve still leaves the body checked.
-fn check_func(
-    func: &ast::FuncDecl,
-    diags: &mut diagnostics::Diagnostics,
-) -> Option<typed_ast::FuncDecl> {
+fn check_func(func: &ast::FuncDecl, diags: &mut diag::Sink) -> Option<typed_ast::FuncDecl> {
     let ret = resolve_type(&func.ret, diags);
     let body = check_body(func, ret, diags);
 
@@ -64,16 +58,13 @@ fn check_func(
 }
 
 /// Resolves a written type name, reporting it if it names no type.
-fn resolve_type(
-    ret: &ast::TypeRef,
-    diags: &mut diagnostics::Diagnostics,
-) -> Option<typed_ast::Type> {
+fn resolve_type(ret: &ast::TypeRef, diags: &mut diag::Sink) -> Option<typed_ast::Type> {
     match ret.name.text.as_str() {
         "uint64" => Some(typed_ast::Type::Uint64),
         "bool" => Some(typed_ast::Type::Bool),
         name => {
-            diags.push(diagnostics::Diagnostic {
-                kind: diagnostics::DiagnosticKind::UnknownType {
+            diags.push(diag::Entry {
+                kind: diag::Kind::UnknownType {
                     name: name.to_string(),
                 },
                 span: ret.name.span,
@@ -89,7 +80,7 @@ fn resolve_type(
 fn check_body(
     func: &ast::FuncDecl,
     ret: Option<typed_ast::Type>,
-    diags: &mut diagnostics::Diagnostics,
+    diags: &mut diag::Sink,
 ) -> Option<Vec<typed_ast::Stmt>> {
     let mut stmts = Vec::new();
     // The variables declared so far, in order: a name's index is its slot.
@@ -111,15 +102,15 @@ fn check_body(
     }
 
     if !returned {
-        diags.push(diagnostics::Diagnostic {
-            kind: diagnostics::DiagnosticKind::MissingReturn,
+        diags.push(diag::Entry {
+            kind: diag::Kind::MissingReturn,
             span: func.name.span,
         });
         return None;
     }
     if let Some(span) = unreachable {
-        diags.push(diagnostics::Diagnostic {
-            kind: diagnostics::DiagnosticKind::UnreachableStatement,
+        diags.push(diag::Entry {
+            kind: diag::Kind::UnreachableStatement,
             span,
         });
         return None;
@@ -136,7 +127,7 @@ fn check_stmt<'a>(
     stmt: &'a ast::Stmt,
     ret: Option<typed_ast::Type>,
     locals: &mut Vec<(&'a str, Option<typed_ast::Type>)>,
-    diags: &mut diagnostics::Diagnostics,
+    diags: &mut diag::Sink,
 ) -> Option<typed_ast::Stmt> {
     match stmt {
         ast::Stmt::Var {
@@ -175,7 +166,7 @@ fn check_stmt<'a>(
 fn check_type(
     expr: Option<&typed_ast::Expr>,
     expected: Option<typed_ast::Type>,
-    diags: &mut diagnostics::Diagnostics,
+    diags: &mut diag::Sink,
 ) -> bool {
     let (Some(expr), Some(expected)) = (expr, expected) else {
         return true;
@@ -183,8 +174,8 @@ fn check_type(
     if expr.ty == expected {
         return true;
     }
-    diags.push(diagnostics::Diagnostic {
-        kind: diagnostics::DiagnosticKind::TypeMismatch {
+    diags.push(diag::Entry {
+        kind: diag::Kind::TypeMismatch {
             expected,
             found: expr.ty,
         },
@@ -199,22 +190,22 @@ fn declare<'a>(
     name: &'a ast::Name,
     ty: Option<typed_ast::Type>,
     locals: &mut Vec<(&'a str, Option<typed_ast::Type>)>,
-    diags: &mut diagnostics::Diagnostics,
+    diags: &mut diag::Sink,
 ) -> Option<typed_ast::LocalId> {
     let kind = if locals.iter().any(|(declared, _)| *declared == name.text) {
-        diagnostics::DiagnosticKind::DuplicateVariable {
+        diag::Kind::DuplicateVariable {
             name: name.text.clone(),
         }
     } else if let Some(local) = typed_ast::LocalId::new(locals.len()) {
         locals.push((&name.text, ty));
         return Some(local);
     } else {
-        diagnostics::DiagnosticKind::TooManyVariables {
+        diag::Kind::TooManyVariables {
             max: typed_ast::LocalId::CAPACITY,
         }
     };
 
-    diags.push(diagnostics::Diagnostic {
+    diags.push(diag::Entry {
         kind,
         span: name.span,
     });
@@ -227,7 +218,7 @@ fn declare<'a>(
 fn check_expr(
     expr: &ast::Expr,
     locals: &[(&str, Option<typed_ast::Type>)],
-    diags: &mut diagnostics::Diagnostics,
+    diags: &mut diag::Sink,
 ) -> Option<typed_ast::Expr> {
     let (kind, ty, span) = match expr {
         ast::Expr::IntLit { value, span } => (
@@ -287,15 +278,15 @@ fn check_expr(
 fn resolve_var(
     name: &ast::Name,
     locals: &[(&str, Option<typed_ast::Type>)],
-    diags: &mut diagnostics::Diagnostics,
+    diags: &mut diag::Sink,
 ) -> Option<(typed_ast::LocalId, typed_ast::Type)> {
     let Some((index, (_, ty))) = locals
         .iter()
         .enumerate()
         .find(|(_, (declared, _))| *declared == name.text)
     else {
-        diags.push(diagnostics::Diagnostic {
-            kind: diagnostics::DiagnosticKind::UndefinedVariable {
+        diags.push(diag::Entry {
+            kind: diag::Kind::UndefinedVariable {
                 name: name.text.clone(),
             },
             span: name.span,
@@ -312,7 +303,7 @@ mod tests {
 
     /// Checks `source`, asserting that it produced no diagnostics.
     fn check_ok(source: &str) -> typed_ast::Program {
-        let mut diags = diagnostics::Diagnostics::default();
+        let mut diags = diag::Sink::default();
         let program = check(&testing::lex_parse(source), &mut diags);
         assert!(diags.is_empty());
         program.expect("checking succeeded")
@@ -320,8 +311,8 @@ mod tests {
 
     /// Checks `source`, asserting that checking produced nothing, and
     /// returning the diagnostics in the order they were reported.
-    fn check_err(source: &str) -> Vec<diagnostics::Diagnostic> {
-        let mut diags = diagnostics::Diagnostics::default();
+    fn check_err(source: &str) -> Vec<diag::Entry> {
+        let mut diags = diag::Sink::default();
         assert_eq!(check(&testing::lex_parse(source), &mut diags), None);
         diags.iter().cloned().collect()
     }
@@ -350,12 +341,12 @@ mod tests {
                             ty: typed_ast::Type::Uint64,
                             span: literal,
                         },
-                        span: diagnostics::Span {
+                        span: diag::Span {
                             start: return_start,
                             end: literal.end,
                         },
                     }],
-                    span: diagnostics::Span { start, end },
+                    span: diag::Span { start, end },
                 }]
             }
         );
@@ -401,7 +392,7 @@ mod tests {
             span,
         };
         let binary = |op, lhs: typed_ast::Expr, rhs: typed_ast::Expr| {
-            let span = diagnostics::Span {
+            let span = diag::Span {
                 start: lhs.span.start,
                 end: rhs.span.end,
             };
@@ -426,7 +417,7 @@ mod tests {
                         uint64(typed_ast::ExprKind::IntLit(1), one),
                         uint64(typed_ast::ExprKind::IntLit(2), two),
                     ),
-                    span: diagnostics::Span {
+                    span: diag::Span {
                         start: first_var,
                         end: two.end
                     },
@@ -439,7 +430,7 @@ mod tests {
                         uint64(typed_ast::ExprKind::Var(typed_ast::LocalId(0)), x_times),
                         uint64(typed_ast::ExprKind::IntLit(3), three),
                     ),
-                    span: diagnostics::Span {
+                    span: diag::Span {
                         start: second_var,
                         end: three.end
                     },
@@ -450,7 +441,7 @@ mod tests {
                         uint64(typed_ast::ExprKind::Var(typed_ast::LocalId(1)), y_minus),
                         uint64(typed_ast::ExprKind::Var(typed_ast::LocalId(0)), x_minus),
                     ),
-                    span: diagnostics::Span {
+                    span: diag::Span {
                         start: return_start,
                         end: x_minus.end
                     },
@@ -464,8 +455,8 @@ mod tests {
         let source = wrap("return x");
         assert_eq!(
             check_err(&source),
-            vec![diagnostics::Diagnostic {
-                kind: diagnostics::DiagnosticKind::UndefinedVariable {
+            vec![diag::Entry {
+                kind: diag::Kind::UndefinedVariable {
                     name: "x".to_string(),
                 },
                 span: testing::span_of(&source, "x", 0),
@@ -481,8 +472,8 @@ mod tests {
 
         assert_eq!(
             check_err(&source),
-            vec![diagnostics::Diagnostic {
-                kind: diagnostics::DiagnosticKind::UndefinedVariable {
+            vec![diag::Entry {
+                kind: diag::Kind::UndefinedVariable {
                     name: "x".to_string(),
                 },
                 span: span("x"),
@@ -498,8 +489,8 @@ mod tests {
 
         assert_eq!(
             check_err(&source),
-            vec![diagnostics::Diagnostic {
-                kind: diagnostics::DiagnosticKind::DuplicateVariable {
+            vec![diag::Entry {
+                kind: diag::Kind::DuplicateVariable {
                     name: "x".to_string(),
                 },
                 span: span("x"),
@@ -512,8 +503,8 @@ mod tests {
         let source = wrap("var x bytes = 1 return x");
         assert_eq!(
             check_err(&source),
-            vec![diagnostics::Diagnostic {
-                kind: diagnostics::DiagnosticKind::UnknownType {
+            vec![diag::Entry {
+                kind: diag::Kind::UnknownType {
                     name: "bytes".to_string(),
                 },
                 span: testing::span_of(&source, "bytes", 0),
@@ -551,8 +542,8 @@ mod tests {
         let source = declarations(typed_ast::LocalId::CAPACITY + 1);
         assert_eq!(
             check_err(&source),
-            vec![diagnostics::Diagnostic {
-                kind: diagnostics::DiagnosticKind::TooManyVariables {
+            vec![diag::Entry {
+                kind: diag::Kind::TooManyVariables {
                     max: typed_ast::LocalId::CAPACITY,
                 },
                 span: testing::span_of(&source, "v128", 0),
@@ -568,8 +559,8 @@ mod tests {
 
         assert_eq!(
             check_err(&source),
-            vec![diagnostics::Diagnostic {
-                kind: diagnostics::DiagnosticKind::MissingReturn,
+            vec![diag::Entry {
+                kind: diag::Kind::MissingReturn,
                 span: span("approval"),
             }]
         );
@@ -580,8 +571,8 @@ mod tests {
         let source = wrap("return 1 var x uint64 = 2");
         assert_eq!(
             check_err(&source),
-            vec![diagnostics::Diagnostic {
-                kind: diagnostics::DiagnosticKind::UnreachableStatement,
+            vec![diag::Entry {
+                kind: diag::Kind::UnreachableStatement,
                 span: testing::span_of(&source, "var x uint64 = 2", 0),
             }]
         );
@@ -596,8 +587,8 @@ mod tests {
 
         assert_eq!(
             check_err(source),
-            vec![diagnostics::Diagnostic {
-                kind: diagnostics::DiagnosticKind::UndefinedVariable {
+            vec![diag::Entry {
+                kind: diag::Kind::UndefinedVariable {
                     name: "x".to_string(),
                 },
                 span: span("x"),
@@ -615,8 +606,8 @@ mod tests {
         let source = "func f() bytes { return 1 }";
         assert_eq!(
             check_err(source),
-            vec![diagnostics::Diagnostic {
-                kind: diagnostics::DiagnosticKind::UnknownType {
+            vec![diag::Entry {
+                kind: diag::Kind::UnknownType {
                     name: "bytes".to_string(),
                 },
                 span: testing::spans(source)("bytes"),
@@ -632,8 +623,8 @@ mod tests {
 
         assert_eq!(
             check_err(source),
-            vec![diagnostics::Diagnostic {
-                kind: diagnostics::DiagnosticKind::MissingReturn,
+            vec![diag::Entry {
+                kind: diag::Kind::MissingReturn,
                 span: span("f"),
             }]
         );
@@ -644,8 +635,8 @@ mod tests {
         let source = "func f() uint64 { return 1 return 2 }";
         assert_eq!(
             check_err(source),
-            vec![diagnostics::Diagnostic {
-                kind: diagnostics::DiagnosticKind::UnreachableStatement,
+            vec![diag::Entry {
+                kind: diag::Kind::UnreachableStatement,
                 span: testing::spans(source)("return 2"),
             }]
         );
@@ -700,14 +691,14 @@ mod tests {
         assert_eq!(
             check_err(source),
             vec![
-                diagnostics::Diagnostic {
-                    kind: diagnostics::DiagnosticKind::UnknownType {
+                diag::Entry {
+                    kind: diag::Kind::UnknownType {
                         name: "bytes".to_string(),
                     },
                     span: span("bytes"),
                 },
-                diagnostics::Diagnostic {
-                    kind: diagnostics::DiagnosticKind::MissingReturn,
+                diag::Entry {
+                    kind: diag::Kind::MissingReturn,
                     span: span("b"),
                 },
             ]
@@ -722,8 +713,8 @@ mod tests {
 
         assert_eq!(
             check_err(source),
-            vec![diagnostics::Diagnostic {
-                kind: diagnostics::DiagnosticKind::DuplicateFunction {
+            vec![diag::Entry {
+                kind: diag::Kind::DuplicateFunction {
                     name: "a".to_string(),
                 },
                 span: span("a"),
@@ -740,14 +731,14 @@ mod tests {
         assert_eq!(
             check_err(source),
             vec![
-                diagnostics::Diagnostic {
-                    kind: diagnostics::DiagnosticKind::DuplicateFunction {
+                diag::Entry {
+                    kind: diag::Kind::DuplicateFunction {
                         name: "a".to_string(),
                     },
                     span: span("a"),
                 },
-                diagnostics::Diagnostic {
-                    kind: diagnostics::DiagnosticKind::DuplicateFunction {
+                diag::Entry {
+                    kind: diag::Kind::DuplicateFunction {
                         name: "a".to_string(),
                     },
                     span: span("a"),
@@ -766,14 +757,14 @@ mod tests {
         assert_eq!(
             check_err(source),
             vec![
-                diagnostics::Diagnostic {
-                    kind: diagnostics::DiagnosticKind::DuplicateFunction {
+                diag::Entry {
+                    kind: diag::Kind::DuplicateFunction {
                         name: "a".to_string(),
                     },
                     span: duplicate,
                 },
-                diagnostics::Diagnostic {
-                    kind: diagnostics::DiagnosticKind::UnknownType {
+                diag::Entry {
+                    kind: diag::Kind::UnknownType {
                         name: "bytes".to_string(),
                     },
                     span: span("bytes"),
@@ -787,8 +778,8 @@ mod tests {
         let source = "func approval() bool { return 1 }";
         assert_eq!(
             check_err(source),
-            vec![diagnostics::Diagnostic {
-                kind: diagnostics::DiagnosticKind::TypeMismatch {
+            vec![diag::Entry {
+                kind: diag::Kind::TypeMismatch {
                     expected: typed_ast::Type::Bool,
                     found: typed_ast::Type::Uint64,
                 },
@@ -805,8 +796,8 @@ mod tests {
 
         assert_eq!(
             check_err(source),
-            vec![diagnostics::Diagnostic {
-                kind: diagnostics::DiagnosticKind::TypeMismatch {
+            vec![diag::Entry {
+                kind: diag::Kind::TypeMismatch {
                     expected: typed_ast::Type::Bool,
                     found: typed_ast::Type::Uint64,
                 },
@@ -825,15 +816,15 @@ mod tests {
         assert_eq!(
             check_err(&source),
             vec![
-                diagnostics::Diagnostic {
-                    kind: diagnostics::DiagnosticKind::TypeMismatch {
+                diag::Entry {
+                    kind: diag::Kind::TypeMismatch {
                         expected: typed_ast::Type::Bool,
                         found: typed_ast::Type::Uint64,
                     },
                     span: one,
                 },
-                diagnostics::Diagnostic {
-                    kind: diagnostics::DiagnosticKind::TypeMismatch {
+                diag::Entry {
+                    kind: diag::Kind::TypeMismatch {
                         expected: typed_ast::Type::Uint64,
                         found: typed_ast::Type::Bool,
                     },
@@ -848,8 +839,8 @@ mod tests {
         let source = "func approval() bool { var x bool = 1 return x }";
         assert_eq!(
             check_err(source),
-            vec![diagnostics::Diagnostic {
-                kind: diagnostics::DiagnosticKind::TypeMismatch {
+            vec![diag::Entry {
+                kind: diag::Kind::TypeMismatch {
                     expected: typed_ast::Type::Bool,
                     found: typed_ast::Type::Uint64,
                 },
@@ -868,8 +859,8 @@ mod tests {
 
         assert_eq!(
             check_err(&source),
-            vec![diagnostics::Diagnostic {
-                kind: diagnostics::DiagnosticKind::TypeMismatch {
+            vec![diag::Entry {
+                kind: diag::Kind::TypeMismatch {
                     expected: typed_ast::Type::Bool,
                     found: typed_ast::Type::Uint64,
                 },
@@ -883,8 +874,8 @@ mod tests {
         let source = wrap("var x bytes = 1 var y uint64 = x + 1 return y");
         assert_eq!(
             check_err(&source),
-            vec![diagnostics::Diagnostic {
-                kind: diagnostics::DiagnosticKind::UnknownType {
+            vec![diag::Entry {
+                kind: diag::Kind::UnknownType {
                     name: "bytes".to_string(),
                 },
                 span: testing::span_of(&source, "bytes", 0),
@@ -923,7 +914,7 @@ mod tests {
                         ty: typed_ast::Type::Bool,
                         span: literal,
                     },
-                    span: diagnostics::Span {
+                    span: diag::Span {
                         start: var_start,
                         end: literal.end,
                     },
@@ -934,7 +925,7 @@ mod tests {
                         ty: typed_ast::Type::Bool,
                         span: returned,
                     },
-                    span: diagnostics::Span {
+                    span: diag::Span {
                         start: return_start,
                         end: returned.end,
                     },
@@ -965,8 +956,8 @@ mod tests {
         let source = wrap("return true");
         assert_eq!(
             check_err(&source),
-            vec![diagnostics::Diagnostic {
-                kind: diagnostics::DiagnosticKind::TypeMismatch {
+            vec![diag::Entry {
+                kind: diag::Kind::TypeMismatch {
                     expected: typed_ast::Type::Uint64,
                     found: typed_ast::Type::Bool,
                 },
@@ -980,8 +971,8 @@ mod tests {
         let source = wrap("return true + 1");
         assert_eq!(
             check_err(&source),
-            vec![diagnostics::Diagnostic {
-                kind: diagnostics::DiagnosticKind::TypeMismatch {
+            vec![diag::Entry {
+                kind: diag::Kind::TypeMismatch {
                     expected: typed_ast::Type::Uint64,
                     found: typed_ast::Type::Bool,
                 },
@@ -995,8 +986,8 @@ mod tests {
         let source = wrap("return 1 + true");
         assert_eq!(
             check_err(&source),
-            vec![diagnostics::Diagnostic {
-                kind: diagnostics::DiagnosticKind::TypeMismatch {
+            vec![diag::Entry {
+                kind: diag::Kind::TypeMismatch {
                     expected: typed_ast::Type::Uint64,
                     found: typed_ast::Type::Bool,
                 },
@@ -1012,8 +1003,8 @@ mod tests {
         let left = span("true");
         let right = span("false");
 
-        let mismatch = diagnostics::Diagnostic {
-            kind: diagnostics::DiagnosticKind::TypeMismatch {
+        let mismatch = diag::Entry {
+            kind: diag::Kind::TypeMismatch {
                 expected: typed_ast::Type::Uint64,
                 found: typed_ast::Type::Bool,
             },
@@ -1024,7 +1015,7 @@ mod tests {
             check_err(&source),
             vec![
                 mismatch.clone(),
-                diagnostics::Diagnostic {
+                diag::Entry {
                     span: right,
                     ..mismatch
                 },
@@ -1037,8 +1028,8 @@ mod tests {
         let source = "func approval() bool { return true + 1 }";
         assert_eq!(
             check_err(source),
-            vec![diagnostics::Diagnostic {
-                kind: diagnostics::DiagnosticKind::TypeMismatch {
+            vec![diag::Entry {
+                kind: diag::Kind::TypeMismatch {
                     expected: typed_ast::Type::Uint64,
                     found: typed_ast::Type::Bool,
                 },
@@ -1056,8 +1047,8 @@ mod tests {
 
         assert_eq!(
             check_err(&source),
-            vec![diagnostics::Diagnostic {
-                kind: diagnostics::DiagnosticKind::TypeMismatch {
+            vec![diag::Entry {
+                kind: diag::Kind::TypeMismatch {
                     expected: typed_ast::Type::Uint64,
                     found: typed_ast::Type::Bool,
                 },
@@ -1102,14 +1093,14 @@ mod tests {
         assert_eq!(
             check_err(source),
             vec![
-                diagnostics::Diagnostic {
-                    kind: diagnostics::DiagnosticKind::UnknownType {
+                diag::Entry {
+                    kind: diag::Kind::UnknownType {
                         name: "bytes".to_string(),
                     },
                     span: span("bytes"),
                 },
-                diagnostics::Diagnostic {
-                    kind: diagnostics::DiagnosticKind::MissingReturn,
+                diag::Entry {
+                    kind: diag::Kind::MissingReturn,
                     span: func_name,
                 },
             ]
@@ -1154,7 +1145,7 @@ mod tests {
                     }),
                 },
                 ty: typed_ast::Type::Bool,
-                span: diagnostics::Span {
+                span: diag::Span {
                     start: one.start,
                     end: two.end,
                 },
@@ -1187,7 +1178,7 @@ mod tests {
                     }),
                 },
                 ty: typed_ast::Type::Bool,
-                span: diagnostics::Span {
+                span: diag::Span {
                     start: left.start,
                     end: right.end,
                 },
@@ -1206,8 +1197,8 @@ mod tests {
         let source = wrap("return 1 < 2");
         assert_eq!(
             check_err(&source),
-            vec![diagnostics::Diagnostic {
-                kind: diagnostics::DiagnosticKind::TypeMismatch {
+            vec![diag::Entry {
+                kind: diag::Kind::TypeMismatch {
                     expected: typed_ast::Type::Uint64,
                     found: typed_ast::Type::Bool,
                 },
@@ -1221,8 +1212,8 @@ mod tests {
         let source = "func approval() bool { return 1 < true }";
         assert_eq!(
             check_err(source),
-            vec![diagnostics::Diagnostic {
-                kind: diagnostics::DiagnosticKind::TypeMismatch {
+            vec![diag::Entry {
+                kind: diag::Kind::TypeMismatch {
                     expected: typed_ast::Type::Uint64,
                     found: typed_ast::Type::Bool,
                 },
@@ -1239,8 +1230,8 @@ mod tests {
         let left = span("true");
         let right = span("false");
 
-        let mismatch = diagnostics::Diagnostic {
-            kind: diagnostics::DiagnosticKind::TypeMismatch {
+        let mismatch = diag::Entry {
+            kind: diag::Kind::TypeMismatch {
                 expected: typed_ast::Type::Uint64,
                 found: typed_ast::Type::Bool,
             },
@@ -1251,7 +1242,7 @@ mod tests {
             check_err(source),
             vec![
                 mismatch.clone(),
-                diagnostics::Diagnostic {
+                diag::Entry {
                     span: right,
                     ..mismatch
                 },
@@ -1264,8 +1255,8 @@ mod tests {
         let source = "func approval() bool { return 1 == true }";
         assert_eq!(
             check_err(source),
-            vec![diagnostics::Diagnostic {
-                kind: diagnostics::DiagnosticKind::TypeMismatch {
+            vec![diag::Entry {
+                kind: diag::Kind::TypeMismatch {
                     expected: typed_ast::Type::Uint64,
                     found: typed_ast::Type::Bool,
                 },
@@ -1276,8 +1267,8 @@ mod tests {
         let source = "func approval() bool { return true == 1 }";
         assert_eq!(
             check_err(source),
-            vec![diagnostics::Diagnostic {
-                kind: diagnostics::DiagnosticKind::TypeMismatch {
+            vec![diag::Entry {
+                kind: diag::Kind::TypeMismatch {
                     expected: typed_ast::Type::Bool,
                     found: typed_ast::Type::Uint64,
                 },
@@ -1291,8 +1282,8 @@ mod tests {
         let source = "func approval() bool { return (1 == 2) == 3 }";
         assert_eq!(
             check_err(source),
-            vec![diagnostics::Diagnostic {
-                kind: diagnostics::DiagnosticKind::TypeMismatch {
+            vec![diag::Entry {
+                kind: diag::Kind::TypeMismatch {
                     expected: typed_ast::Type::Bool,
                     found: typed_ast::Type::Uint64,
                 },
@@ -1306,8 +1297,8 @@ mod tests {
         let source = "func approval() bool { return x == 1 }";
         assert_eq!(
             check_err(source),
-            vec![diagnostics::Diagnostic {
-                kind: diagnostics::DiagnosticKind::UndefinedVariable {
+            vec![diag::Entry {
+                kind: diag::Kind::UndefinedVariable {
                     name: "x".to_string(),
                 },
                 span: testing::span_of(source, "x", 0),
@@ -1372,7 +1363,7 @@ mod tests {
                         }),
                     },
                     ty: typed_ast::Type::Bool,
-                    span: diagnostics::Span {
+                    span: diag::Span {
                         start: yes.start,
                         end: no.end,
                     },
@@ -1396,10 +1387,10 @@ mod tests {
         ];
 
         for (source, reported) in cases {
-            let expected: Vec<diagnostics::Diagnostic> = reported
+            let expected: Vec<diag::Entry> = reported
                 .into_iter()
-                .map(|(text, nth)| diagnostics::Diagnostic {
-                    kind: diagnostics::DiagnosticKind::TypeMismatch {
+                .map(|(text, nth)| diag::Entry {
+                    kind: diag::Kind::TypeMismatch {
                         expected: typed_ast::Type::Bool,
                         found: typed_ast::Type::Uint64,
                     },
@@ -1415,8 +1406,8 @@ mod tests {
         let source = "func approval() uint64 { return !true }";
         assert_eq!(
             check_err(source),
-            vec![diagnostics::Diagnostic {
-                kind: diagnostics::DiagnosticKind::TypeMismatch {
+            vec![diag::Entry {
+                kind: diag::Kind::TypeMismatch {
                     expected: typed_ast::Type::Uint64,
                     found: typed_ast::Type::Bool,
                 },
@@ -1430,8 +1421,8 @@ mod tests {
         let source = "func approval() bool { return !x }";
         assert_eq!(
             check_err(source),
-            vec![diagnostics::Diagnostic {
-                kind: diagnostics::DiagnosticKind::UndefinedVariable {
+            vec![diag::Entry {
+                kind: diag::Kind::UndefinedVariable {
                     name: "x".to_string(),
                 },
                 span: testing::span_of(source, "x", 0),

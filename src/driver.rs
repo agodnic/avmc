@@ -2,7 +2,7 @@
 //!
 //! Both functions are pure; all I/O lives in `src/main.rs`.
 
-use crate::diagnostics;
+use crate::diag;
 use crate::emit;
 use crate::lexer;
 use crate::lower;
@@ -10,7 +10,7 @@ use crate::parser;
 use crate::typeck;
 
 /// Compiles `source` to TEAL text, stopping at the first stage that fails.
-pub fn compile(source: &str, diags: &mut diagnostics::Diagnostics) -> Option<String> {
+pub fn compile(source: &str, diags: &mut diag::Sink) -> Option<String> {
     let tokens = lexer::lex(source, diags)?;
     let parsed = parser::parse(source, &tokens, diags)?;
     let checked = typeck::check(&parsed, diags)?;
@@ -19,7 +19,7 @@ pub fn compile(source: &str, diags: &mut diagnostics::Diagnostics) -> Option<Str
 }
 
 /// Renders `diagnostic` as one line, without a trailing newline.
-pub fn render(diagnostic: &diagnostics::Diagnostic, file_name: &str, source: &str) -> String {
+pub fn render(diagnostic: &diag::Entry, file_name: &str, source: &str) -> String {
     let (line, column) = position(source, diagnostic.span.start);
     let code = diagnostic.kind.code();
     let severity = code.severity;
@@ -51,23 +51,26 @@ mod tests {
 
     /// The diagnostics reported while compiling `source`, asserting that
     /// nothing was emitted.
-    fn compile_err(source: &str) -> Vec<diagnostics::DiagnosticKind> {
-        let mut diags = diagnostics::Diagnostics::default();
+    fn compile_err(source: &str) -> Vec<diag::Kind> {
+        let mut diags = diag::Sink::default();
         assert_eq!(compile(source, &mut diags), None);
-        diags.iter().map(|diag| diag.kind.clone()).collect()
+        diags
+            .iter()
+            .map(|diagnostic| diagnostic.kind.clone())
+            .collect()
     }
 
     /// A diagnostic covering `span`, for [`render`] to format.
-    fn diagnostic(span: diagnostics::Span) -> diagnostics::Diagnostic {
-        diagnostics::Diagnostic {
-            kind: diagnostics::DiagnosticKind::MissingEntryPoint { name: "approval" },
+    fn diagnostic(span: diag::Span) -> diag::Entry {
+        diag::Entry {
+            kind: diag::Kind::MissingEntryPoint { name: "approval" },
             span,
         }
     }
 
     #[test]
     fn example_program_compiles() {
-        let mut diags = diagnostics::Diagnostics::default();
+        let mut diags = diag::Sink::default();
         assert_eq!(
             compile(testing::EXAMPLE, &mut diags),
             Some(
@@ -82,18 +85,14 @@ mod tests {
     fn lexing_stops_the_pipeline() {
         assert_eq!(
             compile_err("func approval() uint64 { return @ }"),
-            [diagnostics::DiagnosticKind::UnexpectedCharacter]
+            [diag::Kind::UnexpectedCharacter]
         );
     }
 
     #[test]
     fn renders_the_start_of_an_empty_source() {
         assert_eq!(
-            render(
-                &diagnostic(diagnostics::Span { start: 0, end: 0 }),
-                "a.txt",
-                ""
-            ),
+            render(&diagnostic(diag::Span { start: 0, end: 0 }), "a.txt", ""),
             "a.txt:1:1: error[E0008]: missing entry point `approval`"
         );
     }
@@ -127,7 +126,7 @@ mod tests {
     #[test]
     fn renders_the_end_of_input() {
         let source = "ab\n";
-        let span = diagnostics::Span {
+        let span = diag::Span {
             start: source.len(),
             end: source.len(),
         };
@@ -140,7 +139,7 @@ mod tests {
     #[test]
     fn renders_a_non_boundary_offset_as_the_end_of_input() {
         let source = "é\n";
-        let span = diagnostics::Span { start: 1, end: 1 };
+        let span = diag::Span { start: 1, end: 1 };
         assert_eq!(
             render(&diagnostic(span), "a.txt", source),
             "a.txt:2:1: error[E0008]: missing entry point `approval`"

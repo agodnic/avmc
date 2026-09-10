@@ -1,14 +1,11 @@
 //! Lowering: a typed AST to IR.
 
-use crate::diagnostics;
+use crate::diag;
 use crate::ir;
 use crate::typed_ast;
 
 /// Lowers every function in `program`, in source order.
-pub fn lower(
-    program: &typed_ast::Program,
-    _diags: &mut diagnostics::Diagnostics,
-) -> Option<ir::Program> {
+pub fn lower(program: &typed_ast::Program, _diags: &mut diag::Sink) -> Option<ir::Program> {
     let funcs: Vec<ir::Function> = program.funcs.iter().map(lower_func).collect();
 
     #[cfg(debug_assertions)]
@@ -142,7 +139,7 @@ mod tests {
 
     /// Lowers `source`, asserting that it produced no diagnostics.
     fn lower_ok(source: &str) -> ir::Program {
-        let mut diags = diagnostics::Diagnostics::default();
+        let mut diags = diag::Sink::default();
         let program = lower(&testing::lex_parse_check(source), &mut diags);
         assert!(diags.is_empty());
         program.expect("lowering succeeded")
@@ -364,7 +361,7 @@ mod tests {
                     ir::Inst::Store {
                         local: typed_ast::LocalId(0),
                         value: ir::ValueId(0),
-                        span: diagnostics::Span {
+                        span: diag::Span {
                             start: var_start,
                             end: literal.end,
                         },
@@ -376,7 +373,7 @@ mod tests {
                     },
                     ir::Inst::Return {
                         value: ir::ValueId(1),
-                        span: diagnostics::Span {
+                        span: diag::Span {
                             start: return_start,
                             end: loaded.end,
                         },
@@ -441,7 +438,7 @@ mod tests {
                         op: ast::BinaryOp::Add,
                         lhs: ir::ValueId(0),
                         rhs: ir::ValueId(1),
-                        span: diagnostics::Span {
+                        span: diag::Span {
                             start: one.start,
                             end: two.end
                         },
@@ -449,7 +446,7 @@ mod tests {
                     ir::Inst::Store {
                         local: typed_ast::LocalId(0),
                         value: ir::ValueId(2),
-                        span: diagnostics::Span {
+                        span: diag::Span {
                             start: first_var,
                             end: two.end
                         },
@@ -470,7 +467,7 @@ mod tests {
                         op: ast::BinaryOp::Mul,
                         lhs: ir::ValueId(3),
                         rhs: ir::ValueId(4),
-                        span: diagnostics::Span {
+                        span: diag::Span {
                             start: x_times.start,
                             end: three.end
                         },
@@ -478,7 +475,7 @@ mod tests {
                     ir::Inst::Store {
                         local: typed_ast::LocalId(1),
                         value: ir::ValueId(5),
-                        span: diagnostics::Span {
+                        span: diag::Span {
                             start: second_var,
                             end: three.end
                         },
@@ -498,14 +495,14 @@ mod tests {
                         op: ast::BinaryOp::Sub,
                         lhs: ir::ValueId(6),
                         rhs: ir::ValueId(7),
-                        span: diagnostics::Span {
+                        span: diag::Span {
                             start: y_minus.start,
                             end: x_minus.end
                         },
                     },
                     ir::Inst::Return {
                         value: ir::ValueId(8),
-                        span: diagnostics::Span {
+                        span: diag::Span {
                             start: return_start,
                             end: x_minus.end
                         },

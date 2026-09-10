@@ -3,7 +3,7 @@
 use std::io::{self, Write};
 use std::process::ExitCode;
 
-use avmc::diagnostics;
+use avmc::diag;
 use avmc::driver;
 
 /// The usage line the binary reports for any bad argument list.
@@ -29,7 +29,7 @@ fn main() -> ExitCode {
         }
     };
 
-    let mut diags = diagnostics::Diagnostics::default();
+    let mut diags = diag::Sink::default();
     let teal = driver::compile(&source, &mut diags);
     // Warnings are reported for a source file that compiles too.
     for diagnostic in diags.iter() {

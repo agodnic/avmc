@@ -14,15 +14,15 @@ pub struct Span {
 
 /// A single problem found in the source.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Diagnostic {
-    pub kind: DiagnosticKind,
+pub struct Entry {
+    pub kind: Kind,
     /// The source location the diagnostic refers to.
     pub span: Span,
 }
 
 /// Every diagnostic the compiler can report, with the data its message needs.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum DiagnosticKind {
+pub enum Kind {
     UnexpectedCharacter,
     UnexpectedToken {
         expected: &'static str,
@@ -60,7 +60,7 @@ pub enum DiagnosticKind {
     },
 }
 
-impl DiagnosticKind {
+impl Kind {
     /// The stable code. A code is never reused for a different meaning.
     pub fn code(&self) -> Code {
         let number = match self {
@@ -85,7 +85,7 @@ impl DiagnosticKind {
     }
 }
 
-impl fmt::Display for DiagnosticKind {
+impl fmt::Display for Kind {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::UnexpectedCharacter => write!(f, "unexpected character"),
@@ -152,13 +152,13 @@ impl fmt::Display for Code {
 
 /// The diagnostics reported by a stage, in the order they were found.
 #[derive(Debug, Default)]
-pub struct Diagnostics {
-    items: Vec<Diagnostic>,
+pub struct Sink {
+    items: Vec<Entry>,
 }
 
-impl Diagnostics {
+impl Sink {
     /// Records one diagnostic.
-    pub fn push(&mut self, diagnostic: Diagnostic) {
+    pub fn push(&mut self, diagnostic: Entry) {
         self.items.push(diagnostic);
     }
 
@@ -168,7 +168,7 @@ impl Diagnostics {
     }
 
     /// Iterates the diagnostics in the order they were reported.
-    pub fn iter(&self) -> impl Iterator<Item = &Diagnostic> {
+    pub fn iter(&self) -> impl Iterator<Item = &Entry> {
         self.items.iter()
     }
 }
@@ -181,15 +181,11 @@ mod tests {
     ///
     /// A new variant does not compile until the match below covers it, which
     /// is the reminder to list a sample for it here.
-    fn samples() -> Vec<(DiagnosticKind, &'static str, &'static str)> {
+    fn samples() -> Vec<(Kind, &'static str, &'static str)> {
         let samples = vec![
+            (Kind::UnexpectedCharacter, "E0001", "unexpected character"),
             (
-                DiagnosticKind::UnexpectedCharacter,
-                "E0001",
-                "unexpected character",
-            ),
-            (
-                DiagnosticKind::UnexpectedToken {
+                Kind::UnexpectedToken {
                     expected: "`)`",
                     found: "an identifier",
                 },
@@ -197,37 +193,33 @@ mod tests {
                 "expected `)`, found an identifier",
             ),
             (
-                DiagnosticKind::IntegerLiteralOutOfRange,
+                Kind::IntegerLiteralOutOfRange,
                 "E0003",
                 "integer literal out of range",
             ),
             (
-                DiagnosticKind::UnknownType {
+                Kind::UnknownType {
                     name: "bytes".to_string(),
                 },
                 "E0004",
                 "unknown type `bytes`",
             ),
-            (DiagnosticKind::MissingReturn, "E0005", "missing return"),
+            (Kind::MissingReturn, "E0005", "missing return"),
+            (Kind::UnreachableStatement, "E0006", "unreachable statement"),
             (
-                DiagnosticKind::UnreachableStatement,
-                "E0006",
-                "unreachable statement",
-            ),
-            (
-                DiagnosticKind::DuplicateFunction {
+                Kind::DuplicateFunction {
                     name: "a".to_string(),
                 },
                 "E0007",
                 "duplicate function `a`",
             ),
             (
-                DiagnosticKind::MissingEntryPoint { name: "approval" },
+                Kind::MissingEntryPoint { name: "approval" },
                 "E0008",
                 "missing entry point `approval`",
             ),
             (
-                DiagnosticKind::AmbiguousPrecedence {
+                Kind::AmbiguousPrecedence {
                     left: "`%`",
                     right: "`+`",
                 },
@@ -235,26 +227,26 @@ mod tests {
                 "`%` and `+` need parentheses to disambiguate",
             ),
             (
-                DiagnosticKind::UndefinedVariable {
+                Kind::UndefinedVariable {
                     name: "x".to_string(),
                 },
                 "E0010",
                 "undefined variable `x`",
             ),
             (
-                DiagnosticKind::DuplicateVariable {
+                Kind::DuplicateVariable {
                     name: "x".to_string(),
                 },
                 "E0011",
                 "duplicate variable `x`",
             ),
             (
-                DiagnosticKind::TooManyVariables { max: 128 },
+                Kind::TooManyVariables { max: 128 },
                 "E0012",
                 "a function may declare at most 128 variables",
             ),
             (
-                DiagnosticKind::TypeMismatch {
+                Kind::TypeMismatch {
                     expected: typed_ast::Type::Bool,
                     found: typed_ast::Type::Uint64,
                 },
@@ -264,22 +256,22 @@ mod tests {
         ];
 
         // Exhaustive, with no wildcard arm, so that adding a variant to
-        // `DiagnosticKind` stops the tests from compiling.
+        // `Kind` stops the tests from compiling.
         for (kind, _, _) in &samples {
             match kind {
-                DiagnosticKind::UnexpectedCharacter
-                | DiagnosticKind::UnexpectedToken { .. }
-                | DiagnosticKind::IntegerLiteralOutOfRange
-                | DiagnosticKind::UnknownType { .. }
-                | DiagnosticKind::MissingReturn
-                | DiagnosticKind::UnreachableStatement
-                | DiagnosticKind::DuplicateFunction { .. }
-                | DiagnosticKind::MissingEntryPoint { .. }
-                | DiagnosticKind::AmbiguousPrecedence { .. }
-                | DiagnosticKind::UndefinedVariable { .. }
-                | DiagnosticKind::DuplicateVariable { .. }
-                | DiagnosticKind::TooManyVariables { .. }
-                | DiagnosticKind::TypeMismatch { .. } => {}
+                Kind::UnexpectedCharacter
+                | Kind::UnexpectedToken { .. }
+                | Kind::IntegerLiteralOutOfRange
+                | Kind::UnknownType { .. }
+                | Kind::MissingReturn
+                | Kind::UnreachableStatement
+                | Kind::DuplicateFunction { .. }
+                | Kind::MissingEntryPoint { .. }
+                | Kind::AmbiguousPrecedence { .. }
+                | Kind::UndefinedVariable { .. }
+                | Kind::DuplicateVariable { .. }
+                | Kind::TooManyVariables { .. }
+                | Kind::TypeMismatch { .. } => {}
             }
         }
 
