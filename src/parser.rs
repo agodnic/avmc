@@ -1,7 +1,7 @@
 //! The parser: tokens to an AST by recursive descent.
 
 use crate::ast;
-use crate::diagnostics;
+use crate::diag;
 use crate::lexer;
 use crate::precedence;
 
@@ -12,7 +12,7 @@ use crate::precedence;
 pub fn parse(
     source: &str,
     tokens: &[lexer::Token],
-    diags: &mut diagnostics::Diagnostics,
+    diags: &mut diag::Sink,
 ) -> Option<ast::Program> {
     Parser {
         source,
@@ -31,7 +31,7 @@ struct Parser<'a> {
     tokens: &'a [lexer::Token],
     /// Index of the token to be consumed next.
     next: usize,
-    diags: &'a mut diagnostics::Diagnostics,
+    diags: &'a mut diag::Sink,
 }
 
 impl Parser<'_> {
@@ -61,7 +61,7 @@ impl Parser<'_> {
             name,
             ret,
             body,
-            span: diagnostics::Span { start, end },
+            span: diag::Span { start, end },
         })
     }
 
@@ -78,7 +78,7 @@ impl Parser<'_> {
         let end = expr.span().end;
         Some(ast::Stmt::Return {
             expr,
-            span: diagnostics::Span { start, end },
+            span: diag::Span { start, end },
         })
     }
 
@@ -94,7 +94,7 @@ impl Parser<'_> {
             name,
             ty,
             init,
-            span: diagnostics::Span { start, end },
+            span: diag::Span { start, end },
         })
     }
 
@@ -118,7 +118,7 @@ impl Parser<'_> {
                     // The enclosing operator takes the operand just parsed.
                     precedence::Priority::Left => break,
                     precedence::Priority::Ambiguous => {
-                        let kind = diagnostics::DiagnosticKind::AmbiguousPrecedence {
+                        let kind = diag::Kind::AmbiguousPrecedence {
                             left: describe(left.kind),
                             right: describe(token.kind),
                         };
@@ -130,7 +130,7 @@ impl Parser<'_> {
 
             self.next += 1;
             let rhs = self.expr(Some(token))?;
-            let span = diagnostics::Span {
+            let span = diag::Span {
                 start: lhs.span().start,
                 end: rhs.span().end,
             };
@@ -159,7 +159,7 @@ impl Parser<'_> {
             let start = self.expect(lexer::TokenKind::LParen, OPERAND)?.span.start;
             let inner = self.expr(None)?;
             let end = self.expect(lexer::TokenKind::RParen, "`)`")?.span.end;
-            return Some(inner.with_span(diagnostics::Span { start, end }));
+            return Some(inner.with_span(diag::Span { start, end }));
         }
 
         if let Some(kind @ (lexer::TokenKind::True | lexer::TokenKind::False)) = self.peek_kind() {
@@ -181,7 +181,7 @@ impl Parser<'_> {
             Ok(value) => Some(ast::Expr::IntLit { value, span }),
             // The lexer only admits ASCII digits, so overflow is the one way
             // parsing can fail here.
-            Err(_) => self.report(diagnostics::DiagnosticKind::IntegerLiteralOutOfRange, span),
+            Err(_) => self.report(diag::Kind::IntegerLiteralOutOfRange, span),
         }
     }
 
@@ -195,7 +195,7 @@ impl Parser<'_> {
             && precedence::priority(left_group, precedence::unary_group(ast::UnaryOp::Not))
                 == precedence::Priority::Ambiguous
         {
-            let kind = diagnostics::DiagnosticKind::AmbiguousPrecedence {
+            let kind = diag::Kind::AmbiguousPrecedence {
                 left: describe(left.kind),
                 right: describe(bang.kind),
             };
@@ -206,7 +206,7 @@ impl Parser<'_> {
         // Parsing the operand with `!` enclosing it is what places the
         // operators that follow it.
         let operand = self.expr(Some(bang))?;
-        let span = diagnostics::Span {
+        let span = diag::Span {
             start: bang.span.start,
             end: operand.span().end,
         };
@@ -238,27 +238,20 @@ impl Parser<'_> {
                     Some(token) => (describe(token.kind), token.span),
                     None => (
                         "end of input",
-                        diagnostics::Span {
+                        diag::Span {
                             start: self.source.len(),
                             end: self.source.len(),
                         },
                     ),
                 };
-                self.report(
-                    diagnostics::DiagnosticKind::UnexpectedToken { expected, found },
-                    span,
-                )
+                self.report(diag::Kind::UnexpectedToken { expected, found }, span)
             }
         }
     }
 
     /// Reports a diagnostic and fails the parse.
-    fn report<T>(
-        &mut self,
-        kind: diagnostics::DiagnosticKind,
-        span: diagnostics::Span,
-    ) -> Option<T> {
-        self.diags.push(diagnostics::Diagnostic { kind, span });
+    fn report<T>(&mut self, kind: diag::Kind, span: diag::Span) -> Option<T> {
+        self.diags.push(diag::Entry { kind, span });
         None
     }
 
@@ -278,7 +271,7 @@ impl Parser<'_> {
 
     /// The source text a token covers. `lex` guarantees valid spans; the
     /// fallback is the one place the parser trusts it.
-    fn text(&self, span: diagnostics::Span) -> &str {
+    fn text(&self, span: diag::Span) -> &str {
         self.source.get(span.start..span.end).unwrap_or("")
     }
 }
@@ -361,7 +354,7 @@ mod tests {
 
     /// Lexes and parses `source`, asserting that it produced no diagnostics.
     fn parse_ok(source: &str) -> ast::Program {
-        let mut diags = diagnostics::Diagnostics::default();
+        let mut diags = diag::Sink::default();
         let tokens = lexer::lex(source, &mut diags).expect("lexing succeeded");
         let program = parse(source, &tokens, &mut diags);
         assert!(diags.is_empty());
@@ -370,8 +363,8 @@ mod tests {
 
     /// Lexes and parses `source`, asserting that it reported exactly one
     /// diagnostic and produced nothing.
-    fn parse_err(source: &str) -> diagnostics::Diagnostic {
-        let mut diags = diagnostics::Diagnostics::default();
+    fn parse_err(source: &str) -> diag::Entry {
+        let mut diags = diag::Sink::default();
         let tokens = lexer::lex(source, &mut diags).expect("lexing succeeded");
         assert_eq!(parse(source, &tokens, &mut diags), None);
         let mut reported = diags.iter();
@@ -405,12 +398,12 @@ mod tests {
                             value: 1,
                             span: literal
                         },
-                        span: diagnostics::Span {
+                        span: diag::Span {
                             start: return_start,
                             end: literal.end
                         },
                     }],
-                    span: diagnostics::Span { start, end },
+                    span: diag::Span { start, end },
                 }]
             }
         );
@@ -421,7 +414,7 @@ mod tests {
                              var y uint64 = x * 3\n  return y - x\n}\n";
 
     /// The variable `text`, written at `span`.
-    fn var(text: &str, span: diagnostics::Span) -> ast::Expr {
+    fn var(text: &str, span: diag::Span) -> ast::Expr {
         ast::Expr::Var {
             name: testing::name(text, span),
             span,
@@ -430,7 +423,7 @@ mod tests {
 
     /// `op operand`, the operator being the byte just before the operand.
     fn unary(op: ast::UnaryOp, operand: ast::Expr) -> ast::Expr {
-        let span = diagnostics::Span {
+        let span = diag::Span {
             start: operand.span().start - 1,
             end: operand.span().end,
         };
@@ -443,7 +436,7 @@ mod tests {
 
     /// `lhs op rhs`, spanning from one operand to the other.
     fn binary(op: ast::BinaryOp, lhs: ast::Expr, rhs: ast::Expr) -> ast::Expr {
-        let span = diagnostics::Span {
+        let span = diag::Span {
             start: lhs.span().start,
             end: rhs.span().end,
         };
@@ -509,7 +502,7 @@ mod tests {
                             name: x,
                             ty: x_ty,
                             init: binary(ast::BinaryOp::Add, int(1, one), int(2, two)),
-                            span: diagnostics::Span {
+                            span: diag::Span {
                                 start: first_var,
                                 end: two.end
                             },
@@ -518,20 +511,20 @@ mod tests {
                             name: y,
                             ty: y_ty,
                             init: binary(ast::BinaryOp::Mul, var("x", x_times), int(3, three)),
-                            span: diagnostics::Span {
+                            span: diag::Span {
                                 start: second_var,
                                 end: three.end
                             },
                         },
                         ast::Stmt::Return {
                             expr: binary(ast::BinaryOp::Sub, var("y", y_minus), var("x", x_minus)),
-                            span: diagnostics::Span {
+                            span: diag::Span {
                                 start: return_start,
                                 end: x_minus.end
                             },
                         },
                     ],
-                    span: diagnostics::Span { start, end },
+                    span: diag::Span { start, end },
                 }]
             }
         );
@@ -576,7 +569,7 @@ mod tests {
             returned(&source),
             ast::Expr::Var {
                 name: testing::name("x", x),
-                span: diagnostics::Span {
+                span: diag::Span {
                     start: open.start,
                     end: close.end
                 },
@@ -590,8 +583,8 @@ mod tests {
         let mut span = testing::spans(source);
         assert_eq!(
             parse_err(source),
-            diagnostics::Diagnostic {
-                kind: diagnostics::DiagnosticKind::UnexpectedToken {
+            diag::Entry {
+                kind: diag::Kind::UnexpectedToken {
                     expected: "an identifier",
                     found: "`=`",
                 },
@@ -606,8 +599,8 @@ mod tests {
         let mut span = testing::spans(source);
         assert_eq!(
             parse_err(source),
-            diagnostics::Diagnostic {
-                kind: diagnostics::DiagnosticKind::UnexpectedToken {
+            diag::Entry {
+                kind: diag::Kind::UnexpectedToken {
                     expected: "`=`",
                     found: "an integer literal",
                 },
@@ -623,8 +616,8 @@ mod tests {
         span("{");
         assert_eq!(
             parse_err(source),
-            diagnostics::Diagnostic {
-                kind: diagnostics::DiagnosticKind::UnexpectedToken {
+            diag::Entry {
+                kind: diag::Kind::UnexpectedToken {
                     expected: OPERAND,
                     found: "`}`",
                 },
@@ -639,8 +632,8 @@ mod tests {
         let mut span = testing::spans(source);
         assert_eq!(
             parse_err(source),
-            diagnostics::Diagnostic {
-                kind: diagnostics::DiagnosticKind::UnexpectedToken {
+            diag::Entry {
+                kind: diag::Kind::UnexpectedToken {
                     expected: "`var`, `return` or `}`",
                     found: "an integer literal",
                 },
@@ -665,13 +658,10 @@ mod tests {
             .map(|func| func.name.text.as_str())
             .collect();
         assert_eq!(names, vec!["a", "b"]);
-        assert_eq!(
-            program.funcs[0].span,
-            diagnostics::Span { start: 0, end: 28 }
-        );
+        assert_eq!(program.funcs[0].span, diag::Span { start: 0, end: 28 });
         assert_eq!(
             program.funcs[1].span,
-            diagnostics::Span {
+            diag::Span {
                 start: 29,
                 end: source.len()
             }
@@ -697,7 +687,7 @@ mod tests {
                     name: func_name,
                     ret,
                     body: Vec::new(),
-                    span: diagnostics::Span { start, end },
+                    span: diag::Span { start, end },
                 }]
             }
         );
@@ -708,12 +698,12 @@ mod tests {
         let source = "func f( uint64 {}";
         assert_eq!(
             parse_err(source),
-            diagnostics::Diagnostic {
-                kind: diagnostics::DiagnosticKind::UnexpectedToken {
+            diag::Entry {
+                kind: diag::Kind::UnexpectedToken {
                     expected: "`)`",
                     found: "an identifier",
                 },
-                span: diagnostics::Span { start: 8, end: 14 },
+                span: diag::Span { start: 8, end: 14 },
             }
         );
     }
@@ -742,8 +732,8 @@ mod tests {
         let mut span = testing::spans(&source);
         assert_eq!(
             parse_err(&source),
-            diagnostics::Diagnostic {
-                kind: diagnostics::DiagnosticKind::UnexpectedToken {
+            diag::Entry {
+                kind: diag::Kind::UnexpectedToken {
                     expected: OPERAND,
                     found: "`+`",
                 },
@@ -758,8 +748,8 @@ mod tests {
         let mut span = testing::spans(source);
         assert_eq!(
             parse_err(source),
-            diagnostics::Diagnostic {
-                kind: diagnostics::DiagnosticKind::UnexpectedToken {
+            diag::Entry {
+                kind: diag::Kind::UnexpectedToken {
                     expected: OPERAND,
                     found: "`==`",
                 },
@@ -775,8 +765,8 @@ mod tests {
         span("{");
         assert_eq!(
             parse_err(source),
-            diagnostics::Diagnostic {
-                kind: diagnostics::DiagnosticKind::UnexpectedToken {
+            diag::Entry {
+                kind: diag::Kind::UnexpectedToken {
                     expected: OPERAND,
                     found: "`}`",
                 },
@@ -791,8 +781,8 @@ mod tests {
         let mut span = testing::spans(source);
         assert_eq!(
             parse_err(source),
-            diagnostics::Diagnostic {
-                kind: diagnostics::DiagnosticKind::UnexpectedToken {
+            diag::Entry {
+                kind: diag::Kind::UnexpectedToken {
                     expected: OPERAND,
                     found: "`&&`",
                 },
@@ -809,8 +799,8 @@ mod tests {
         span(")");
         assert_eq!(
             parse_err(&source),
-            diagnostics::Diagnostic {
-                kind: diagnostics::DiagnosticKind::UnexpectedToken {
+            diag::Entry {
+                kind: diag::Kind::UnexpectedToken {
                     expected: OPERAND,
                     found: "`)`",
                 },
@@ -872,7 +862,7 @@ mod tests {
                     value: 1,
                     span: one
                 }),
-                span: diagnostics::Span {
+                span: diag::Span {
                     start: literal.start,
                     end: one.end,
                 },
@@ -888,8 +878,8 @@ mod tests {
 
         assert_eq!(
             parse_err(source),
-            diagnostics::Diagnostic {
-                kind: diagnostics::DiagnosticKind::UnexpectedToken {
+            diag::Entry {
+                kind: diag::Kind::UnexpectedToken {
                     expected: OPERAND,
                     found: "`}`",
                 },
@@ -928,12 +918,12 @@ mod tests {
                         value: 3,
                         span: three
                     }),
-                    span: diagnostics::Span {
+                    span: diag::Span {
                         start: two.start,
                         end: three.end
                     },
                 }),
-                span: diagnostics::Span {
+                span: diag::Span {
                     start: one.start,
                     end: three.end
                 },
@@ -967,7 +957,7 @@ mod tests {
                         value: 2,
                         span: two
                     }),
-                    span: diagnostics::Span {
+                    span: diag::Span {
                         start: one.start,
                         end: two.end
                     },
@@ -976,7 +966,7 @@ mod tests {
                     value: 3,
                     span: three
                 }),
-                span: diagnostics::Span {
+                span: diag::Span {
                     start: one.start,
                     end: three.end
                 },
@@ -1011,7 +1001,7 @@ mod tests {
                             value: 2,
                             span: two
                         }),
-                        span: diagnostics::Span {
+                        span: diag::Span {
                             start: one.start,
                             end: two.end
                         },
@@ -1020,7 +1010,7 @@ mod tests {
                         value: 3,
                         span: three
                     }),
-                    span: diagnostics::Span {
+                    span: diag::Span {
                         start: one.start,
                         end: three.end
                     },
@@ -1052,7 +1042,7 @@ mod tests {
                 value: 3,
                 span: three,
             }),
-            span: diagnostics::Span {
+            span: diag::Span {
                 start: two.start,
                 end: three.end,
             },
@@ -1064,7 +1054,7 @@ mod tests {
                 span: one,
             }),
             rhs: Box::new(product),
-            span: diagnostics::Span {
+            span: diag::Span {
                 start: one.start,
                 end: three.end,
             },
@@ -1079,7 +1069,7 @@ mod tests {
                 value: 5,
                 span: five,
             }),
-            span: diagnostics::Span {
+            span: diag::Span {
                 start: four.start,
                 end: five.end,
             },
@@ -1091,7 +1081,7 @@ mod tests {
                 op: ast::BinaryOp::Sub,
                 lhs: Box::new(sum),
                 rhs: Box::new(quotient),
-                span: diagnostics::Span {
+                span: diag::Span {
                     start: one.start,
                     end: five.end
                 },
@@ -1126,7 +1116,7 @@ mod tests {
                         value: 2,
                         span: two
                     }),
-                    span: diagnostics::Span {
+                    span: diag::Span {
                         start: open.start,
                         end: close.end
                     },
@@ -1135,7 +1125,7 @@ mod tests {
                     value: 3,
                     span: three
                 }),
-                span: diagnostics::Span {
+                span: diag::Span {
                     start: open.start,
                     end: three.end
                 },
@@ -1157,7 +1147,7 @@ mod tests {
             returned(&source),
             ast::Expr::IntLit {
                 value: 1,
-                span: diagnostics::Span {
+                span: diag::Span {
                     start: open.start,
                     end: close.end
                 },
@@ -1190,7 +1180,7 @@ mod tests {
                     value: 2,
                     span: two
                 }),
-                span: diagnostics::Span {
+                span: diag::Span {
                     start: open.start,
                     end: close.end
                 },
@@ -1219,7 +1209,7 @@ mod tests {
                     value: 2,
                     span: two
                 }),
-                span: diagnostics::Span {
+                span: diag::Span {
                     start: one.start,
                     end: two.end
                 },
@@ -1250,7 +1240,7 @@ mod tests {
                         value: 2,
                         span: two
                     }),
-                    span: diagnostics::Span {
+                    span: diag::Span {
                         start: open.start,
                         end: close.end
                     },
@@ -1259,7 +1249,7 @@ mod tests {
                     value: 3,
                     span: three
                 }),
-                span: diagnostics::Span {
+                span: diag::Span {
                     start: open.start,
                     end: three.end
                 },
@@ -1286,8 +1276,8 @@ mod tests {
             let text = right.trim_matches('`');
             assert_eq!(
                 parse_err(&source),
-                diagnostics::Diagnostic {
-                    kind: diagnostics::DiagnosticKind::AmbiguousPrecedence { left, right },
+                diag::Entry {
+                    kind: diag::Kind::AmbiguousPrecedence { left, right },
                     span: testing::span_of(&source, text, nth),
                 },
                 "{source}"
@@ -1303,8 +1293,8 @@ mod tests {
         span(")");
         assert_eq!(
             parse_err(source),
-            diagnostics::Diagnostic {
-                kind: diagnostics::DiagnosticKind::UnexpectedToken {
+            diag::Entry {
+                kind: diag::Kind::UnexpectedToken {
                     expected: "`)`",
                     found: "`}`",
                 },
@@ -1318,12 +1308,12 @@ mod tests {
         let source = "func f() uint64 { return 1 +";
         assert_eq!(
             parse_err(source),
-            diagnostics::Diagnostic {
-                kind: diagnostics::DiagnosticKind::UnexpectedToken {
+            diag::Entry {
+                kind: diag::Kind::UnexpectedToken {
                     expected: OPERAND,
                     found: "end of input",
                 },
-                span: diagnostics::Span {
+                span: diag::Span {
                     start: source.len(),
                     end: source.len()
                 },
@@ -1336,12 +1326,12 @@ mod tests {
         let source = "func f() uint64 {";
         assert_eq!(
             parse_err(source),
-            diagnostics::Diagnostic {
-                kind: diagnostics::DiagnosticKind::UnexpectedToken {
+            diag::Entry {
+                kind: diag::Kind::UnexpectedToken {
                     expected: "`var`, `return` or `}`",
                     found: "end of input",
                 },
-                span: diagnostics::Span {
+                span: diag::Span {
                     start: source.len(),
                     end: source.len()
                 },
@@ -1353,12 +1343,12 @@ mod tests {
     fn a_declaration_must_start_with_func() {
         assert_eq!(
             parse_err("}"),
-            diagnostics::Diagnostic {
-                kind: diagnostics::DiagnosticKind::UnexpectedToken {
+            diag::Entry {
+                kind: diag::Kind::UnexpectedToken {
                     expected: "`func`",
                     found: "`}`",
                 },
-                span: diagnostics::Span { start: 0, end: 1 },
+                span: diag::Span { start: 0, end: 1 },
             }
         );
     }
@@ -1368,9 +1358,9 @@ mod tests {
         let source = "func f() uint64 { return 18446744073709551616 }";
         assert_eq!(
             parse_err(source),
-            diagnostics::Diagnostic {
-                kind: diagnostics::DiagnosticKind::IntegerLiteralOutOfRange,
-                span: diagnostics::Span { start: 25, end: 45 },
+            diag::Entry {
+                kind: diag::Kind::IntegerLiteralOutOfRange,
+                span: diag::Span { start: 25, end: 45 },
             }
         );
     }
@@ -1385,9 +1375,9 @@ mod tests {
             vec![ast::Stmt::Return {
                 expr: ast::Expr::IntLit {
                     value: u64::MAX,
-                    span: diagnostics::Span { start: 25, end: 45 },
+                    span: diag::Span { start: 25, end: 45 },
                 },
-                span: diagnostics::Span { start: 18, end: 45 },
+                span: diag::Span { start: 18, end: 45 },
             }]
         );
     }
@@ -1536,7 +1526,7 @@ mod tests {
                 value: 2,
                 span: two,
             }),
-            span: diagnostics::Span {
+            span: diag::Span {
                 start: open.start,
                 end: close.end,
             },
@@ -1614,7 +1604,7 @@ mod tests {
                         value: 2,
                         span: two,
                     }),
-                    span: diagnostics::Span {
+                    span: diag::Span {
                         start: open.start,
                         end: close.end,
                     },
@@ -1807,7 +1797,7 @@ mod tests {
                         value: false,
                         span: no,
                     }),
-                    span: diagnostics::Span {
+                    span: diag::Span {
                         start: open.start,
                         end: close.end,
                     },
@@ -1839,8 +1829,8 @@ mod tests {
             let text = right.trim_matches('`');
             assert_eq!(
                 parse_err(&source),
-                diagnostics::Diagnostic {
-                    kind: diagnostics::DiagnosticKind::AmbiguousPrecedence { left, right },
+                diag::Entry {
+                    kind: diag::Kind::AmbiguousPrecedence { left, right },
                     span: testing::span_of(&source, text, nth),
                 },
                 "{source}"

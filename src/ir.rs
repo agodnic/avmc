@@ -2,7 +2,7 @@
 //! enforces its invariant.
 
 use crate::ast;
-use crate::diagnostics;
+use crate::diag;
 use crate::typed_ast;
 
 /// The value a defining instruction produces. Numbered per function.
@@ -21,7 +21,7 @@ pub enum Inst {
         /// The constant it holds: for a `Bool`, `0` or `1`.
         value: u64,
         /// The literal it came from.
-        span: diagnostics::Span,
+        span: diag::Span,
     },
     /// Defines `dest` as `lhs op rhs`.
     Binary {
@@ -34,7 +34,7 @@ pub enum Inst {
         /// The right operand, consumed second.
         rhs: ValueId,
         /// The expression it came from.
-        span: diagnostics::Span,
+        span: diag::Span,
     },
     /// Defines `dest` as `op operand`.
     Unary {
@@ -45,7 +45,7 @@ pub enum Inst {
         /// The operand, consumed.
         operand: ValueId,
         /// The expression it came from.
-        span: diagnostics::Span,
+        span: diag::Span,
     },
     /// Writes `value` into frame slot `local`.
     Store {
@@ -54,7 +54,7 @@ pub enum Inst {
         /// The value it writes, consumed.
         value: ValueId,
         /// The declaration it came from.
-        span: diagnostics::Span,
+        span: diag::Span,
     },
     /// Defines `dest` as a copy of frame slot `local`.
     Load {
@@ -63,20 +63,20 @@ pub enum Inst {
         /// The slot it reads.
         local: typed_ast::LocalId,
         /// The expression it came from.
-        span: diagnostics::Span,
+        span: diag::Span,
     },
     /// Returns `value` from the enclosing function.
     Return {
         /// The value it returns.
         value: ValueId,
         /// The `return` statement it came from.
-        span: diagnostics::Span,
+        span: diag::Span,
     },
 }
 
 impl Inst {
     /// The source it came from.
-    pub fn span(&self) -> diagnostics::Span {
+    pub fn span(&self) -> diag::Span {
         match self {
             Inst::Const { span, .. }
             | Inst::Binary { span, .. }
@@ -100,7 +100,7 @@ pub struct Function {
     /// The instructions, in execution order.
     pub insts: Vec<Inst>,
     /// From `func` through the closing `}`.
-    pub span: diagnostics::Span,
+    pub span: diag::Span,
 }
 
 /// A whole compilation unit.
@@ -442,7 +442,7 @@ mod tests {
 
     /// The span every hand-built instruction carries: the verifier ignores
     /// spans, so which one it is does not matter.
-    const SPAN: diagnostics::Span = diagnostics::Span { start: 0, end: 0 };
+    const SPAN: diag::Span = diag::Span { start: 0, end: 0 };
 
     /// A function with an empty frame.
     fn function(insts: Vec<Inst>) -> Function {

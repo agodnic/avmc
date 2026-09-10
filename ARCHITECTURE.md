@@ -58,7 +58,7 @@ compiler, not a compilation parameter.
 Uniform, and enforced by review:
 
 ```rust
-pub fn stage(input: Input, diags: &mut Diagnostics) -> Option<Output>;
+pub fn stage(input: Input, diags: &mut diag::Sink) -> Option<Output>;
 ```
 
 - **Stages are pure functions.** No file I/O, no network, no environment
