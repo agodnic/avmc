@@ -36,26 +36,26 @@ pub enum Priority {
 }
 
 /// The group an operator belongs to.
-pub fn group(op: ast::BinaryOp) -> Group {
+pub fn group(op: ast::BinOp) -> Group {
     match op {
-        ast::BinaryOp::Add | ast::BinaryOp::Sub => Group::Additive,
-        ast::BinaryOp::Mul | ast::BinaryOp::Div => Group::Multiplicative,
-        ast::BinaryOp::Mod => Group::Modulo,
-        ast::BinaryOp::Eq
-        | ast::BinaryOp::Ne
-        | ast::BinaryOp::Lt
-        | ast::BinaryOp::Le
-        | ast::BinaryOp::Gt
-        | ast::BinaryOp::Ge => Group::Comparison,
-        ast::BinaryOp::And => Group::And,
-        ast::BinaryOp::Or => Group::Or,
+        ast::BinOp::Add | ast::BinOp::Sub => Group::Additive,
+        ast::BinOp::Mul | ast::BinOp::Div => Group::Multiplicative,
+        ast::BinOp::Mod => Group::Modulo,
+        ast::BinOp::Eq
+        | ast::BinOp::Ne
+        | ast::BinOp::Lt
+        | ast::BinOp::Le
+        | ast::BinOp::Gt
+        | ast::BinOp::Ge => Group::Comparison,
+        ast::BinOp::And => Group::And,
+        ast::BinOp::Or => Group::Or,
     }
 }
 
 /// The group a prefix operator belongs to.
-pub fn unary_group(op: ast::UnaryOp) -> Group {
+pub fn unary_group(op: ast::UnOp) -> Group {
     match op {
-        ast::UnaryOp::Not => Group::Not,
+        ast::UnOp::Not => Group::Not,
     }
 }
 
@@ -136,24 +136,24 @@ mod tests {
 
     #[test]
     fn every_operator_has_its_group() {
-        assert_eq!(group(ast::BinaryOp::Add), Group::Additive);
-        assert_eq!(group(ast::BinaryOp::Sub), Group::Additive);
-        assert_eq!(group(ast::BinaryOp::Mul), Group::Multiplicative);
-        assert_eq!(group(ast::BinaryOp::Div), Group::Multiplicative);
-        assert_eq!(group(ast::BinaryOp::Mod), Group::Modulo);
+        assert_eq!(group(ast::BinOp::Add), Group::Additive);
+        assert_eq!(group(ast::BinOp::Sub), Group::Additive);
+        assert_eq!(group(ast::BinOp::Mul), Group::Multiplicative);
+        assert_eq!(group(ast::BinOp::Div), Group::Multiplicative);
+        assert_eq!(group(ast::BinOp::Mod), Group::Modulo);
         for op in [
-            ast::BinaryOp::Eq,
-            ast::BinaryOp::Ne,
-            ast::BinaryOp::Lt,
-            ast::BinaryOp::Le,
-            ast::BinaryOp::Gt,
-            ast::BinaryOp::Ge,
+            ast::BinOp::Eq,
+            ast::BinOp::Ne,
+            ast::BinOp::Lt,
+            ast::BinOp::Le,
+            ast::BinOp::Gt,
+            ast::BinOp::Ge,
         ] {
             assert_eq!(group(op), Group::Comparison, "{op:?}");
         }
-        assert_eq!(group(ast::BinaryOp::And), Group::And);
-        assert_eq!(group(ast::BinaryOp::Or), Group::Or);
-        assert_eq!(unary_group(ast::UnaryOp::Not), Group::Not);
+        assert_eq!(group(ast::BinOp::And), Group::And);
+        assert_eq!(group(ast::BinOp::Or), Group::Or);
+        assert_eq!(unary_group(ast::UnOp::Not), Group::Not);
     }
 
     #[test]

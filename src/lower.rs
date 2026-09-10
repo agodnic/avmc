@@ -199,14 +199,14 @@ mod tests {
                 },
                 ir::Inst::Binary {
                     dest: ir::ValueId(3),
-                    op: ast::BinaryOp::Mul,
+                    op: ast::BinOp::Mul,
                     lhs: ir::ValueId(1),
                     rhs: ir::ValueId(2),
                     span: testing::span_of(source, "2 * 3", 0),
                 },
                 ir::Inst::Binary {
                     dest: ir::ValueId(4),
-                    op: ast::BinaryOp::Add,
+                    op: ast::BinOp::Add,
                     lhs: ir::ValueId(0),
                     rhs: ir::ValueId(3),
                     span: testing::span_of(source, "1 + 2 * 3", 0),
@@ -239,7 +239,7 @@ mod tests {
                 },
                 ir::Inst::Binary {
                     dest: ir::ValueId(2),
-                    op: ast::BinaryOp::Add,
+                    op: ast::BinOp::Add,
                     lhs: ir::ValueId(0),
                     rhs: ir::ValueId(1),
                     span: testing::span_of(source, "(1 + 2)", 0),
@@ -252,7 +252,7 @@ mod tests {
                 },
                 ir::Inst::Binary {
                     dest: ir::ValueId(4),
-                    op: ast::BinaryOp::Mul,
+                    op: ast::BinOp::Mul,
                     lhs: ir::ValueId(2),
                     rhs: ir::ValueId(3),
                     span: testing::span_of(source, "(1 + 2) * 3", 0),
@@ -271,14 +271,14 @@ mod tests {
                 },
                 ir::Inst::Binary {
                     dest: ir::ValueId(7),
-                    op: ast::BinaryOp::Div,
+                    op: ast::BinOp::Div,
                     lhs: ir::ValueId(5),
                     rhs: ir::ValueId(6),
                     span: testing::span_of(source, "4 / 5", 0),
                 },
                 ir::Inst::Binary {
                     dest: ir::ValueId(8),
-                    op: ast::BinaryOp::Sub,
+                    op: ast::BinOp::Sub,
                     lhs: ir::ValueId(4),
                     rhs: ir::ValueId(7),
                     span: testing::span_of(source, "(1 + 2) * 3 - 4 / 5", 0),
@@ -435,7 +435,7 @@ mod tests {
                     },
                     ir::Inst::Binary {
                         dest: ir::ValueId(2),
-                        op: ast::BinaryOp::Add,
+                        op: ast::BinOp::Add,
                         lhs: ir::ValueId(0),
                         rhs: ir::ValueId(1),
                         span: diag::Span {
@@ -464,7 +464,7 @@ mod tests {
                     },
                     ir::Inst::Binary {
                         dest: ir::ValueId(5),
-                        op: ast::BinaryOp::Mul,
+                        op: ast::BinOp::Mul,
                         lhs: ir::ValueId(3),
                         rhs: ir::ValueId(4),
                         span: diag::Span {
@@ -492,7 +492,7 @@ mod tests {
                     },
                     ir::Inst::Binary {
                         dest: ir::ValueId(8),
-                        op: ast::BinaryOp::Sub,
+                        op: ast::BinOp::Sub,
                         lhs: ir::ValueId(6),
                         rhs: ir::ValueId(7),
                         span: diag::Span {
@@ -586,7 +586,7 @@ mod tests {
                 },
                 ir::Inst::Binary {
                     dest: ir::ValueId(2),
-                    op: ast::BinaryOp::Lt,
+                    op: ast::BinOp::Lt,
                     lhs: ir::ValueId(0),
                     rhs: ir::ValueId(1),
                     span: testing::span_of(source, "1 < 2", 0),
@@ -613,7 +613,7 @@ mod tests {
                 },
                 ir::Inst::Unary {
                     dest: ir::ValueId(1),
-                    op: ast::UnaryOp::Not,
+                    op: ast::UnOp::Not,
                     operand: ir::ValueId(0),
                     span: testing::span_of(source, "!true", 0),
                 },
@@ -645,7 +645,7 @@ mod tests {
                 },
                 ir::Inst::Binary {
                     dest: ir::ValueId(2),
-                    op: ast::BinaryOp::And,
+                    op: ast::BinOp::And,
                     lhs: ir::ValueId(0),
                     rhs: ir::ValueId(1),
                     span: testing::span_of(source, "true && false", 0),

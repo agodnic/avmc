@@ -26,38 +26,36 @@ impl std::fmt::Display for Type {
 
 /// The type both operands of `op` must have, or `None` if they need only
 /// agree with each other.
-pub fn operand_type(op: ast::BinaryOp) -> Option<Type> {
+pub fn operand_type(op: ast::BinOp) -> Option<Type> {
     match op {
-        ast::BinaryOp::Add
-        | ast::BinaryOp::Sub
-        | ast::BinaryOp::Mul
-        | ast::BinaryOp::Div
-        | ast::BinaryOp::Mod
-        | ast::BinaryOp::Lt
-        | ast::BinaryOp::Le
-        | ast::BinaryOp::Gt
-        | ast::BinaryOp::Ge => Some(Type::Uint64),
-        ast::BinaryOp::Eq | ast::BinaryOp::Ne => None,
-        ast::BinaryOp::And | ast::BinaryOp::Or => Some(Type::Bool),
+        ast::BinOp::Add
+        | ast::BinOp::Sub
+        | ast::BinOp::Mul
+        | ast::BinOp::Div
+        | ast::BinOp::Mod
+        | ast::BinOp::Lt
+        | ast::BinOp::Le
+        | ast::BinOp::Gt
+        | ast::BinOp::Ge => Some(Type::Uint64),
+        ast::BinOp::Eq | ast::BinOp::Ne => None,
+        ast::BinOp::And | ast::BinOp::Or => Some(Type::Bool),
     }
 }
 
 /// The type `op` produces.
-pub fn result_type(op: ast::BinaryOp) -> Type {
+pub fn result_type(op: ast::BinOp) -> Type {
     match op {
-        ast::BinaryOp::Add
-        | ast::BinaryOp::Sub
-        | ast::BinaryOp::Mul
-        | ast::BinaryOp::Div
-        | ast::BinaryOp::Mod => Type::Uint64,
-        ast::BinaryOp::Eq
-        | ast::BinaryOp::Ne
-        | ast::BinaryOp::Lt
-        | ast::BinaryOp::Le
-        | ast::BinaryOp::Gt
-        | ast::BinaryOp::Ge
-        | ast::BinaryOp::And
-        | ast::BinaryOp::Or => Type::Bool,
+        ast::BinOp::Add | ast::BinOp::Sub | ast::BinOp::Mul | ast::BinOp::Div | ast::BinOp::Mod => {
+            Type::Uint64
+        }
+        ast::BinOp::Eq
+        | ast::BinOp::Ne
+        | ast::BinOp::Lt
+        | ast::BinOp::Le
+        | ast::BinOp::Gt
+        | ast::BinOp::Ge
+        | ast::BinOp::And
+        | ast::BinOp::Or => Type::Bool,
     }
 }
 
@@ -143,7 +141,7 @@ pub enum ExprKind {
     /// A binary operation.
     Binary {
         /// The operator it applies.
-        op: ast::BinaryOp,
+        op: ast::BinOp,
         /// The left operand.
         lhs: Box<Expr>,
         /// The right operand.
@@ -152,7 +150,7 @@ pub enum ExprKind {
     /// A prefix operation.
     Unary {
         /// The operator it applies.
-        op: ast::UnaryOp,
+        op: ast::UnOp,
         /// The operand.
         operand: Box<Expr>,
     },
@@ -174,11 +172,11 @@ mod tests {
     #[test]
     fn arithmetic_takes_and_produces_uint64() {
         for op in [
-            ast::BinaryOp::Add,
-            ast::BinaryOp::Sub,
-            ast::BinaryOp::Mul,
-            ast::BinaryOp::Div,
-            ast::BinaryOp::Mod,
+            ast::BinOp::Add,
+            ast::BinOp::Sub,
+            ast::BinOp::Mul,
+            ast::BinOp::Div,
+            ast::BinOp::Mod,
         ] {
             assert_eq!(operand_type(op), Some(Type::Uint64), "{op:?}");
             assert_eq!(result_type(op), Type::Uint64, "{op:?}");
@@ -187,7 +185,7 @@ mod tests {
 
     #[test]
     fn equality_takes_operands_that_agree() {
-        for op in [ast::BinaryOp::Eq, ast::BinaryOp::Ne] {
+        for op in [ast::BinOp::Eq, ast::BinOp::Ne] {
             assert_eq!(operand_type(op), None, "{op:?}");
             assert_eq!(result_type(op), Type::Bool, "{op:?}");
         }
@@ -196,10 +194,10 @@ mod tests {
     #[test]
     fn ordering_takes_uint64_and_produces_bool() {
         for op in [
-            ast::BinaryOp::Lt,
-            ast::BinaryOp::Le,
-            ast::BinaryOp::Gt,
-            ast::BinaryOp::Ge,
+            ast::BinOp::Lt,
+            ast::BinOp::Le,
+            ast::BinOp::Gt,
+            ast::BinOp::Ge,
         ] {
             assert_eq!(operand_type(op), Some(Type::Uint64), "{op:?}");
             assert_eq!(result_type(op), Type::Bool, "{op:?}");
@@ -208,7 +206,7 @@ mod tests {
 
     #[test]
     fn logic_takes_and_produces_bool() {
-        for op in [ast::BinaryOp::And, ast::BinaryOp::Or] {
+        for op in [ast::BinOp::And, ast::BinOp::Or] {
             assert_eq!(operand_type(op), Some(Type::Bool), "{op:?}");
             assert_eq!(result_type(op), Type::Bool, "{op:?}");
         }

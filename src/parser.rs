@@ -192,7 +192,7 @@ impl Parser<'_> {
         // whole point of a partial order: the source must parenthesize.
         let enclosing = ambient.and_then(|token| Some((token, operator_group(token.kind)?)));
         if let Some((left, left_group)) = enclosing
-            && precedence::priority(left_group, precedence::unary_group(ast::UnaryOp::Not))
+            && precedence::priority(left_group, precedence::unary_group(ast::UnOp::Not))
                 == precedence::Priority::Ambiguous
         {
             let kind = diag::Kind::AmbiguousPrecedence {
@@ -211,7 +211,7 @@ impl Parser<'_> {
             end: operand.span().end,
         };
         Some(ast::Expr::Unary {
-            op: ast::UnaryOp::Not,
+            op: ast::UnOp::Not,
             operand: Box::new(operand),
             span,
         })
@@ -264,7 +264,7 @@ impl Parser<'_> {
     }
 
     /// The next token and the operator it denotes, if it denotes one.
-    fn peek_binary_op(&self) -> Option<(lexer::Token, ast::BinaryOp)> {
+    fn peek_binary_op(&self) -> Option<(lexer::Token, ast::BinOp)> {
         let &token = self.peek()?;
         Some((token, binary_op(token.kind)?))
     }
@@ -310,27 +310,27 @@ fn describe(kind: lexer::TokenKind) -> &'static str {
 /// The precedence group of an operator token, if it is one.
 fn operator_group(kind: lexer::TokenKind) -> Option<precedence::Group> {
     match kind {
-        lexer::TokenKind::Bang => Some(precedence::unary_group(ast::UnaryOp::Not)),
+        lexer::TokenKind::Bang => Some(precedence::unary_group(ast::UnOp::Not)),
         kind => binary_op(kind).map(precedence::group),
     }
 }
 
 /// The operator a token denotes, if it denotes one.
-fn binary_op(kind: lexer::TokenKind) -> Option<ast::BinaryOp> {
+fn binary_op(kind: lexer::TokenKind) -> Option<ast::BinOp> {
     match kind {
-        lexer::TokenKind::Plus => Some(ast::BinaryOp::Add),
-        lexer::TokenKind::Minus => Some(ast::BinaryOp::Sub),
-        lexer::TokenKind::Star => Some(ast::BinaryOp::Mul),
-        lexer::TokenKind::Slash => Some(ast::BinaryOp::Div),
-        lexer::TokenKind::Percent => Some(ast::BinaryOp::Mod),
-        lexer::TokenKind::EqEq => Some(ast::BinaryOp::Eq),
-        lexer::TokenKind::BangEq => Some(ast::BinaryOp::Ne),
-        lexer::TokenKind::Lt => Some(ast::BinaryOp::Lt),
-        lexer::TokenKind::LtEq => Some(ast::BinaryOp::Le),
-        lexer::TokenKind::Gt => Some(ast::BinaryOp::Gt),
-        lexer::TokenKind::GtEq => Some(ast::BinaryOp::Ge),
-        lexer::TokenKind::AmpAmp => Some(ast::BinaryOp::And),
-        lexer::TokenKind::PipePipe => Some(ast::BinaryOp::Or),
+        lexer::TokenKind::Plus => Some(ast::BinOp::Add),
+        lexer::TokenKind::Minus => Some(ast::BinOp::Sub),
+        lexer::TokenKind::Star => Some(ast::BinOp::Mul),
+        lexer::TokenKind::Slash => Some(ast::BinOp::Div),
+        lexer::TokenKind::Percent => Some(ast::BinOp::Mod),
+        lexer::TokenKind::EqEq => Some(ast::BinOp::Eq),
+        lexer::TokenKind::BangEq => Some(ast::BinOp::Ne),
+        lexer::TokenKind::Lt => Some(ast::BinOp::Lt),
+        lexer::TokenKind::LtEq => Some(ast::BinOp::Le),
+        lexer::TokenKind::Gt => Some(ast::BinOp::Gt),
+        lexer::TokenKind::GtEq => Some(ast::BinOp::Ge),
+        lexer::TokenKind::AmpAmp => Some(ast::BinOp::And),
+        lexer::TokenKind::PipePipe => Some(ast::BinOp::Or),
         lexer::TokenKind::Func
         | lexer::TokenKind::Return
         | lexer::TokenKind::Var
@@ -422,7 +422,7 @@ mod tests {
     }
 
     /// `op operand`, the operator being the byte just before the operand.
-    fn unary(op: ast::UnaryOp, operand: ast::Expr) -> ast::Expr {
+    fn unary(op: ast::UnOp, operand: ast::Expr) -> ast::Expr {
         let span = diag::Span {
             start: operand.span().start - 1,
             end: operand.span().end,
@@ -435,7 +435,7 @@ mod tests {
     }
 
     /// `lhs op rhs`, spanning from one operand to the other.
-    fn binary(op: ast::BinaryOp, lhs: ast::Expr, rhs: ast::Expr) -> ast::Expr {
+    fn binary(op: ast::BinOp, lhs: ast::Expr, rhs: ast::Expr) -> ast::Expr {
         let span = diag::Span {
             start: lhs.span().start,
             end: rhs.span().end,
@@ -501,7 +501,7 @@ mod tests {
                         ast::Stmt::Var {
                             name: x,
                             ty: x_ty,
-                            init: binary(ast::BinaryOp::Add, int(1, one), int(2, two)),
+                            init: binary(ast::BinOp::Add, int(1, one), int(2, two)),
                             span: diag::Span {
                                 start: first_var,
                                 end: two.end
@@ -510,14 +510,14 @@ mod tests {
                         ast::Stmt::Var {
                             name: y,
                             ty: y_ty,
-                            init: binary(ast::BinaryOp::Mul, var("x", x_times), int(3, three)),
+                            init: binary(ast::BinOp::Mul, var("x", x_times), int(3, three)),
                             span: diag::Span {
                                 start: second_var,
                                 end: three.end
                             },
                         },
                         ast::Stmt::Return {
-                            expr: binary(ast::BinaryOp::Sub, var("y", y_minus), var("x", x_minus)),
+                            expr: binary(ast::BinOp::Sub, var("y", y_minus), var("x", x_minus)),
                             span: diag::Span {
                                 start: return_start,
                                 end: x_minus.end
@@ -542,7 +542,7 @@ mod tests {
         assert_eq!(
             returned(&source),
             binary(
-                ast::BinaryOp::Add,
+                ast::BinOp::Add,
                 ast::Expr::Var {
                     name: testing::name("x", x),
                     span: x
@@ -853,7 +853,7 @@ mod tests {
         assert_eq!(
             returned(&source),
             ast::Expr::Binary {
-                op: ast::BinaryOp::Add,
+                op: ast::BinOp::Add,
                 lhs: Box::new(ast::Expr::BoolLit {
                     value: true,
                     span: literal,
@@ -903,13 +903,13 @@ mod tests {
         assert_eq!(
             returned(&source),
             ast::Expr::Binary {
-                op: ast::BinaryOp::Add,
+                op: ast::BinOp::Add,
                 lhs: Box::new(ast::Expr::IntLit {
                     value: 1,
                     span: one
                 }),
                 rhs: Box::new(ast::Expr::Binary {
-                    op: ast::BinaryOp::Mul,
+                    op: ast::BinOp::Mul,
                     lhs: Box::new(ast::Expr::IntLit {
                         value: 2,
                         span: two
@@ -946,9 +946,9 @@ mod tests {
         assert_eq!(
             returned(&source),
             ast::Expr::Binary {
-                op: ast::BinaryOp::Add,
+                op: ast::BinOp::Add,
                 lhs: Box::new(ast::Expr::Binary {
-                    op: ast::BinaryOp::Mul,
+                    op: ast::BinOp::Mul,
                     lhs: Box::new(ast::Expr::IntLit {
                         value: 1,
                         span: one
@@ -977,8 +977,8 @@ mod tests {
     #[test]
     fn a_group_is_left_associative() {
         for (source, op) in [
-            (wrap("1 - 2 - 3"), ast::BinaryOp::Sub),
-            (wrap("1 / 2 / 3"), ast::BinaryOp::Div),
+            (wrap("1 - 2 - 3"), ast::BinOp::Sub),
+            (wrap("1 / 2 / 3"), ast::BinOp::Div),
         ] {
             let mut span = testing::spans(&source);
             span("(");
@@ -1033,7 +1033,7 @@ mod tests {
         let five = span("5");
 
         let product = ast::Expr::Binary {
-            op: ast::BinaryOp::Mul,
+            op: ast::BinOp::Mul,
             lhs: Box::new(ast::Expr::IntLit {
                 value: 2,
                 span: two,
@@ -1048,7 +1048,7 @@ mod tests {
             },
         };
         let sum = ast::Expr::Binary {
-            op: ast::BinaryOp::Add,
+            op: ast::BinOp::Add,
             lhs: Box::new(ast::Expr::IntLit {
                 value: 1,
                 span: one,
@@ -1060,7 +1060,7 @@ mod tests {
             },
         };
         let quotient = ast::Expr::Binary {
-            op: ast::BinaryOp::Div,
+            op: ast::BinOp::Div,
             lhs: Box::new(ast::Expr::IntLit {
                 value: 4,
                 span: four,
@@ -1078,7 +1078,7 @@ mod tests {
         assert_eq!(
             returned(&source),
             ast::Expr::Binary {
-                op: ast::BinaryOp::Sub,
+                op: ast::BinOp::Sub,
                 lhs: Box::new(sum),
                 rhs: Box::new(quotient),
                 span: diag::Span {
@@ -1105,9 +1105,9 @@ mod tests {
         assert_eq!(
             returned(&source),
             ast::Expr::Binary {
-                op: ast::BinaryOp::Mul,
+                op: ast::BinOp::Mul,
                 lhs: Box::new(ast::Expr::Binary {
-                    op: ast::BinaryOp::Add,
+                    op: ast::BinOp::Add,
                     lhs: Box::new(ast::Expr::IntLit {
                         value: 1,
                         span: one
@@ -1171,7 +1171,7 @@ mod tests {
         assert_eq!(
             returned(&source),
             ast::Expr::Binary {
-                op: ast::BinaryOp::Add,
+                op: ast::BinOp::Add,
                 lhs: Box::new(ast::Expr::IntLit {
                     value: 1,
                     span: one
@@ -1200,7 +1200,7 @@ mod tests {
         assert_eq!(
             returned(&source),
             ast::Expr::Binary {
-                op: ast::BinaryOp::Mod,
+                op: ast::BinOp::Mod,
                 lhs: Box::new(ast::Expr::IntLit {
                     value: 1,
                     span: one
@@ -1229,9 +1229,9 @@ mod tests {
         assert_eq!(
             returned(&source),
             ast::Expr::Binary {
-                op: ast::BinaryOp::Mod,
+                op: ast::BinOp::Mod,
                 lhs: Box::new(ast::Expr::Binary {
-                    op: ast::BinaryOp::Mod,
+                    op: ast::BinOp::Mod,
                     lhs: Box::new(ast::Expr::IntLit {
                         value: 1,
                         span: one
@@ -1385,12 +1385,12 @@ mod tests {
     #[test]
     fn parses_every_comparison_operator() {
         let cases = [
-            ("1 == 2", ast::BinaryOp::Eq),
-            ("1 != 2", ast::BinaryOp::Ne),
-            ("1 < 2", ast::BinaryOp::Lt),
-            ("1 <= 2", ast::BinaryOp::Le),
-            ("1 > 2", ast::BinaryOp::Gt),
-            ("1 >= 2", ast::BinaryOp::Ge),
+            ("1 == 2", ast::BinOp::Eq),
+            ("1 != 2", ast::BinOp::Ne),
+            ("1 < 2", ast::BinOp::Lt),
+            ("1 <= 2", ast::BinOp::Le),
+            ("1 > 2", ast::BinOp::Gt),
+            ("1 >= 2", ast::BinOp::Ge),
         ];
 
         for (expr, op) in cases {
@@ -1434,9 +1434,9 @@ mod tests {
         assert_eq!(
             returned(&source),
             binary(
-                ast::BinaryOp::Eq,
-                binary(ast::BinaryOp::Add, int(1, one), int(2, two)),
-                binary(ast::BinaryOp::Mul, int(3, three), int(4, four)),
+                ast::BinOp::Eq,
+                binary(ast::BinOp::Add, int(1, one), int(2, two)),
+                binary(ast::BinOp::Mul, int(3, three), int(4, four)),
             )
         );
     }
@@ -1455,8 +1455,8 @@ mod tests {
         assert_eq!(
             returned(&source),
             binary(
-                ast::BinaryOp::Eq,
-                binary(ast::BinaryOp::Mod, int(1, one), int(2, two)),
+                ast::BinOp::Eq,
+                binary(ast::BinOp::Mod, int(1, one), int(2, two)),
                 int(0, zero),
             )
         );
@@ -1476,9 +1476,9 @@ mod tests {
         assert_eq!(
             returned(&source),
             binary(
-                ast::BinaryOp::Eq,
+                ast::BinOp::Eq,
                 int(1, one),
-                binary(ast::BinaryOp::Mod, int(2, two), int(3, three)),
+                binary(ast::BinOp::Mod, int(2, two), int(3, three)),
             )
         );
     }
@@ -1497,9 +1497,9 @@ mod tests {
         assert_eq!(
             returned(&source),
             binary(
-                ast::BinaryOp::Lt,
+                ast::BinOp::Lt,
                 int(1, one),
-                binary(ast::BinaryOp::Add, int(2, two), int(3, three)),
+                binary(ast::BinOp::Add, int(2, two), int(3, three)),
             )
         );
     }
@@ -1517,7 +1517,7 @@ mod tests {
         let literal = span("true");
 
         let parenthesized = ast::Expr::Binary {
-            op: ast::BinaryOp::Lt,
+            op: ast::BinOp::Lt,
             lhs: Box::new(ast::Expr::IntLit {
                 value: 1,
                 span: one,
@@ -1535,7 +1535,7 @@ mod tests {
         assert_eq!(
             returned(&source),
             binary(
-                ast::BinaryOp::Eq,
+                ast::BinOp::Eq,
                 parenthesized,
                 ast::Expr::BoolLit {
                     value: true,
@@ -1553,7 +1553,7 @@ mod tests {
         assert_eq!(
             returned(&source),
             unary(
-                ast::UnaryOp::Not,
+                ast::UnOp::Not,
                 ast::Expr::BoolLit {
                     value: true,
                     span: literal,
@@ -1570,7 +1570,7 @@ mod tests {
         assert_eq!(
             returned(&source),
             unary(
-                ast::UnaryOp::Not,
+                ast::UnOp::Not,
                 ast::Expr::Var {
                     name: testing::name("x", x),
                     span: x,
@@ -1593,9 +1593,9 @@ mod tests {
         assert_eq!(
             returned(&source),
             unary(
-                ast::UnaryOp::Not,
+                ast::UnOp::Not,
                 ast::Expr::Binary {
-                    op: ast::BinaryOp::Lt,
+                    op: ast::BinOp::Lt,
                     lhs: Box::new(ast::Expr::IntLit {
                         value: 1,
                         span: one,
@@ -1616,8 +1616,8 @@ mod tests {
     #[test]
     fn parses_both_logical_operators() {
         for (expr, op) in [
-            ("true && false", ast::BinaryOp::And),
-            ("true || false", ast::BinaryOp::Or),
+            ("true && false", ast::BinOp::And),
+            ("true || false", ast::BinOp::Or),
         ] {
             let source = wrap(expr);
             let mut span = testing::spans(&source);
@@ -1654,8 +1654,8 @@ mod tests {
         assert_eq!(
             returned(&source),
             binary(
-                ast::BinaryOp::And,
-                unary(ast::UnaryOp::Not, var("x", x)),
+                ast::BinOp::And,
+                unary(ast::UnOp::Not, var("x", x)),
                 var("y", y),
             )
         );
@@ -1670,9 +1670,9 @@ mod tests {
         assert_eq!(
             returned(&source),
             binary(
-                ast::BinaryOp::Or,
+                ast::BinOp::Or,
                 var("x", x),
-                unary(ast::UnaryOp::Not, var("y", y))
+                unary(ast::UnOp::Not, var("y", y))
             )
         );
 
@@ -1687,11 +1687,11 @@ mod tests {
         assert_eq!(
             returned(&source),
             binary(
-                ast::BinaryOp::And,
+                ast::BinOp::And,
                 binary(
-                    ast::BinaryOp::And,
+                    ast::BinOp::And,
                     var("x", x),
-                    unary(ast::UnaryOp::Not, var("y", y))
+                    unary(ast::UnOp::Not, var("y", y))
                 ),
                 var("z", z),
             )
@@ -1701,8 +1701,8 @@ mod tests {
     #[test]
     fn logic_is_left_associative() {
         for (expr, op) in [
-            ("x && y && z", ast::BinaryOp::And),
-            ("x || y || z", ast::BinaryOp::Or),
+            ("x && y && z", ast::BinOp::And),
+            ("x || y || z", ast::BinOp::Or),
         ] {
             let source = wrap(expr);
             let mut span = testing::spans(&source);
@@ -1735,9 +1735,9 @@ mod tests {
         assert_eq!(
             returned(&source),
             binary(
-                ast::BinaryOp::And,
-                binary(ast::BinaryOp::Lt, int(1, one), int(2, two)),
-                binary(ast::BinaryOp::Lt, int(3, three), int(4, four)),
+                ast::BinOp::And,
+                binary(ast::BinOp::Lt, int(1, one), int(2, two)),
+                binary(ast::BinOp::Lt, int(3, three), int(4, four)),
             )
         );
     }
@@ -1757,10 +1757,10 @@ mod tests {
         assert_eq!(
             returned(&source),
             binary(
-                ast::BinaryOp::Or,
+                ast::BinOp::Or,
                 binary(
-                    ast::BinaryOp::Eq,
-                    binary(ast::BinaryOp::Add, int(1, one), int(2, two)),
+                    ast::BinOp::Eq,
+                    binary(ast::BinOp::Add, int(1, one), int(2, two)),
                     int(3, three),
                 ),
                 ast::Expr::BoolLit {
@@ -1786,9 +1786,9 @@ mod tests {
         assert_eq!(
             returned(&source),
             binary(
-                ast::BinaryOp::Or,
+                ast::BinOp::Or,
                 ast::Expr::Binary {
-                    op: ast::BinaryOp::And,
+                    op: ast::BinOp::And,
                     lhs: Box::new(ast::Expr::BoolLit {
                         value: true,
                         span: yes,
