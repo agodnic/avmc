@@ -21,5 +21,3 @@ The items in this section are not hard rules - they can be broken if there is a 
 ```sh
 cargo run -- program.txt
 ```
-
-`compiler` is the default binary.
