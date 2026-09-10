@@ -57,6 +57,10 @@ checks grows with the IR.
 **Emission targets the TEAL version MainNet runs.** It is fixed in the
 compiler, not a compilation parameter.
 
+**The formatter** is not a stage. It consumes the lexer and the parser and
+prints the CST with canonical whitespace; it never sees the AST or anything
+after it. It has no options.
+
 ## 2. Stage contracts
 
 Uniform, and enforced by review:
