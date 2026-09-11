@@ -2,7 +2,7 @@
 
 use crate::cst;
 use crate::diag;
-use crate::token;
+use crate::lexer;
 
 /// A whole source file.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -170,41 +170,41 @@ pub fn from_cst(source: &str, program: &cst::Program, diags: &mut diag::Sink) ->
 
 /// The operator a token denotes, if it denotes one. The parser needs it for
 /// precedence, and the AST stage to build the node.
-pub(crate) fn binary_op(kind: token::Kind) -> Option<BinOp> {
+pub(crate) fn binary_op(kind: lexer::TokenKind) -> Option<BinOp> {
     match kind {
-        token::Kind::Plus => Some(BinOp::Add),
-        token::Kind::Minus => Some(BinOp::Sub),
-        token::Kind::Star => Some(BinOp::Mul),
-        token::Kind::Slash => Some(BinOp::Div),
-        token::Kind::Percent => Some(BinOp::Mod),
-        token::Kind::EqEq => Some(BinOp::Eq),
-        token::Kind::BangEq => Some(BinOp::Ne),
-        token::Kind::Lt => Some(BinOp::Lt),
-        token::Kind::LtEq => Some(BinOp::Le),
-        token::Kind::Gt => Some(BinOp::Gt),
-        token::Kind::GtEq => Some(BinOp::Ge),
-        token::Kind::AmpAmp => Some(BinOp::And),
-        token::Kind::PipePipe => Some(BinOp::Or),
-        token::Kind::Func
-        | token::Kind::Return
-        | token::Kind::Var
-        | token::Kind::True
-        | token::Kind::False
-        | token::Kind::Ident
-        | token::Kind::IntLit
-        | token::Kind::LParen
-        | token::Kind::RParen
-        | token::Kind::LBrace
-        | token::Kind::RBrace
-        | token::Kind::Equals
-        | token::Kind::Bang
-        | token::Kind::Eof => None,
+        lexer::TokenKind::Plus => Some(BinOp::Add),
+        lexer::TokenKind::Minus => Some(BinOp::Sub),
+        lexer::TokenKind::Star => Some(BinOp::Mul),
+        lexer::TokenKind::Slash => Some(BinOp::Div),
+        lexer::TokenKind::Percent => Some(BinOp::Mod),
+        lexer::TokenKind::EqEq => Some(BinOp::Eq),
+        lexer::TokenKind::BangEq => Some(BinOp::Ne),
+        lexer::TokenKind::Lt => Some(BinOp::Lt),
+        lexer::TokenKind::LtEq => Some(BinOp::Le),
+        lexer::TokenKind::Gt => Some(BinOp::Gt),
+        lexer::TokenKind::GtEq => Some(BinOp::Ge),
+        lexer::TokenKind::AmpAmp => Some(BinOp::And),
+        lexer::TokenKind::PipePipe => Some(BinOp::Or),
+        lexer::TokenKind::Func
+        | lexer::TokenKind::Return
+        | lexer::TokenKind::Var
+        | lexer::TokenKind::True
+        | lexer::TokenKind::False
+        | lexer::TokenKind::Ident
+        | lexer::TokenKind::IntLit
+        | lexer::TokenKind::LParen
+        | lexer::TokenKind::RParen
+        | lexer::TokenKind::LBrace
+        | lexer::TokenKind::RBrace
+        | lexer::TokenKind::Equals
+        | lexer::TokenKind::Bang
+        | lexer::TokenKind::Eof => None,
     }
 }
 
 /// The prefix operator a token denotes, if it denotes one.
-fn unary_op(kind: token::Kind) -> Option<UnOp> {
-    (kind == token::Kind::Bang).then_some(UnOp::Not)
+fn unary_op(kind: lexer::TokenKind) -> Option<UnOp> {
+    (kind == lexer::TokenKind::Bang).then_some(UnOp::Not)
 }
 
 struct Builder<'a> {
@@ -291,7 +291,7 @@ impl Builder<'_> {
                 }
             }
             cst::Expr::BoolLit(token) => Some(Expr::BoolLit {
-                value: token.kind == token::Kind::True,
+                value: token.kind == lexer::TokenKind::True,
                 span: token.span,
             }),
             cst::Expr::Var(token) => {
@@ -331,7 +331,7 @@ impl Builder<'_> {
         }
     }
 
-    fn name(&self, token: token::Token) -> Name {
+    fn name(&self, token: lexer::Token) -> Name {
         Name {
             text: self.text(token.span).to_string(),
             span: token.span,
