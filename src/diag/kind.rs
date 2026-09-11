@@ -39,6 +39,12 @@ pub enum Kind {
         expected: typed_ast::Type,
         found: typed_ast::Type,
     },
+    TooManyParameters {
+        max: usize,
+    },
+    EntryPointTakesParameters {
+        name: &'static str,
+    },
 }
 
 impl Kind {
@@ -58,6 +64,8 @@ impl Kind {
             Self::DuplicateVariable { .. } => 11,
             Self::TooManyVariables { .. } => 12,
             Self::TypeMismatch { .. } => 13,
+            Self::TooManyParameters { .. } => 14,
+            Self::EntryPointTakesParameters { .. } => 15,
         };
         Code {
             severity: Severity::Error,
@@ -92,6 +100,12 @@ impl fmt::Display for Kind {
                     f,
                     "mismatched types: expected `{expected}`, found `{found}`"
                 )
+            }
+            Self::TooManyParameters { max } => {
+                write!(f, "a function may declare at most {max} parameters")
+            }
+            Self::EntryPointTakesParameters { name } => {
+                write!(f, "entry point `{name}` takes parameters")
             }
         }
     }

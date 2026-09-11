@@ -16,6 +16,10 @@ fn compile_err(source: &str) -> Vec<diag::Kind> {
         .collect()
 }
 
+/// The example program of the parameters milestone.
+const PARAMETERS: &str = "func add(a uint64, b uint64) uint64 {\n\tvar sum uint64 = a + b\n\t\
+                          return sum\n}\n\nfunc approval() uint64 {\n\treturn 1\n}\n";
+
 /// A diagnostic covering `span`, for [`render`] to format.
 fn diagnostic(span: diag::Span) -> diag::Entry {
     diag::Entry {
@@ -29,6 +33,20 @@ fn example_program_compiles() {
     let mut diags = diag::Sink::default();
     assert_eq!(
         compile(testing::EXAMPLE, &mut diags),
+        Some(
+            "#pragma version 13\ncallsub approval\nreturn\napproval:\nproto 0 1\npushint 1\nretsub\n"
+                .to_string()
+        )
+    );
+    assert!(diags.is_empty());
+}
+
+#[test]
+fn a_function_with_parameters_compiles() {
+    // `add` is dead code: nothing can call it yet.
+    let mut diags = diag::Sink::default();
+    assert_eq!(
+        compile(PARAMETERS, &mut diags),
         Some(
             "#pragma version 13\ncallsub approval\nreturn\napproval:\nproto 0 1\npushint 1\nretsub\n"
                 .to_string()

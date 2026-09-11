@@ -41,6 +41,7 @@ fn hand_built(ret: typed_ast::Type, locals: Vec<typed_ast::Type>, insts: Vec<ir:
         funcs: vec![ir::Function {
             name: pass::ENTRY_POINT.to_string(),
             ret,
+            params: vec![],
             locals,
             insts,
             span: ZERO,
@@ -96,6 +97,14 @@ fn load(dest: u32, local: u8) -> ir::Inst {
     ir::Inst::Load {
         dest: ir::ValueId(dest),
         local: typed_ast::LocalId(local),
+        span: ZERO,
+    }
+}
+
+fn load_param(dest: u32, param: u8) -> ir::Inst {
+    ir::Inst::LoadParam {
+        dest: ir::ValueId(dest),
+        param: typed_ast::ParamId(param),
         span: ZERO,
     }
 }
@@ -387,8 +396,53 @@ fn the_remainder_opcode() {
 #[test]
 fn only_the_entry_point_is_emitted() {
     assert_eq!(
-        emit_ok("func f() uint64 { return 2 } func approval() uint64 { return 1 }"),
+        emit_ok("func f(a uint64) uint64 { return a } func approval() uint64 { return 1 }"),
         "#pragma version 13\ncallsub approval\nreturn\napproval:\nproto 0 1\npushint 1\nretsub\n"
+    );
+}
+
+#[test]
+fn the_subroutine_of_a_function_with_parameters() {
+    // `func add(a uint64, b uint64) uint64 { var sum uint64 = a + b
+    //  return sum }`.
+    let func = ir::Function {
+        name: "add".to_string(),
+        ret: typed_ast::Type::Uint64,
+        params: vec![typed_ast::Type::Uint64; 2],
+        locals: vec![typed_ast::Type::Uint64],
+        insts: vec![
+            load_param(0, 0),
+            load_param(1, 1),
+            binary(2, ast::BinOp::Add, 0, 1),
+            store(0, 2),
+            load(3, 0),
+            ret(3),
+        ],
+        span: ZERO,
+    };
+    assert_eq!(
+        pass::function(&func),
+        "add:\n\
+         proto 2 1\n\
+         pushint 0\n\
+         frame_dig -2\n\
+         frame_dig -1\n\
+         +\n\
+         frame_bury 0\n\
+         frame_dig 0\n\
+         retsub\n"
+    );
+}
+
+#[test]
+fn an_entry_point_with_parameters_is_reported() {
+    let source = "func approval(a uint64) uint64 { return a }";
+    assert_eq!(
+        emit_err(source),
+        vec![diag::Entry {
+            kind: diag::Kind::EntryPointTakesParameters { name: "approval" },
+            span: testing::span_of(source, source, 0),
+        }]
     );
 }
 

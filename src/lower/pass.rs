@@ -52,6 +52,7 @@ fn lower_func(func: &typed_ast::FuncDecl) -> ir::Function {
     ir::Function {
         name: func.name.text.clone(),
         ret: func.ret,
+        params: func.params.iter().map(|param| param.ty).collect(),
         locals,
         insts,
         span: func.span,
@@ -82,6 +83,15 @@ fn lower_expr(
                 dest,
                 ty: typed_ast::Type::Bool,
                 value: u64::from(*value),
+                span: expr.span,
+            });
+            dest
+        }
+        typed_ast::ExprKind::Param(param) => {
+            let dest = next_value_id(next_value);
+            insts.push(ir::Inst::LoadParam {
+                dest,
+                param: *param,
                 span: expr.span,
             });
             dest

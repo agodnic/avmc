@@ -61,6 +61,20 @@ pub enum Violation {
         /// How many slots the frame holds.
         count: usize,
     },
+    /// The function takes more parameters than one can address.
+    TooManyParams {
+        /// How many it takes.
+        count: usize,
+    },
+    /// An instruction names a parameter the function does not take.
+    ParamOutOfRange {
+        /// The offending instruction's position.
+        index: usize,
+        /// The parameter it names.
+        param: typed_ast::ParamId,
+        /// How many parameters the function takes.
+        count: usize,
+    },
     /// An instruction uses an operand of the wrong type.
     OperandType {
         /// The offending instruction's position.
@@ -142,6 +156,21 @@ impl std::fmt::Display for Violation {
                  {count} locals",
                 local.0
             ),
+            Violation::TooManyParams { count } => write!(
+                f,
+                "addressed within the frame: {count} parameters exceed the capacity of {}",
+                typed_ast::ParamId::CAPACITY
+            ),
+            Violation::ParamOutOfRange {
+                index,
+                param,
+                count,
+            } => write!(
+                f,
+                "addressed within the frame: instruction {index} names p{} but the function takes \
+                 {count} parameters",
+                param.0
+            ),
             Violation::OperandType {
                 index,
                 position,
@@ -167,6 +196,11 @@ impl std::fmt::Display for Violation {
 pub fn verify(func: &Function) -> Result<(), Violation> {
     verify_return(func)?;
 
+    if func.params.len() > typed_ast::ParamId::CAPACITY {
+        return Err(Violation::TooManyParams {
+            count: func.params.len(),
+        });
+    }
     if func.locals.len() > typed_ast::LocalId::CAPACITY {
         return Err(Violation::FrameTooLarge {
             count: func.locals.len(),
@@ -227,6 +261,10 @@ pub fn verify(func: &Function) -> Result<(), Violation> {
             }
             Inst::Load { dest, local, .. } => {
                 let ty = slot(&func.locals, *local, index)?;
+                (dest, ty)
+            }
+            Inst::LoadParam { dest, param, .. } => {
+                let ty = parameter(&func.params, *param, index)?;
                 (dest, ty)
             }
             Inst::Return { value, .. } => {
@@ -311,6 +349,22 @@ fn slot(
             index,
             local,
             count: locals.len(),
+        })
+}
+
+/// Checks that `param` is one the function takes, returning its type.
+fn parameter(
+    params: &[typed_ast::Type],
+    param: typed_ast::ParamId,
+    index: usize,
+) -> Result<typed_ast::Type, Violation> {
+    params
+        .get(usize::from(param.0))
+        .copied()
+        .ok_or(Violation::ParamOutOfRange {
+            index,
+            param,
+            count: params.len(),
         })
 }
 

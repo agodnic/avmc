@@ -1,6 +1,6 @@
 //! Building the AST from the concrete syntax tree.
 
-use super::node::{BinOp, Expr, FuncDecl, Name, Program, Stmt, TypeRef, UnOp};
+use super::node::{BinOp, Expr, FuncDecl, Name, Param, Program, Stmt, TypeRef, UnOp};
 use crate::cst;
 use crate::diag;
 use crate::lexer;
@@ -41,6 +41,7 @@ pub(crate) fn binary_op(kind: lexer::TokenKind) -> Option<BinOp> {
         | lexer::TokenKind::RParen
         | lexer::TokenKind::LBrace
         | lexer::TokenKind::RBrace
+        | lexer::TokenKind::Comma
         | lexer::TokenKind::Equals
         | lexer::TokenKind::Bang
         | lexer::TokenKind::Eof => None,
@@ -68,6 +69,7 @@ impl Builder<'_> {
 
     fn func_decl(&mut self, func: &cst::FuncDecl) -> Option<FuncDecl> {
         let name = self.name(func.name);
+        let params = func.params.iter().map(|param| self.param(param)).collect();
         let ret = TypeRef {
             name: self.name(func.ret),
         };
@@ -79,6 +81,7 @@ impl Builder<'_> {
 
         Some(FuncDecl {
             name,
+            params,
             ret,
             body,
             span: diag::Span {
@@ -86,6 +89,15 @@ impl Builder<'_> {
                 end: func.rbrace.span.end,
             },
         })
+    }
+
+    fn param(&self, param: &cst::Param) -> Param {
+        Param {
+            name: self.name(param.name),
+            ty: TypeRef {
+                name: self.name(param.ty),
+            },
+        }
     }
 
     fn stmt(&mut self, stmt: &cst::Stmt) -> Option<Stmt> {

@@ -79,6 +79,16 @@ fn samples() -> Vec<(Kind, &'static str, &'static str)> {
             "E0013",
             "mismatched types: expected `bool`, found `uint64`",
         ),
+        (
+            Kind::TooManyParameters { max: 128 },
+            "E0014",
+            "a function may declare at most 128 parameters",
+        ),
+        (
+            Kind::EntryPointTakesParameters { name: "approval" },
+            "E0015",
+            "entry point `approval` takes parameters",
+        ),
     ];
 
     // Exhaustive, with no wildcard arm, so that adding a variant to
@@ -97,7 +107,9 @@ fn samples() -> Vec<(Kind, &'static str, &'static str)> {
             | Kind::UndefinedVariable { .. }
             | Kind::DuplicateVariable { .. }
             | Kind::TooManyVariables { .. }
-            | Kind::TypeMismatch { .. } => {}
+            | Kind::TypeMismatch { .. }
+            | Kind::TooManyParameters { .. }
+            | Kind::EntryPointTakesParameters { .. } => {}
         }
     }
 

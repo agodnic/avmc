@@ -20,6 +20,23 @@ impl LocalId {
     }
 }
 
+/// A parameter's position in its function's parameter list, counted from 0.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ParamId(pub u8);
+
+impl ParamId {
+    /// How many parameters a function can take. `frame_dig` addresses a
+    /// parameter with the negative half of a signed byte.
+    pub const CAPACITY: usize = 128;
+
+    /// The position of the `index`th parameter, or `None` if a function
+    /// cannot take that many.
+    pub fn new(index: usize) -> Option<Self> {
+        let position = u8::try_from(index).ok()?;
+        (usize::from(position) < Self::CAPACITY).then_some(Self(position))
+    }
+}
+
 /// A whole source file.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Program {
@@ -32,12 +49,23 @@ pub struct Program {
 pub struct FuncDecl {
     /// The declared name.
     pub name: ast::Name,
+    /// The parameters it takes, in declaration order.
+    pub params: Vec<Param>,
     /// The resolved return type.
     pub ret: Type,
     /// The statements in the body, in source order.
     pub body: Vec<Stmt>,
     /// From `func` through the closing `}`.
     pub span: diag::Span,
+}
+
+/// A parameter, with its type resolved.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Param {
+    /// The declared name.
+    pub name: ast::Name,
+    /// The resolved type.
+    pub ty: Type,
 }
 
 /// A statement.
@@ -99,6 +127,8 @@ pub enum ExprKind {
     },
     /// A variable, by frame slot.
     Var(LocalId),
+    /// A parameter, by position.
+    Param(ParamId),
 }
 
 impl Expr {

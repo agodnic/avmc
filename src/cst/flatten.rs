@@ -1,4 +1,4 @@
-use super::node::{Expr, FuncDecl, Program, Stmt};
+use super::node::{Expr, FuncDecl, Param, Program, Stmt};
 use crate::lexer;
 
 /// The tokens of `program` in source order, ending with `eof`.
@@ -12,18 +12,20 @@ pub fn tokens(program: &Program) -> Vec<lexer::Token> {
 }
 
 fn push_func(tokens: &mut Vec<lexer::Token>, func: &FuncDecl) {
-    tokens.extend([
-        func.func,
-        func.name,
-        func.lparen,
-        func.rparen,
-        func.ret,
-        func.lbrace,
-    ]);
+    tokens.extend([func.func, func.name, func.lparen]);
+    for param in &func.params {
+        push_param(tokens, param);
+    }
+    tokens.extend([func.rparen, func.ret, func.lbrace]);
     for stmt in &func.body {
         push_stmt(tokens, stmt);
     }
     tokens.push(func.rbrace);
+}
+
+fn push_param(tokens: &mut Vec<lexer::Token>, param: &Param) {
+    tokens.extend([param.name, param.ty]);
+    tokens.extend(param.comma);
 }
 
 fn push_stmt(tokens: &mut Vec<lexer::Token>, stmt: &Stmt) {

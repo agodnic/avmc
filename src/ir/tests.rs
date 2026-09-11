@@ -10,26 +10,33 @@ use crate::typed_ast;
 /// spans, so which one it is does not matter.
 const SPAN: diag::Span = diag::Span { start: 0, end: 0 };
 
-/// A function with an empty frame.
+/// A function taking nothing, with an empty frame.
 fn function(insts: Vec<Inst>) -> Function {
     framed(0, insts)
 }
 
-/// A function whose frame is `locals` slots of `Type::Uint64`, returning
-/// `Type::Uint64`.
+/// A function taking nothing, whose frame is `locals` slots of
+/// `Type::Uint64`, returning `Type::Uint64`.
 fn framed(locals: usize, insts: Vec<Inst>) -> Function {
     shaped(
         typed_ast::Type::Uint64,
+        vec![],
         vec![typed_ast::Type::Uint64; locals],
         insts,
     )
 }
 
-/// A function returning `ret`, with `locals` as its frame.
-fn shaped(ret: typed_ast::Type, locals: Vec<typed_ast::Type>, insts: Vec<Inst>) -> Function {
+/// A function returning `ret`, taking `params`, with `locals` as its frame.
+fn shaped(
+    ret: typed_ast::Type,
+    params: Vec<typed_ast::Type>,
+    locals: Vec<typed_ast::Type>,
+    insts: Vec<Inst>,
+) -> Function {
     Function {
         name: "approval".to_string(),
         ret,
+        params,
         locals,
         insts,
         span: SPAN,
@@ -68,6 +75,14 @@ fn load(dest: u32, local: u8) -> Inst {
     Inst::Load {
         dest: ValueId(dest),
         local: typed_ast::LocalId(local),
+        span: SPAN,
+    }
+}
+
+fn load_param(dest: u32, param: u8) -> Inst {
+    Inst::LoadParam {
+        dest: ValueId(dest),
+        param: typed_ast::ParamId(param),
         span: SPAN,
     }
 }
@@ -315,6 +330,61 @@ fn storing_past_the_frame_is_rejected() {
 }
 
 #[test]
+fn a_parameter_load_has_the_parameters_type() {
+    assert_eq!(
+        verifier::verify(&shaped(
+            typed_ast::Type::Uint64,
+            vec![typed_ast::Type::Bool],
+            vec![],
+            vec![
+                load_param(0, 0),
+                constant(1, 1),
+                binary(2, ast::BinOp::Add, 0, 1),
+                ret(2),
+            ]
+        )),
+        Err(Violation::OperandType {
+            index: 2,
+            position: 0,
+            value: ValueId(0),
+            found: typed_ast::Type::Bool,
+            expected: typed_ast::Type::Uint64,
+        })
+    );
+}
+
+#[test]
+fn a_parameter_out_of_range_is_a_violation() {
+    assert_eq!(
+        verifier::verify(&shaped(
+            typed_ast::Type::Uint64,
+            vec![typed_ast::Type::Uint64],
+            vec![],
+            vec![load_param(0, 1), ret(0)]
+        )),
+        Err(Violation::ParamOutOfRange {
+            index: 0,
+            param: typed_ast::ParamId(1),
+            count: 1,
+        })
+    );
+}
+
+#[test]
+fn too_many_parameters_is_a_violation() {
+    let count = typed_ast::ParamId::CAPACITY + 1;
+    assert_eq!(
+        verifier::verify(&shaped(
+            typed_ast::Type::Uint64,
+            vec![typed_ast::Type::Uint64; count],
+            vec![],
+            vec![constant(0, 1), ret(0)]
+        )),
+        Err(Violation::TooManyParams { count })
+    );
+}
+
+#[test]
 fn a_frame_past_the_capacity_is_rejected() {
     let count = typed_ast::LocalId::CAPACITY + 1;
     assert_eq!(
@@ -341,6 +411,7 @@ fn a_bool_constant_is_returned() {
             verifier::verify(&shaped(
                 typed_ast::Type::Bool,
                 vec![],
+                vec![],
                 vec![constant_of(0, typed_ast::Type::Bool, value), ret(0)]
             )),
             Ok(())
@@ -354,6 +425,7 @@ fn a_bool_constant_outside_its_range_is_rejected() {
         verifier::verify(&shaped(
             typed_ast::Type::Bool,
             vec![],
+            vec![],
             vec![constant_of(0, typed_ast::Type::Bool, 2), ret(0)]
         )),
         Err(Violation::BoolOutOfRange { index: 0, value: 2 })
@@ -365,6 +437,7 @@ fn returning_a_uint64_as_a_bool_is_rejected() {
     assert_eq!(
         verifier::verify(&shaped(
             typed_ast::Type::Bool,
+            vec![],
             vec![],
             vec![constant(0, 1), ret(0)]
         )),
@@ -400,6 +473,7 @@ fn storing_and_loading_a_bool_slot_is_valid() {
     assert_eq!(
         verifier::verify(&shaped(
             typed_ast::Type::Bool,
+            vec![],
             vec![typed_ast::Type::Bool],
             vec![
                 constant_of(0, typed_ast::Type::Bool, 1),
@@ -439,6 +513,7 @@ fn a_load_carries_its_slots_type() {
     assert_eq!(
         verifier::verify(&shaped(
             typed_ast::Type::Uint64,
+            vec![],
             vec![typed_ast::Type::Bool],
             vec![
                 constant_of(0, typed_ast::Type::Bool, 1),
@@ -533,6 +608,7 @@ fn a_comparison_of_two_uint64s_is_valid() {
             verifier::verify(&shaped(
                 typed_ast::Type::Bool,
                 vec![],
+                vec![],
                 vec![constant(0, 1), constant(1, 2), binary(2, op, 0, 1), ret(2)]
             )),
             Ok(()),
@@ -586,6 +662,7 @@ fn equality_over_two_bools_is_valid() {
             verifier::verify(&shaped(
                 typed_ast::Type::Bool,
                 vec![],
+                vec![],
                 vec![
                     constant_of(0, typed_ast::Type::Bool, 1),
                     constant_of(1, typed_ast::Type::Bool, 0),
@@ -604,6 +681,7 @@ fn ordering_two_bools_is_rejected() {
     assert_eq!(
         verifier::verify(&shaped(
             typed_ast::Type::Bool,
+            vec![],
             vec![],
             vec![
                 constant_of(0, typed_ast::Type::Bool, 1),
@@ -627,6 +705,7 @@ fn comparing_a_uint64_with_a_bool_is_rejected() {
     assert_eq!(
         verifier::verify(&shaped(
             typed_ast::Type::Bool,
+            vec![],
             vec![],
             vec![
                 constant(0, 1),
@@ -652,6 +731,7 @@ fn comparing_a_bool_with_a_uint64_is_rejected() {
         verifier::verify(&shaped(
             typed_ast::Type::Bool,
             vec![],
+            vec![],
             vec![
                 constant_of(0, typed_ast::Type::Bool, 1),
                 constant(1, 1),
@@ -675,6 +755,7 @@ fn an_equality_without_enough_live_values_is_rejected() {
         verifier::verify(&shaped(
             typed_ast::Type::Bool,
             vec![],
+            vec![],
             vec![
                 constant_of(0, typed_ast::Type::Bool, 1),
                 binary(1, ast::BinOp::Eq, 0, 1),
@@ -696,6 +777,7 @@ fn logic_over_two_bools_is_valid() {
             verifier::verify(&shaped(
                 typed_ast::Type::Bool,
                 vec![],
+                vec![],
                 vec![
                     constant_of(0, typed_ast::Type::Bool, 1),
                     constant_of(1, typed_ast::Type::Bool, 0),
@@ -714,6 +796,7 @@ fn a_uint64_as_an_operand_of_logic_is_rejected() {
     assert_eq!(
         verifier::verify(&shaped(
             typed_ast::Type::Bool,
+            vec![],
             vec![],
             vec![
                 constant(0, 1),
@@ -738,6 +821,7 @@ fn negating_a_bool_is_valid() {
         verifier::verify(&shaped(
             typed_ast::Type::Bool,
             vec![],
+            vec![],
             vec![
                 constant_of(0, typed_ast::Type::Bool, 1),
                 unary(1, ast::UnOp::Not, 0),
@@ -753,6 +837,7 @@ fn negating_a_uint64_is_rejected() {
     assert_eq!(
         verifier::verify(&shaped(
             typed_ast::Type::Bool,
+            vec![],
             vec![],
             vec![constant(0, 1), unary(1, ast::UnOp::Not, 0), ret(1)]
         )),
@@ -772,6 +857,7 @@ fn negating_without_a_live_value_is_rejected() {
         verifier::verify(&shaped(
             typed_ast::Type::Bool,
             vec![],
+            vec![],
             vec![unary(0, ast::UnOp::Not, 0), ret(1)]
         )),
         Err(Violation::StackUnderflow {
@@ -787,6 +873,7 @@ fn negating_a_value_that_is_not_on_top_is_rejected() {
     assert_eq!(
         verifier::verify(&shaped(
             typed_ast::Type::Bool,
+            vec![],
             vec![],
             vec![
                 constant_of(0, typed_ast::Type::Bool, 1),
@@ -810,6 +897,7 @@ fn a_comparison_joined_by_logic_is_valid() {
     assert_eq!(
         verifier::verify(&shaped(
             typed_ast::Type::Bool,
+            vec![],
             vec![],
             vec![
                 constant(0, 1),

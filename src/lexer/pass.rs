@@ -22,6 +22,7 @@ pub fn lex(source: &str, diags: &mut diag::Sink) -> Option<Vec<Token>> {
             ')' => tokens.push(token(TokenKind::RParen, start, single)),
             '{' => tokens.push(token(TokenKind::LBrace, start, single)),
             '}' => tokens.push(token(TokenKind::RBrace, start, single)),
+            ',' => tokens.push(token(TokenKind::Comma, start, single)),
             '+' => tokens.push(token(TokenKind::Plus, start, single)),
             '-' => tokens.push(token(TokenKind::Minus, start, single)),
             '*' => tokens.push(token(TokenKind::Star, start, single)),
