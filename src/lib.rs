@@ -7,11 +7,11 @@ pub mod driver;
 pub mod emit;
 pub mod formatter;
 pub mod ir;
+pub mod lexer;
 pub mod lower;
 pub mod parser;
 pub mod precedence;
 #[cfg(test)]
 pub(crate) mod testing;
-pub mod token;
 pub mod typeck;
 pub mod typed_ast;

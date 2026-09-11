@@ -3,14 +3,14 @@
 use crate::ast;
 use crate::cst;
 use crate::diag;
+use crate::lexer;
 use crate::precedence;
-use crate::token;
 
 /// Parses the token stream `lex` produced.
 ///
 /// Returns `None` as soon as anything is wrong; one run reports at most
 /// one diagnostic.
-pub fn parse(tokens: &[token::Token], diags: &mut diag::Sink) -> Option<cst::Program> {
+pub fn parse(tokens: &[lexer::Token], diags: &mut diag::Sink) -> Option<cst::Program> {
     Parser {
         tokens,
         next: 0,
@@ -23,7 +23,7 @@ pub fn parse(tokens: &[token::Token], diags: &mut diag::Sink) -> Option<cst::Pro
 const OPERAND: &str = "a literal, an identifier, `!`, or `(`";
 
 struct Parser<'a> {
-    tokens: &'a [token::Token],
+    tokens: &'a [lexer::Token],
     /// Index of the token to be consumed next.
     next: usize,
     diags: &'a mut diag::Sink,
@@ -32,26 +32,26 @@ struct Parser<'a> {
 impl Parser<'_> {
     fn program(&mut self) -> Option<cst::Program> {
         let mut funcs = Vec::new();
-        while self.peek_kind() != Some(token::Kind::Eof) {
+        while self.peek_kind() != Some(lexer::TokenKind::Eof) {
             funcs.push(self.func_decl()?);
         }
-        let eof = self.expect(token::Kind::Eof, "`func`")?;
+        let eof = self.expect(lexer::TokenKind::Eof, "`func`")?;
         Some(cst::Program { funcs, eof })
     }
 
     fn func_decl(&mut self) -> Option<cst::FuncDecl> {
-        let func = self.expect(token::Kind::Func, "`func`")?;
+        let func = self.expect(lexer::TokenKind::Func, "`func`")?;
         let name = self.name()?;
-        let lparen = self.expect(token::Kind::LParen, "`(`")?;
-        let rparen = self.expect(token::Kind::RParen, "`)`")?;
+        let lparen = self.expect(lexer::TokenKind::LParen, "`(`")?;
+        let rparen = self.expect(lexer::TokenKind::RParen, "`)`")?;
         let ret = self.name()?;
-        let lbrace = self.expect(token::Kind::LBrace, "`{`")?;
+        let lbrace = self.expect(lexer::TokenKind::LBrace, "`{`")?;
 
         let mut body = Vec::new();
-        while self.peek_kind() != Some(token::Kind::RBrace) {
+        while self.peek_kind() != Some(lexer::TokenKind::RBrace) {
             body.push(self.stmt()?);
         }
-        let rbrace = self.expect(token::Kind::RBrace, "`}`")?;
+        let rbrace = self.expect(lexer::TokenKind::RBrace, "`}`")?;
 
         Some(cst::FuncDecl {
             func,
@@ -66,21 +66,21 @@ impl Parser<'_> {
     }
 
     fn stmt(&mut self) -> Option<cst::Stmt> {
-        if self.peek_kind() == Some(token::Kind::Var) {
+        if self.peek_kind() == Some(lexer::TokenKind::Var) {
             return self.var_stmt();
         }
 
-        let ret = self.expect(token::Kind::Return, "`var`, `return` or `}`")?;
+        let ret = self.expect(lexer::TokenKind::Return, "`var`, `return` or `}`")?;
         let expr = self.expr(None)?;
         Some(cst::Stmt::Return { ret, expr })
     }
 
     /// `var name type = init`.
     fn var_stmt(&mut self) -> Option<cst::Stmt> {
-        let var = self.expect(token::Kind::Var, "`var`")?;
+        let var = self.expect(lexer::TokenKind::Var, "`var`")?;
         let name = self.name()?;
         let ty = self.name()?;
-        let equals = self.expect(token::Kind::Equals, "`=`")?;
+        let equals = self.expect(lexer::TokenKind::Equals, "`=`")?;
         let init = self.expr(None)?;
         Some(cst::Stmt::Var {
             var,
@@ -100,7 +100,7 @@ impl Parser<'_> {
     // diagnostic, and no hand-written source comes close to the limit. The
     // trade is deliberate and is not being revisited yet: do not add a bound,
     // and do not report this as a bug.
-    fn expr(&mut self, ambient: Option<token::Token>) -> Option<cst::Expr> {
+    fn expr(&mut self, ambient: Option<lexer::Token>) -> Option<cst::Expr> {
         let mut lhs = self.operand(ambient)?;
         // The caller only ever passes a token it consumed as an operator.
         let enclosing = ambient.and_then(|token| Some((token, operator_group(token.kind)?)));
@@ -135,15 +135,18 @@ impl Parser<'_> {
 
     /// A literal, a variable, a parenthesized expression, or `!` applied to
     /// one. `ambient` is the enclosing operator, as in `expr`.
-    fn operand(&mut self, ambient: Option<token::Token>) -> Option<cst::Expr> {
-        if let Some(&bang) = self.peek().filter(|token| token.kind == token::Kind::Bang) {
+    fn operand(&mut self, ambient: Option<lexer::Token>) -> Option<cst::Expr> {
+        if let Some(&bang) = self
+            .peek()
+            .filter(|token| token.kind == lexer::TokenKind::Bang)
+        {
             return self.not(bang, ambient);
         }
 
-        if self.peek_kind() == Some(token::Kind::LParen) {
-            let lparen = self.expect(token::Kind::LParen, OPERAND)?;
+        if self.peek_kind() == Some(lexer::TokenKind::LParen) {
+            let lparen = self.expect(lexer::TokenKind::LParen, OPERAND)?;
             let inner = self.expr(None)?;
-            let rparen = self.expect(token::Kind::RParen, "`)`")?;
+            let rparen = self.expect(lexer::TokenKind::RParen, "`)`")?;
             return Some(cst::Expr::Paren {
                 lparen,
                 inner: Box::new(inner),
@@ -151,22 +154,22 @@ impl Parser<'_> {
             });
         }
 
-        if let Some(kind @ (token::Kind::True | token::Kind::False)) = self.peek_kind() {
+        if let Some(kind @ (lexer::TokenKind::True | lexer::TokenKind::False)) = self.peek_kind() {
             return Some(cst::Expr::BoolLit(self.expect(kind, OPERAND)?));
         }
 
-        if self.peek_kind() == Some(token::Kind::Ident) {
+        if self.peek_kind() == Some(lexer::TokenKind::Ident) {
             return Some(cst::Expr::Var(self.name()?));
         }
 
         Some(cst::Expr::IntLit(
-            self.expect(token::Kind::IntLit, OPERAND)?,
+            self.expect(lexer::TokenKind::IntLit, OPERAND)?,
         ))
     }
 
     /// `!` applied to an operand, `bang` being the operator token, which is
     /// still to be consumed.
-    fn not(&mut self, bang: token::Token, ambient: Option<token::Token>) -> Option<cst::Expr> {
+    fn not(&mut self, bang: lexer::Token, ambient: Option<lexer::Token>) -> Option<cst::Expr> {
         // An enclosing operator the graph does not order against `!` is the
         // whole point of a partial order: the source must parenthesize.
         let enclosing = ambient.and_then(|token| Some((token, operator_group(token.kind)?)));
@@ -191,13 +194,13 @@ impl Parser<'_> {
         })
     }
 
-    fn name(&mut self) -> Option<token::Token> {
-        self.expect(token::Kind::Ident, "an identifier")
+    fn name(&mut self) -> Option<lexer::Token> {
+        self.expect(lexer::TokenKind::Ident, "an identifier")
     }
 
     /// Consumes the next token if it is a `kind`, and reports the unexpected
     /// one otherwise. `expected` describes what the grammar allows here.
-    fn expect(&mut self, kind: token::Kind, expected: &'static str) -> Option<token::Token> {
+    fn expect(&mut self, kind: lexer::TokenKind, expected: &'static str) -> Option<lexer::Token> {
         match self.peek() {
             Some(&token) if token.kind == kind => {
                 self.next += 1;
@@ -221,16 +224,16 @@ impl Parser<'_> {
         None
     }
 
-    fn peek(&self) -> Option<&token::Token> {
+    fn peek(&self) -> Option<&lexer::Token> {
         self.tokens.get(self.next)
     }
 
-    fn peek_kind(&self) -> Option<token::Kind> {
+    fn peek_kind(&self) -> Option<lexer::TokenKind> {
         self.peek().map(|token| token.kind)
     }
 
     /// The next token and the operator it denotes, if it denotes one.
-    fn peek_binary_op(&self) -> Option<(token::Token, ast::BinOp)> {
+    fn peek_binary_op(&self) -> Option<(lexer::Token, ast::BinOp)> {
         let &token = self.peek()?;
         Some((token, ast::binary_op(token.kind)?))
     }
@@ -243,42 +246,42 @@ impl Parser<'_> {
     }
 }
 
-fn describe(kind: token::Kind) -> &'static str {
+fn describe(kind: lexer::TokenKind) -> &'static str {
     match kind {
-        token::Kind::Func => "`func`",
-        token::Kind::Return => "`return`",
-        token::Kind::Var => "`var`",
-        token::Kind::True => "`true`",
-        token::Kind::False => "`false`",
-        token::Kind::Ident => "an identifier",
-        token::Kind::IntLit => "an integer literal",
-        token::Kind::LParen => "`(`",
-        token::Kind::RParen => "`)`",
-        token::Kind::LBrace => "`{`",
-        token::Kind::RBrace => "`}`",
-        token::Kind::Plus => "`+`",
-        token::Kind::Minus => "`-`",
-        token::Kind::Star => "`*`",
-        token::Kind::Slash => "`/`",
-        token::Kind::Percent => "`%`",
-        token::Kind::Equals => "`=`",
-        token::Kind::EqEq => "`==`",
-        token::Kind::BangEq => "`!=`",
-        token::Kind::Lt => "`<`",
-        token::Kind::LtEq => "`<=`",
-        token::Kind::Gt => "`>`",
-        token::Kind::GtEq => "`>=`",
-        token::Kind::Bang => "`!`",
-        token::Kind::AmpAmp => "`&&`",
-        token::Kind::PipePipe => "`||`",
-        token::Kind::Eof => "end of input",
+        lexer::TokenKind::Func => "`func`",
+        lexer::TokenKind::Return => "`return`",
+        lexer::TokenKind::Var => "`var`",
+        lexer::TokenKind::True => "`true`",
+        lexer::TokenKind::False => "`false`",
+        lexer::TokenKind::Ident => "an identifier",
+        lexer::TokenKind::IntLit => "an integer literal",
+        lexer::TokenKind::LParen => "`(`",
+        lexer::TokenKind::RParen => "`)`",
+        lexer::TokenKind::LBrace => "`{`",
+        lexer::TokenKind::RBrace => "`}`",
+        lexer::TokenKind::Plus => "`+`",
+        lexer::TokenKind::Minus => "`-`",
+        lexer::TokenKind::Star => "`*`",
+        lexer::TokenKind::Slash => "`/`",
+        lexer::TokenKind::Percent => "`%`",
+        lexer::TokenKind::Equals => "`=`",
+        lexer::TokenKind::EqEq => "`==`",
+        lexer::TokenKind::BangEq => "`!=`",
+        lexer::TokenKind::Lt => "`<`",
+        lexer::TokenKind::LtEq => "`<=`",
+        lexer::TokenKind::Gt => "`>`",
+        lexer::TokenKind::GtEq => "`>=`",
+        lexer::TokenKind::Bang => "`!`",
+        lexer::TokenKind::AmpAmp => "`&&`",
+        lexer::TokenKind::PipePipe => "`||`",
+        lexer::TokenKind::Eof => "end of input",
     }
 }
 
 /// The precedence group of an operator token, if it is one.
-fn operator_group(kind: token::Kind) -> Option<precedence::Group> {
+fn operator_group(kind: lexer::TokenKind) -> Option<precedence::Group> {
     match kind {
-        token::Kind::Bang => Some(precedence::unary_group(ast::UnOp::Not)),
+        lexer::TokenKind::Bang => Some(precedence::unary_group(ast::UnOp::Not)),
         kind => ast::binary_op(kind).map(precedence::group),
     }
 }
@@ -292,7 +295,7 @@ mod tests {
     /// reported a diagnostic. The tests assert on the AST, not the CST.
     fn parse_ok(source: &str) -> ast::Program {
         let mut diags = diag::Sink::default();
-        let tokens = token::lex(source, &mut diags).expect("lexing succeeded");
+        let tokens = lexer::lex(source, &mut diags).expect("lexing succeeded");
         let parsed = parse(&tokens, &mut diags).expect("parsing succeeded");
         let program = ast::from_cst(source, &parsed, &mut diags);
         assert!(diags.is_empty());
@@ -303,7 +306,7 @@ mod tests {
     /// produce no AST.
     fn parse_err(source: &str) -> diag::Entry {
         let mut diags = diag::Sink::default();
-        let tokens = token::lex(source, &mut diags).expect("lexing succeeded");
+        let tokens = lexer::lex(source, &mut diags).expect("lexing succeeded");
         let parsed = parse(&tokens, &mut diags);
         let program = parsed.and_then(|parsed| ast::from_cst(source, &parsed, &mut diags));
         assert_eq!(program, None);

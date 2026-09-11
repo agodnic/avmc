@@ -2,12 +2,12 @@
 
 use crate::cst;
 use crate::diag;
+use crate::lexer;
 use crate::parser;
-use crate::token;
 
 /// Formats `source`, or reports why it cannot be parsed.
 pub fn format(source: &str, diags: &mut diag::Sink) -> Option<String> {
-    let tokens = token::lex(source, diags)?;
+    let tokens = lexer::lex(source, diags)?;
     let program = parser::parse(&tokens, diags)?;
 
     let mut printer = Printer {
@@ -158,11 +158,11 @@ impl Printer<'_> {
     }
 
     /// Prints `token` and the trivia before it, keeping its blank lines.
-    fn token(&mut self, token: &token::Token, sep: Sep) {
+    fn token(&mut self, token: &lexer::Token, sep: Sep) {
         self.token_with_blanks(token, sep, Blanks::All);
     }
 
-    fn token_with_blanks(&mut self, token: &token::Token, sep: Sep, blanks: Blanks) {
+    fn token_with_blanks(&mut self, token: &lexer::Token, sep: Sep, blanks: Blanks) {
         self.trivia(token.trivia, blanks);
         self.text(slice(self.source, token.span), sep);
     }
@@ -499,9 +499,9 @@ mod tests {
     #[test]
     fn formatting_preserves_the_tokens() {
         /// The kind of every token of `source`, `Eof` included.
-        fn kinds(source: &str) -> Vec<token::Kind> {
+        fn kinds(source: &str) -> Vec<lexer::TokenKind> {
             let mut diags = diag::Sink::default();
-            let tokens = token::lex(source, &mut diags).expect("lexing succeeded");
+            let tokens = lexer::lex(source, &mut diags).expect("lexing succeeded");
             tokens.iter().map(|token| token.kind).collect()
         }
 
