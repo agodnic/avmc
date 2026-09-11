@@ -10,6 +10,10 @@ use crate::parser;
 /// The approval program of the v0 milestone, with comments.
 const COMMENTED_APPROVAL: &str = "// The approval program.\nfunc approval() uint64 {\n  var x uint64 = 1 + 2 // one more than two\n  return x\n}\n";
 
+/// The example program of the parameters milestone.
+const PARAMETERS: &str = "func add(a uint64, b uint64) uint64 {\n\tvar sum uint64 = a + b\n\t\
+                          return sum\n}\n\nfunc approval() uint64 {\n\treturn 1\n}\n";
+
 /// The example program of the variables milestone.
 const VARIABLES: &str = "func approval() uint64 {\n  var x uint64 = 1 + 2\n  \
                          var y uint64 = x * 3\n  return y - x\n}\n";
@@ -64,6 +68,7 @@ fn the_tree_is_lossless() {
     let sources = [
         COMMENTED_APPROVAL,
         VARIABLES,
+        PARAMETERS,
         "func f() uint64 { return (1 + 2) * 3 // grouped\n}\n",
     ];
 

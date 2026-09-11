@@ -41,18 +41,65 @@ fn check_duplicates(program: &ast::Program, diags: &mut diag::Sink) -> bool {
     ok
 }
 
-/// Checks one function. The three rules are independent: a return type that
-/// does not resolve still leaves the body checked.
+/// Checks one function. The rules are independent: a return type that does
+/// not resolve still leaves the parameters and the body checked.
 fn check_func(func: &ast::FuncDecl, diags: &mut diag::Sink) -> Option<typed_ast::FuncDecl> {
+    let mut scope = Scope::default();
+    let params = check_params(func, &mut scope, diags);
     let ret = resolve_type(&func.ret, diags);
-    let body = check_body(func, ret, diags);
+    let body = check_body(func, ret, &mut scope, diags);
 
     Some(typed_ast::FuncDecl {
         name: func.name.clone(),
+        params: params?,
         ret: ret?,
         body: body?,
         span: func.span,
     })
+}
+
+/// A function's scope: its parameters, then the variables its body declares.
+/// They share one namespace, and a binding's index in its own list is its id.
+/// A type of `None` is one that did not resolve.
+#[derive(Default)]
+struct Scope<'a> {
+    params: Vec<(&'a str, Option<typed_ast::Type>)>,
+    locals: Vec<(&'a str, Option<typed_ast::Type>)>,
+}
+
+impl Scope<'_> {
+    /// Whether the scope already declares `name`.
+    fn holds(&self, name: &str) -> bool {
+        self.params
+            .iter()
+            .chain(&self.locals)
+            .any(|(declared, _)| *declared == name)
+    }
+}
+
+/// Checks a function's parameters, declaring each one. They are checked in
+/// order, and each is reported whether or not another failed.
+fn check_params<'a>(
+    func: &'a ast::FuncDecl,
+    scope: &mut Scope<'a>,
+    diags: &mut diag::Sink,
+) -> Option<Vec<typed_ast::Param>> {
+    let mut params = Vec::new();
+    let mut ok = true;
+
+    for param in &func.params {
+        let ty = resolve_type(&param.ty, diags);
+        let declared = declare_param(param, ty, scope, diags).is_some();
+        match ty.filter(|_| declared) {
+            Some(ty) => params.push(typed_ast::Param {
+                name: param.name.clone(),
+                ty,
+            }),
+            None => ok = false,
+        }
+    }
+
+    ok.then_some(params)
 }
 
 /// Resolves a written type name, reporting it if it names no type.
@@ -72,17 +119,16 @@ fn resolve_type(ret: &ast::TypeRef, diags: &mut diag::Sink) -> Option<typed_ast:
     }
 }
 
-/// Checks a function body: every statement in it, in a scope of its own. The
-/// body must end with a `return`, and nothing may follow one — of which only
-/// the first is reported.
-fn check_body(
-    func: &ast::FuncDecl,
+/// Checks a function body: every statement in it, in the scope its
+/// parameters opened. The body must end with a `return`, and nothing may
+/// follow one — of which only the first is reported.
+fn check_body<'a>(
+    func: &'a ast::FuncDecl,
     ret: Option<typed_ast::Type>,
+    scope: &mut Scope<'a>,
     diags: &mut diag::Sink,
 ) -> Option<Vec<typed_ast::Stmt>> {
     let mut stmts = Vec::new();
-    // The variables declared so far, in order: a name's index is its slot.
-    let mut locals = Vec::new();
     let mut ok = true;
     let mut returned = false;
     let mut unreachable = None;
@@ -92,7 +138,7 @@ fn check_body(
         if returned && unreachable.is_none() {
             unreachable = Some(*span);
         }
-        match check_stmt(stmt, ret, &mut locals, diags) {
+        match check_stmt(stmt, ret, scope, diags) {
             Some(stmt) => stmts.push(stmt),
             None => ok = false,
         }
@@ -124,7 +170,7 @@ fn check_body(
 fn check_stmt<'a>(
     stmt: &'a ast::Stmt,
     ret: Option<typed_ast::Type>,
-    locals: &mut Vec<(&'a str, Option<typed_ast::Type>)>,
+    scope: &mut Scope<'a>,
     diags: &mut diag::Sink,
 ) -> Option<typed_ast::Stmt> {
     match stmt {
@@ -135,13 +181,13 @@ fn check_stmt<'a>(
             span,
         } => {
             // The initializer cannot see the name being declared.
-            let init = check_expr(init, locals, diags);
+            let init = check_expr(init, scope, diags);
             let ty = resolve_type(ty, diags);
             let agrees = check_type(init.as_ref(), ty, diags);
             // The name is declared with its written type even when the
             // initializer disagreed, so that later uses check against the
             // declaration.
-            let local = declare(name, ty, locals, diags);
+            let local = declare(name, ty, scope, diags);
             agrees.then_some(())?;
             Some(typed_ast::Stmt::Var {
                 local: local?,
@@ -151,7 +197,7 @@ fn check_stmt<'a>(
             })
         }
         ast::Stmt::Return { expr, span } => {
-            let expr = check_expr(expr, locals, diags)?;
+            let expr = check_expr(expr, scope, diags)?;
             check_type(Some(&expr), ret, diags).then_some(())?;
             Some(typed_ast::Stmt::Return { expr, span: *span })
         }
@@ -182,20 +228,20 @@ fn check_type(
     false
 }
 
-/// Declares `name`, reporting it if the scope already holds it or has no room
-/// for it. A name that is reported is not declared.
+/// Declares a variable, reporting it if the scope already holds its name or
+/// the frame has no room for it. A name that is reported is not declared.
 fn declare<'a>(
     name: &'a ast::Name,
     ty: Option<typed_ast::Type>,
-    locals: &mut Vec<(&'a str, Option<typed_ast::Type>)>,
+    scope: &mut Scope<'a>,
     diags: &mut diag::Sink,
 ) -> Option<typed_ast::LocalId> {
-    let kind = if locals.iter().any(|(declared, _)| *declared == name.text) {
+    let kind = if scope.holds(&name.text) {
         diag::Kind::DuplicateVariable {
             name: name.text.clone(),
         }
-    } else if let Some(local) = typed_ast::LocalId::new(locals.len()) {
-        locals.push((&name.text, ty));
+    } else if let Some(local) = typed_ast::LocalId::new(scope.locals.len()) {
+        scope.locals.push((&name.text, ty));
         return Some(local);
     } else {
         diag::Kind::TooManyVariables {
@@ -210,14 +256,38 @@ fn declare<'a>(
     None
 }
 
-/// Checks one expression, giving it its type. A name that resolves to no
-/// variable and an operand of arithmetic that is not a `uint64` are what can
-/// fail.
-fn check_expr(
-    expr: &ast::Expr,
-    locals: &[(&str, Option<typed_ast::Type>)],
+/// Declares a parameter, reporting it if the scope already holds its name or
+/// the function takes too many. A parameter that is reported is not declared.
+fn declare_param<'a>(
+    param: &'a ast::Param,
+    ty: Option<typed_ast::Type>,
+    scope: &mut Scope<'a>,
     diags: &mut diag::Sink,
-) -> Option<typed_ast::Expr> {
+) -> Option<typed_ast::ParamId> {
+    let kind = if scope.holds(&param.name.text) {
+        diag::Kind::DuplicateVariable {
+            name: param.name.text.clone(),
+        }
+    } else if let Some(id) = typed_ast::ParamId::new(scope.params.len()) {
+        scope.params.push((&param.name.text, ty));
+        return Some(id);
+    } else {
+        diag::Kind::TooManyParameters {
+            max: typed_ast::ParamId::CAPACITY,
+        }
+    };
+
+    diags.push(diag::Entry {
+        kind,
+        span: param.name.span,
+    });
+    None
+}
+
+/// Checks one expression, giving it its type. A name that resolves to nothing
+/// in scope and an operand of arithmetic that is not a `uint64` are what can
+/// fail.
+fn check_expr(expr: &ast::Expr, scope: &Scope, diags: &mut diag::Sink) -> Option<typed_ast::Expr> {
     let (kind, ty, span) = match expr {
         ast::Expr::IntLit { value, span } => (
             typed_ast::ExprKind::IntLit(*value),
@@ -231,8 +301,8 @@ fn check_expr(
         ),
         ast::Expr::Binary { op, lhs, rhs, span } => {
             // Both operands are checked, so both report.
-            let lhs = check_expr(lhs, locals, diags);
-            let rhs = check_expr(rhs, locals, diags);
+            let lhs = check_expr(lhs, scope, diags);
+            let rhs = check_expr(rhs, scope, diags);
             // Equality takes any one type: the right operand must match the
             // left.
             let lhs_expected = typed_ast::operand_type(*op);
@@ -251,7 +321,7 @@ fn check_expr(
             )
         }
         ast::Expr::Unary { op, operand, span } => {
-            let operand = check_expr(operand, locals, diags);
+            let operand = check_expr(operand, scope, diags);
             check_type(operand.as_ref(), Some(typed_ast::Type::Bool), diags).then_some(())?;
             (
                 typed_ast::ExprKind::Unary {
@@ -263,33 +333,47 @@ fn check_expr(
             )
         }
         ast::Expr::Var { name, span } => {
-            let (local, ty) = resolve_var(name, locals, diags)?;
-            (typed_ast::ExprKind::Var(local), ty, *span)
+            let (kind, ty) = resolve_var(name, scope, diags)?;
+            (kind, ty, *span)
         }
     };
     Some(typed_ast::Expr { kind, ty, span })
 }
 
-/// Resolves a name to its frame slot and type, reporting it if it names no
-/// variable. A variable whose declared type did not resolve is `None` without
-/// a report: the declaration reported it.
+/// Resolves a name to the expression reading it and its type, reporting it if
+/// it names neither a parameter nor a variable. A binding whose declared type
+/// did not resolve is `None` without a report: the declaration reported it.
 fn resolve_var(
     name: &ast::Name,
-    locals: &[(&str, Option<typed_ast::Type>)],
+    scope: &Scope,
     diags: &mut diag::Sink,
-) -> Option<(typed_ast::LocalId, typed_ast::Type)> {
-    let Some((index, (_, ty))) = locals
+) -> Option<(typed_ast::ExprKind, typed_ast::Type)> {
+    if let Some((index, ty)) = lookup(&scope.params, name) {
+        let id = typed_ast::ParamId::new(index)?;
+        return Some((typed_ast::ExprKind::Param(id), ty?));
+    }
+    if let Some((index, ty)) = lookup(&scope.locals, name) {
+        let id = typed_ast::LocalId::new(index)?;
+        return Some((typed_ast::ExprKind::Var(id), ty?));
+    }
+
+    diags.push(diag::Entry {
+        kind: diag::Kind::UndefinedVariable {
+            name: name.text.clone(),
+        },
+        span: name.span,
+    });
+    None
+}
+
+/// The position and declared type of `name` among `bindings`, if they hold it.
+fn lookup(
+    bindings: &[(&str, Option<typed_ast::Type>)],
+    name: &ast::Name,
+) -> Option<(usize, Option<typed_ast::Type>)> {
+    bindings
         .iter()
         .enumerate()
         .find(|(_, (declared, _))| *declared == name.text)
-    else {
-        diags.push(diag::Entry {
-            kind: diag::Kind::UndefinedVariable {
-                name: name.text.clone(),
-            },
-            span: name.span,
-        });
-        return None;
-    };
-    Some((typed_ast::LocalId::new(index)?, (*ty)?))
+        .map(|(index, (_, ty))| (index, *ty))
 }

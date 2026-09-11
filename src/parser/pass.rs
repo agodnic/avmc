@@ -41,7 +41,7 @@ impl Parser<'_> {
         let func = self.expect(lexer::TokenKind::Func, "`func`")?;
         let name = self.name()?;
         let lparen = self.expect(lexer::TokenKind::LParen, "`(`")?;
-        let rparen = self.expect(lexer::TokenKind::RParen, "`)`")?;
+        let (params, rparen) = self.params()?;
         let ret = self.name()?;
         let lbrace = self.expect(lexer::TokenKind::LBrace, "`{`")?;
 
@@ -55,12 +55,32 @@ impl Parser<'_> {
             func,
             name,
             lparen,
+            params,
             rparen,
             ret,
             lbrace,
             body,
             rbrace,
         })
+    }
+
+    /// The parameter list and the `)` that ends it, the `(` already consumed.
+    fn params(&mut self) -> Option<(Vec<cst::Param>, lexer::Token)> {
+        let mut params = Vec::new();
+        if let Some(rparen) = self.consume(lexer::TokenKind::RParen) {
+            return Some((params, rparen));
+        }
+
+        loop {
+            let name = self.name()?;
+            let ty = self.name()?;
+            let comma = self.consume(lexer::TokenKind::Comma);
+            params.push(cst::Param { name, ty, comma });
+            if comma.is_none() {
+                let rparen = self.expect(lexer::TokenKind::RParen, "`,` or `)`")?;
+                return Some((params, rparen));
+            }
+        }
     }
 
     fn stmt(&mut self) -> Option<cst::Stmt> {
@@ -196,6 +216,13 @@ impl Parser<'_> {
         self.expect(lexer::TokenKind::Ident, "an identifier")
     }
 
+    /// Consumes the next token if it is a `kind`, and leaves it otherwise.
+    fn consume(&mut self, kind: lexer::TokenKind) -> Option<lexer::Token> {
+        let &token = self.peek().filter(|token| token.kind == kind)?;
+        self.next += 1;
+        Some(token)
+    }
+
     /// Consumes the next token if it is a `kind`, and reports the unexpected
     /// one otherwise. `expected` describes what the grammar allows here.
     fn expect(&mut self, kind: lexer::TokenKind, expected: &'static str) -> Option<lexer::Token> {
@@ -257,6 +284,7 @@ fn describe(kind: lexer::TokenKind) -> &'static str {
         lexer::TokenKind::RParen => "`)`",
         lexer::TokenKind::LBrace => "`{`",
         lexer::TokenKind::RBrace => "`}`",
+        lexer::TokenKind::Comma => "`,`",
         lexer::TokenKind::Plus => "`+`",
         lexer::TokenKind::Minus => "`-`",
         lexer::TokenKind::Star => "`*`",

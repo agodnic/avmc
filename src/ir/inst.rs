@@ -62,6 +62,15 @@ pub enum Inst {
         /// The expression it came from.
         span: diag::Span,
     },
+    /// Defines `dest` as a copy of parameter `param`.
+    LoadParam {
+        /// The value it defines.
+        dest: ValueId,
+        /// The parameter it reads.
+        param: typed_ast::ParamId,
+        /// The expression it came from.
+        span: diag::Span,
+    },
     /// Returns `value` from the enclosing function.
     Return {
         /// The value it returns.
@@ -80,6 +89,7 @@ impl Inst {
             | Inst::Unary { span, .. }
             | Inst::Store { span, .. }
             | Inst::Load { span, .. }
+            | Inst::LoadParam { span, .. }
             | Inst::Return { span, .. } => *span,
         }
     }
@@ -92,6 +102,8 @@ pub struct Function {
     pub name: String,
     /// The return type.
     pub ret: typed_ast::Type,
+    /// The parameter types, in declaration order, indexed by `ParamId`.
+    pub params: Vec<typed_ast::Type>,
     /// The frame: one slot per variable, indexed by `LocalId`.
     pub locals: Vec<typed_ast::Type>,
     /// The instructions, in execution order.

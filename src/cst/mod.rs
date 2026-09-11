@@ -6,4 +6,4 @@ mod node;
 mod tests;
 
 pub use flatten::tokens;
-pub use node::{Expr, FuncDecl, Program, Stmt};
+pub use node::{Expr, FuncDecl, Param, Program, Stmt};

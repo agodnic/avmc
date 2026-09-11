@@ -50,6 +50,7 @@ fn parses_the_approval_program() {
         ast::Program {
             funcs: vec![ast::FuncDecl {
                 name: func_name,
+                params: vec![],
                 ret,
                 body: vec![ast::Stmt::Return {
                     expr: ast::Expr::IntLit {
@@ -154,6 +155,7 @@ fn parses_the_variables_program() {
         ast::Program {
             funcs: vec![ast::FuncDecl {
                 name: func_name,
+                params: vec![],
                 ret,
                 body: vec![
                     ast::Stmt::Var {
@@ -335,6 +337,7 @@ fn a_body_may_be_empty() {
         ast::Program {
             funcs: vec![ast::FuncDecl {
                 name: func_name,
+                params: vec![],
                 ret,
                 body: Vec::new(),
                 span: diag::Span { start, end },
@@ -343,17 +346,103 @@ fn a_body_may_be_empty() {
     );
 }
 
+/// The parameter `name type`, each written at the next occurrence of its
+/// text.
+fn param(name: &str, ty: &str, span: &mut impl FnMut(&str) -> diag::Span) -> ast::Param {
+    let name = testing::name(name, span(name));
+    ast::Param {
+        name,
+        ty: ast::TypeRef {
+            name: testing::name(ty, span(ty)),
+        },
+    }
+}
+
 #[test]
-fn a_missing_closing_paren_is_reported() {
-    let source = "func f( uint64 {}";
+fn parses_one_parameter() {
+    let source = "func f(a uint64) uint64 { return 1 }";
+    let mut span = testing::spans(source);
+    span("func");
+    span("f");
+
+    assert_eq!(
+        parse_ok(source).funcs[0].params,
+        vec![param("a", "uint64", &mut span)]
+    );
+}
+
+#[test]
+fn parses_two_parameters() {
+    let source = "func add(a uint64, b uint64) uint64 { return a }";
+    let mut span = testing::spans(source);
+    span("func");
+    span("add");
+
+    assert_eq!(
+        parse_ok(source).funcs[0].params,
+        vec![
+            param("a", "uint64", &mut span),
+            param("b", "uint64", &mut span),
+        ]
+    );
+}
+
+#[test]
+fn a_parameter_needs_a_type() {
+    let source = "func f(a) uint64 { return 1 }";
     assert_eq!(
         parse_err(source),
         diag::Entry {
             kind: diag::Kind::UnexpectedToken {
-                expected: "`)`",
+                expected: "an identifier",
+                found: "`)`",
+            },
+            span: testing::span_of(source, ")", 0),
+        }
+    );
+}
+
+#[test]
+fn a_trailing_comma_is_reported() {
+    let source = "func f(a uint64,) uint64 { return 1 }";
+    assert_eq!(
+        parse_err(source),
+        diag::Entry {
+            kind: diag::Kind::UnexpectedToken {
+                expected: "an identifier",
+                found: "`)`",
+            },
+            span: testing::span_of(source, ")", 0),
+        }
+    );
+}
+
+#[test]
+fn parameters_are_separated_by_commas() {
+    let source = "func f(a uint64 b uint64) uint64 { return 1 }";
+    assert_eq!(
+        parse_err(source),
+        diag::Entry {
+            kind: diag::Kind::UnexpectedToken {
+                expected: "`,` or `)`",
                 found: "an identifier",
             },
-            span: diag::Span { start: 8, end: 14 },
+            span: testing::span_of(source, "b", 0),
+        }
+    );
+}
+
+#[test]
+fn a_missing_closing_paren_is_reported() {
+    let source = "func f(a uint64 {}";
+    assert_eq!(
+        parse_err(source),
+        diag::Entry {
+            kind: diag::Kind::UnexpectedToken {
+                expected: "`,` or `)`",
+                found: "`{`",
+            },
+            span: testing::span_of(source, "{", 0),
         }
     );
 }

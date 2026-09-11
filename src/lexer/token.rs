@@ -25,6 +25,8 @@ pub enum TokenKind {
     LBrace,
     /// `}`
     RBrace,
+    /// `,`
+    Comma,
     /// `+`
     Plus,
     /// `-`

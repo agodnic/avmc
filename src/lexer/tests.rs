@@ -114,6 +114,42 @@ fn whitespace_only_shifts_spans() {
 }
 
 #[test]
+fn a_comma_is_a_token() {
+    let source = "a, b";
+    let expected = spans(
+        source,
+        &[
+            (TokenKind::Ident, "a"),
+            (TokenKind::Comma, ","),
+            (TokenKind::Ident, "b"),
+        ],
+    );
+    assert_eq!(lex_ok(source), expected);
+}
+
+#[test]
+fn lexes_a_parameter_list() {
+    let source = "func add(a uint64, b uint64) uint64 {";
+    let expected = spans(
+        source,
+        &[
+            (TokenKind::Func, "func"),
+            (TokenKind::Ident, "add"),
+            (TokenKind::LParen, "("),
+            (TokenKind::Ident, "a"),
+            (TokenKind::Ident, "uint64"),
+            (TokenKind::Comma, ","),
+            (TokenKind::Ident, "b"),
+            (TokenKind::Ident, "uint64"),
+            (TokenKind::RParen, ")"),
+            (TokenKind::Ident, "uint64"),
+            (TokenKind::LBrace, "{"),
+        ],
+    );
+    assert_eq!(lex_ok(source), expected);
+}
+
+#[test]
 fn empty_input_produces_only_the_end_of_input_token() {
     assert_eq!(lex_ok(""), spans("", &[]));
 }

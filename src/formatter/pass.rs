@@ -81,6 +81,15 @@ impl Printer<'_> {
         self.token_with_blanks(&func.func, Sep::Tight, blanks);
         self.token(&func.name, Sep::Space);
         self.token(&func.lparen, Sep::Tight);
+        for (index, param) in func.params.iter().enumerate() {
+            // The first parameter follows `(`; the rest follow a `,`.
+            let sep = if index == 0 { Sep::Tight } else { Sep::Space };
+            self.token(&param.name, sep);
+            self.token(&param.ty, Sep::Space);
+            if let Some(comma) = &param.comma {
+                self.token(comma, Sep::Tight);
+            }
+        }
         self.token(&func.rparen, Sep::Tight);
         self.token(&func.ret, Sep::Space);
         self.token(&func.lbrace, Sep::Space);

@@ -39,6 +39,7 @@ fn checks_the_approval_program() {
         typed_ast::Program {
             funcs: vec![typed_ast::FuncDecl {
                 name: func_name,
+                params: vec![],
                 ret: typed_ast::Type::Uint64,
                 body: vec![typed_ast::Stmt::Return {
                     expr: typed_ast::Expr {
@@ -280,6 +281,226 @@ fn a_declaration_after_a_return_is_unreachable() {
             kind: diag::Kind::UnreachableStatement,
             span: testing::span_of(&source, "var x uint64 = 2", 0),
         }]
+    );
+}
+
+/// The `add` function of the parameters milestone.
+const ADD: &str = "func add(a uint64, b uint64) uint64 {\n\tvar sum uint64 = a + b\n\t\
+                   return sum\n}\n";
+
+/// `func f(<params>) uint64 { <body> }`.
+fn taking(params: &str, body: &str) -> String {
+    format!("func f({params}) uint64 {{ {body} }}")
+}
+
+#[test]
+fn a_parameter_reads_as_its_type() {
+    let source = ADD;
+    let mut span = testing::spans(source);
+
+    span("func");
+    span("add");
+    let first = testing::name("a", span("a"));
+    span("uint64");
+    let second = testing::name("b", span("b"));
+    span("uint64");
+    span("uint64");
+
+    let var = span("var").start;
+    span("sum");
+    span("uint64");
+    let a = span("a");
+    let b = span("b");
+    let return_start = span("return").start;
+    let sum = span("sum");
+
+    let uint64 = |kind, span| typed_ast::Expr {
+        kind,
+        ty: typed_ast::Type::Uint64,
+        span,
+    };
+    let func = &check_ok(source).funcs[0];
+
+    assert_eq!(
+        func.params,
+        vec![
+            typed_ast::Param {
+                name: first,
+                ty: typed_ast::Type::Uint64,
+            },
+            typed_ast::Param {
+                name: second,
+                ty: typed_ast::Type::Uint64,
+            },
+        ]
+    );
+    assert_eq!(
+        func.body,
+        vec![
+            typed_ast::Stmt::Var {
+                local: typed_ast::LocalId(0),
+                ty: typed_ast::Type::Uint64,
+                init: uint64(
+                    typed_ast::ExprKind::Binary {
+                        op: ast::BinOp::Add,
+                        lhs: Box::new(uint64(typed_ast::ExprKind::Param(typed_ast::ParamId(0)), a)),
+                        rhs: Box::new(uint64(typed_ast::ExprKind::Param(typed_ast::ParamId(1)), b)),
+                    },
+                    diag::Span {
+                        start: a.start,
+                        end: b.end,
+                    },
+                ),
+                span: diag::Span {
+                    start: var,
+                    end: b.end,
+                },
+            },
+            typed_ast::Stmt::Return {
+                expr: uint64(typed_ast::ExprKind::Var(typed_ast::LocalId(0)), sum),
+                span: diag::Span {
+                    start: return_start,
+                    end: sum.end,
+                },
+            },
+        ]
+    );
+}
+
+#[test]
+fn a_parameter_is_in_scope_before_the_first_statement() {
+    let source = taking("a uint64", "return a");
+    assert_eq!(
+        check_ok(&source).funcs[0].body,
+        vec![typed_ast::Stmt::Return {
+            expr: typed_ast::Expr {
+                kind: typed_ast::ExprKind::Param(typed_ast::ParamId(0)),
+                ty: typed_ast::Type::Uint64,
+                span: testing::span_of(&source, "a", 1),
+            },
+            span: testing::span_of(&source, "return a", 0),
+        }]
+    );
+}
+
+#[test]
+fn a_variable_may_not_share_a_parameters_name() {
+    let source = taking("a uint64", "var a uint64 = 1 return a");
+    let mut span = testing::spans(&source);
+    span("a");
+    span("var");
+
+    assert_eq!(
+        check_err(&source),
+        vec![diag::Entry {
+            kind: diag::Kind::DuplicateVariable {
+                name: "a".to_string(),
+            },
+            span: span("a"),
+        }]
+    );
+}
+
+#[test]
+fn a_duplicate_parameter_is_reported_at_the_later_one() {
+    let source = taking("a uint64, a uint64", "return a");
+    let mut span = testing::spans(&source);
+    span("a");
+
+    assert_eq!(
+        check_err(&source),
+        vec![diag::Entry {
+            kind: diag::Kind::DuplicateVariable {
+                name: "a".to_string(),
+            },
+            span: span("a"),
+        }]
+    );
+}
+
+#[test]
+fn an_unknown_parameter_type_is_reported() {
+    // The use of `a` reports nothing more: its declaration reported it.
+    let source = taking("a bytes", "return a + 1");
+    assert_eq!(
+        check_err(&source),
+        vec![diag::Entry {
+            kind: diag::Kind::UnknownType {
+                name: "bytes".to_string(),
+            },
+            span: testing::span_of(&source, "bytes", 0),
+        }]
+    );
+}
+
+/// `func f(p0 uint64, .. p<count-1> uint64) uint64 { return 1 }`.
+fn parameters(count: usize) -> String {
+    let params: Vec<String> = (0..count).map(|index| format!("p{index} uint64")).collect();
+    taking(&params.join(", "), "return 1")
+}
+
+#[test]
+fn a_function_may_declare_the_parameter_capacity() {
+    let source = parameters(typed_ast::ParamId::CAPACITY);
+    let params = &check_ok(&source).funcs[0].params;
+
+    assert_eq!(params.len(), typed_ast::ParamId::CAPACITY);
+    assert_eq!(params[typed_ast::ParamId::CAPACITY - 1].name.text, "p127");
+}
+
+#[test]
+fn one_parameter_past_the_capacity_is_reported() {
+    let source = parameters(typed_ast::ParamId::CAPACITY + 1);
+    assert_eq!(
+        check_err(&source),
+        vec![diag::Entry {
+            kind: diag::Kind::TooManyParameters {
+                max: typed_ast::ParamId::CAPACITY,
+            },
+            span: testing::span_of(&source, "p128", 0),
+        }]
+    );
+}
+
+#[test]
+fn a_parameter_does_not_outlive_its_function() {
+    let source = "func a(x uint64) uint64 { return x } func b() uint64 { return x }";
+    let mut span = testing::spans(source);
+    span("x");
+    span("x");
+
+    assert_eq!(
+        check_err(source),
+        vec![diag::Entry {
+            kind: diag::Kind::UndefinedVariable {
+                name: "x".to_string(),
+            },
+            span: span("x"),
+        }]
+    );
+}
+
+#[test]
+fn parameters_are_checked_when_the_body_fails() {
+    let source = taking("a bytes", "var x uint64 = 1");
+    let mut span = testing::spans(&source);
+    span("func");
+    let name = span("f");
+
+    assert_eq!(
+        check_err(&source),
+        vec![
+            diag::Entry {
+                kind: diag::Kind::UnknownType {
+                    name: "bytes".to_string(),
+                },
+                span: testing::span_of(&source, "bytes", 0),
+            },
+            diag::Entry {
+                kind: diag::Kind::MissingReturn,
+                span: name,
+            },
+        ]
     );
 }
 

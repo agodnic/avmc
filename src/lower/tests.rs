@@ -24,6 +24,7 @@ fn example_program() {
             funcs: vec![ir::Function {
                 name: "approval".to_string(),
                 ret: typed_ast::Type::Uint64,
+                params: vec![],
                 locals: vec![],
                 insts: vec![
                     ir::Inst::Const {
@@ -175,6 +176,7 @@ fn a_boolean_literal_lowers_to_a_bool_constant() {
         ir::Function {
             name: "approval".to_string(),
             ret: typed_ast::Type::Bool,
+            params: vec![],
             locals: vec![],
             insts: vec![
                 ir::Inst::Const {
@@ -226,6 +228,7 @@ fn the_booleans_program_lowers_to_the_frame() {
         ir::Function {
             name: "approval".to_string(),
             ret: typed_ast::Type::Bool,
+            params: vec![],
             locals: vec![typed_ast::Type::Bool],
             insts: vec![
                 ir::Inst::Const {
@@ -295,6 +298,7 @@ fn variables_lower_to_the_frame() {
         ir::Function {
             name: "approval".to_string(),
             ret: typed_ast::Type::Uint64,
+            params: vec![],
             locals: vec![typed_ast::Type::Uint64, typed_ast::Type::Uint64],
             insts: vec![
                 ir::Inst::Const {
@@ -395,6 +399,104 @@ fn empty_input() {
 }
 
 #[test]
+fn a_parameter_lowers_to_a_load() {
+    let source = "func f(a uint64, b uint64) uint64 { return a + b } \
+                  func approval() uint64 { return 1 }";
+    let mut span = testing::spans(source);
+
+    let f_start = span("func").start;
+    span("f");
+    span("a");
+    span("uint64");
+    span("b");
+    span("uint64");
+    span("uint64");
+    let f_return = span("return").start;
+    let a = span("a");
+    let b = span("b");
+    let f_end = span("}").end;
+
+    let approval_start = span("func").start;
+    span("approval");
+    span("uint64");
+    let approval_return = span("return").start;
+    let one = span("1");
+    let approval_end = span("}").end;
+
+    assert_eq!(
+        lower_ok(source),
+        ir::Program {
+            funcs: vec![
+                ir::Function {
+                    name: "f".to_string(),
+                    ret: typed_ast::Type::Uint64,
+                    params: vec![typed_ast::Type::Uint64; 2],
+                    locals: vec![],
+                    insts: vec![
+                        ir::Inst::LoadParam {
+                            dest: ir::ValueId(0),
+                            param: typed_ast::ParamId(0),
+                            span: a,
+                        },
+                        ir::Inst::LoadParam {
+                            dest: ir::ValueId(1),
+                            param: typed_ast::ParamId(1),
+                            span: b,
+                        },
+                        ir::Inst::Binary {
+                            dest: ir::ValueId(2),
+                            op: ast::BinOp::Add,
+                            lhs: ir::ValueId(0),
+                            rhs: ir::ValueId(1),
+                            span: diag::Span {
+                                start: a.start,
+                                end: b.end,
+                            },
+                        },
+                        ir::Inst::Return {
+                            value: ir::ValueId(2),
+                            span: diag::Span {
+                                start: f_return,
+                                end: b.end,
+                            },
+                        },
+                    ],
+                    span: diag::Span {
+                        start: f_start,
+                        end: f_end,
+                    },
+                },
+                ir::Function {
+                    name: "approval".to_string(),
+                    ret: typed_ast::Type::Uint64,
+                    params: vec![],
+                    locals: vec![],
+                    insts: vec![
+                        ir::Inst::Const {
+                            dest: ir::ValueId(0),
+                            ty: typed_ast::Type::Uint64,
+                            value: 1,
+                            span: one,
+                        },
+                        ir::Inst::Return {
+                            value: ir::ValueId(0),
+                            span: diag::Span {
+                                start: approval_return,
+                                end: one.end,
+                            },
+                        },
+                    ],
+                    span: diag::Span {
+                        start: approval_start,
+                        end: approval_end,
+                    },
+                },
+            ],
+        }
+    );
+}
+
+#[test]
 fn each_function_numbers_its_own_values() {
     let source = "func a() uint64 { return 1 } func b() uint64 { return 2 }";
     assert_eq!(
@@ -404,6 +506,7 @@ fn each_function_numbers_its_own_values() {
                 ir::Function {
                     name: "a".to_string(),
                     ret: typed_ast::Type::Uint64,
+                    params: vec![],
                     locals: vec![],
                     insts: vec![
                         ir::Inst::Const {
@@ -422,6 +525,7 @@ fn each_function_numbers_its_own_values() {
                 ir::Function {
                     name: "b".to_string(),
                     ret: typed_ast::Type::Uint64,
+                    params: vec![],
                     locals: vec![],
                     insts: vec![
                         ir::Inst::Const {

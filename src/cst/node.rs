@@ -9,7 +9,7 @@ pub struct Program {
     pub eof: lexer::Token,
 }
 
-/// A function declaration: `func name() ret { body }`.
+/// A function declaration: `func name(params) ret { body }`.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct FuncDecl {
     /// The `func` keyword.
@@ -18,6 +18,8 @@ pub struct FuncDecl {
     pub name: lexer::Token,
     /// The `(` of the parameter list.
     pub lparen: lexer::Token,
+    /// The parameters it declares, in source order.
+    pub params: Vec<Param>,
     /// The `)` of the parameter list.
     pub rparen: lexer::Token,
     /// The declared return type.
@@ -28,6 +30,17 @@ pub struct FuncDecl {
     pub body: Vec<Stmt>,
     /// The `}` closing the body.
     pub rbrace: lexer::Token,
+}
+
+/// `name ty`, and the `,` after it if one follows.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Param {
+    /// The declared name.
+    pub name: lexer::Token,
+    /// The declared type.
+    pub ty: lexer::Token,
+    /// The `,` separating it from the next parameter; `None` on the last.
+    pub comma: Option<lexer::Token>,
 }
 
 /// A statement.

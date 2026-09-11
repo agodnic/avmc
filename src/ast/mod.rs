@@ -5,4 +5,4 @@ mod node;
 
 pub(crate) use build::binary_op;
 pub use build::from_cst;
-pub use node::{BinOp, Expr, FuncDecl, Name, Program, Stmt, TypeRef, UnOp};
+pub use node::{BinOp, Expr, FuncDecl, Name, Param, Program, Stmt, TypeRef, UnOp};

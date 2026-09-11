@@ -76,6 +76,10 @@ const TRAILING_COMMENT: &str = "func approval() uint64 {\n\
                                 \n\
                                 // end\n";
 
+/// The example program of the parameters milestone.
+const PARAMETERS: &str = "func add(a uint64, b uint64) uint64 {\n\tvar sum uint64 = a + b\n\t\
+                          return sum\n}\n\nfunc approval() uint64 {\n\treturn 1\n}\n";
+
 /// Every golden input, for the properties to run over.
 const GOLDEN: &[&str] = &[
     CANONICAL,
@@ -88,6 +92,7 @@ const GOLDEN: &[&str] = &[
     EXPRESSION_COMMENT,
     ONLY_COMMENTS,
     TRAILING_COMMENT,
+    PARAMETERS,
     "",
     "//x\n",
     "//   spaced   \n",
@@ -137,6 +142,14 @@ fn a_canonical_program_is_unchanged() {
 #[test]
 fn whitespace_is_normalised() {
     assert_eq!(format_ok(MESSY), CANONICAL);
+}
+
+#[test]
+fn parameters_are_formatted() {
+    let messy = "func add( a uint64 ,b uint64 )uint64 {\n\treturn a + b\n}\n";
+    let canonical = "func add(a uint64, b uint64) uint64 {\n\treturn a + b\n}\n";
+    assert_eq!(format_ok(messy), canonical);
+    assert_eq!(format_ok(canonical), canonical);
 }
 
 #[test]

@@ -9,17 +9,28 @@ pub struct Program {
     pub funcs: Vec<FuncDecl>,
 }
 
-/// A function declaration: `func name() ret { body }`.
+/// A function declaration: `func name(params) ret { body }`.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct FuncDecl {
     /// The declared name.
     pub name: Name,
+    /// The parameters it declares, in source order.
+    pub params: Vec<Param>,
     /// The declared return type.
     pub ret: TypeRef,
     /// The statements in the body, in source order.
     pub body: Vec<Stmt>,
     /// From `func` through the closing `}`.
     pub span: diag::Span,
+}
+
+/// A parameter: `name type`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Param {
+    /// The declared name.
+    pub name: Name,
+    /// The declared type.
+    pub ty: TypeRef,
 }
 
 /// An identifier and where it was written.
