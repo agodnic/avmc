@@ -5,6 +5,8 @@ mod inst;
 #[cfg(test)]
 mod tests;
 mod verifier;
+mod violation;
 
 pub use inst::{Function, Inst, Program, ValueId};
-pub use verifier::{Violation, verify};
+pub use verifier::verify;
+pub use violation::Violation;
