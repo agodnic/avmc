@@ -5,9 +5,8 @@ use crate::ast;
 pub enum Type {
     /// A 64-bit unsigned integer.
     Uint64,
-    /// A truth value, held as the AVM holds one: a `uint64` that is `0` for
-    /// `false` and nonzero for `true`. The compiler only ever produces `1`
-    /// for `true`.
+    /// A truth value, held as the AVM holds one: a `uint64` restricted to `0`
+    /// for `false` and `1` for `true`.
     Bool,
 }
 
