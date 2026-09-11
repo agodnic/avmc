@@ -7,7 +7,7 @@ use crate::diag;
 use crate::lexer;
 use crate::parser;
 
-/// The approval program of the v0 milestone, with comments.
+/// The approval program, with comments.
 const COMMENTED_APPROVAL: &str = "// The approval program.\nfunc approval() uint64 {\n  var x uint64 = 1 + 2 // one more than two\n  return x\n}\n";
 
 /// The example program of the parameters milestone.
