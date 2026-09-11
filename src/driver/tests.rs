@@ -25,6 +25,11 @@ const CALLS: &str = "func approval() uint64 {\n\treturn add(1, double(2))\n}\n\n
                      func add(a uint64, b uint64) uint64 {\n\treturn a + b\n}\n\n\
                      func double(x uint64) uint64 {\n\treturn x * 2\n}\n";
 
+/// The example program of the recursion milestone.
+const RECURSION: &str = "func approval() uint64 {\n\treturn f(1)\n}\n\n\
+                         func f(n uint64) uint64 {\n\treturn g(n)\n}\n\n\
+                         func g(n uint64) uint64 {\n\treturn f(n)\n}\n";
+
 /// A diagnostic covering `span`, for [`render`] to format.
 fn diagnostic(span: diag::Span) -> diag::Entry {
     diag::Entry {
@@ -122,6 +127,16 @@ fn a_call_in_the_middle_of_an_expression_compiles() {
         )
     );
     assert!(diags.is_empty());
+}
+
+#[test]
+fn a_recursive_program_does_not_compile() {
+    assert_eq!(
+        compile_err(RECURSION),
+        [diag::Kind::RecursiveCall {
+            name: "f".to_string()
+        }]
+    );
 }
 
 #[test]

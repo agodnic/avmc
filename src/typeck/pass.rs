@@ -1,9 +1,11 @@
+use super::recursion;
 use crate::ast;
 use crate::diag;
 use crate::typed_ast;
 use std::collections::{HashMap, HashSet};
 
-/// Checks `program`: its declared names, then every function in source order.
+/// Checks `program`: its declared names, then every function in source
+/// order, and finally its call graph.
 ///
 /// Reports every problem it finds, and returns `None` if it found any.
 pub fn check(program: &ast::Program, diags: &mut diag::Sink) -> Option<typed_ast::Program> {
@@ -18,7 +20,10 @@ pub fn check(program: &ast::Program, diags: &mut diag::Sink) -> Option<typed_ast
         }
     }
 
-    ok.then_some(typed_ast::Program { funcs })
+    // Recursion is checked over the whole program, so it is checked only
+    // once every body has checked.
+    let checked = ok.then_some(typed_ast::Program { funcs })?;
+    recursion::check(&checked, diags).then_some(checked)
 }
 
 /// A function's signature, with its written types resolved. A type of `None`

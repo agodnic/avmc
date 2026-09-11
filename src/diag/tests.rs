@@ -105,6 +105,13 @@ fn samples() -> Vec<(Kind, &'static str, &'static str)> {
             "E0017",
             "wrong number of arguments to `add`: expected 2, found 1",
         ),
+        (
+            Kind::RecursiveCall {
+                name: "f".to_string(),
+            },
+            "E0018",
+            "recursive call to `f`: recursion is not supported",
+        ),
     ];
 
     // Exhaustive, with no wildcard arm, so that adding a variant to
@@ -127,7 +134,8 @@ fn samples() -> Vec<(Kind, &'static str, &'static str)> {
             | Kind::TooManyParameters { .. }
             | Kind::EntryPointTakesParameters { .. }
             | Kind::UndefinedFunction { .. }
-            | Kind::WrongArgumentCount { .. } => {}
+            | Kind::WrongArgumentCount { .. }
+            | Kind::RecursiveCall { .. } => {}
         }
     }
 
