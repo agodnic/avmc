@@ -53,6 +53,9 @@ pub enum Kind {
         expected: usize,
         found: usize,
     },
+    RecursiveCall {
+        name: String,
+    },
 }
 
 impl Kind {
@@ -76,6 +79,7 @@ impl Kind {
             Self::EntryPointTakesParameters { .. } => 15,
             Self::UndefinedFunction { .. } => 16,
             Self::WrongArgumentCount { .. } => 17,
+            Self::RecursiveCall { .. } => 18,
         };
         Code {
             severity: Severity::Error,
@@ -126,6 +130,9 @@ impl fmt::Display for Kind {
                 f,
                 "wrong number of arguments to `{name}`: expected {expected}, found {found}"
             ),
+            Self::RecursiveCall { name } => {
+                write!(f, "recursive call to `{name}`: recursion is not supported")
+            }
         }
     }
 }
