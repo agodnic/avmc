@@ -2,12 +2,12 @@
 //! enforces its invariant.
 
 mod inst;
-#[cfg(test)]
-mod tests;
 mod verifier;
 #[cfg(test)]
 mod verifier_test;
 mod violation;
+#[cfg(test)]
+mod violation_test;
 
 pub use inst::{Function, Inst, Program, ValueId};
 pub use verifier::verify;
