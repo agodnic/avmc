@@ -387,3 +387,48 @@ fn compiles_logical_operators_to_teal() {
     assert_eq!(stderr(&output), "");
     assert_eq!(code(&output), 0);
 }
+
+#[test]
+fn compiles_calls_to_teal() {
+    let file = SourceFile::new(
+        "compiles_calls_to_teal",
+        "func approval() uint64 {\n\t\
+           return add(1, double(2))\n\
+         }\n\n\
+         func add(a uint64, b uint64) uint64 {\n\t\
+           return a + b\n\
+         }\n\n\
+         func double(x uint64) uint64 {\n\t\
+           return x * 2\n\
+         }\n",
+    );
+    let output = run(&[file.path()]);
+
+    assert_eq!(
+        stdout(&output),
+        "#pragma version 13\n\
+         callsub approval\n\
+         return\n\
+         approval:\n\
+         proto 0 1\n\
+         pushint 1\n\
+         pushint 2\n\
+         callsub double\n\
+         callsub add\n\
+         retsub\n\
+         add:\n\
+         proto 2 1\n\
+         frame_dig -2\n\
+         frame_dig -1\n\
+         +\n\
+         retsub\n\
+         double:\n\
+         proto 1 1\n\
+         frame_dig -1\n\
+         pushint 2\n\
+         *\n\
+         retsub\n"
+    );
+    assert_eq!(stderr(&output), "");
+    assert_eq!(code(&output), 0);
+}

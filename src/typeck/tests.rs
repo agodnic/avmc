@@ -1356,3 +1356,415 @@ fn a_negation_of_an_undefined_name_reports_only_the_name() {
         }]
     );
 }
+
+/// The example program of the calls milestone.
+const CALLS: &str = "func approval() uint64 {\n\treturn add(1, double(2))\n}\n\n\
+                     func add(a uint64, b uint64) uint64 {\n\treturn a + b\n}\n\n\
+                     func double(x uint64) uint64 {\n\treturn x * 2\n}\n";
+
+/// A `uint64` expression, with its type and span.
+fn uint64(kind: typed_ast::ExprKind, span: diag::Span) -> typed_ast::Expr {
+    typed_ast::Expr {
+        kind,
+        ty: typed_ast::Type::Uint64,
+        span,
+    }
+}
+
+#[test]
+fn a_call_has_the_callees_return_type() {
+    let source = CALLS;
+    let mut span = testing::spans(source);
+
+    let approval_start = span("func").start;
+    let approval = testing::name("approval", span("approval"));
+    span("uint64");
+    let approval_return = span("return").start;
+    let call_start = span("add").start;
+    let one = span("1");
+    let double_start = span("double").start;
+    let two = span("2");
+    let double_end = span(")").end;
+    let call_end = span(")").end;
+    let approval_end = span("}").end;
+
+    let add_start = span("func").start;
+    let add = testing::name("add", span("add"));
+    let a = testing::name("a", span("a"));
+    span("uint64");
+    let b = testing::name("b", span("b"));
+    span("uint64");
+    span("uint64");
+    let add_return = span("return").start;
+    let a_use = span("a");
+    let b_use = span("b");
+    let add_end = span("}").end;
+
+    let double_start_decl = span("func").start;
+    let double = testing::name("double", span("double"));
+    let x = testing::name("x", span("x"));
+    span("uint64");
+    span("uint64");
+    let double_return = span("return").start;
+    let x_use = span("x");
+    let two_use = span("2");
+    let double_end_decl = span("}").end;
+
+    let param = |name: ast::Name| typed_ast::Param {
+        name,
+        ty: typed_ast::Type::Uint64,
+    };
+
+    assert_eq!(
+        check_ok(source),
+        typed_ast::Program {
+            funcs: vec![
+                typed_ast::FuncDecl {
+                    name: approval,
+                    params: vec![],
+                    ret: typed_ast::Type::Uint64,
+                    body: vec![typed_ast::Stmt::Return {
+                        expr: uint64(
+                            typed_ast::ExprKind::Call {
+                                callee: typed_ast::FuncId(1),
+                                args: vec![
+                                    uint64(typed_ast::ExprKind::IntLit(1), one),
+                                    uint64(
+                                        typed_ast::ExprKind::Call {
+                                            callee: typed_ast::FuncId(2),
+                                            args: vec![uint64(typed_ast::ExprKind::IntLit(2), two)],
+                                        },
+                                        diag::Span {
+                                            start: double_start,
+                                            end: double_end,
+                                        },
+                                    ),
+                                ],
+                            },
+                            diag::Span {
+                                start: call_start,
+                                end: call_end,
+                            },
+                        ),
+                        span: diag::Span {
+                            start: approval_return,
+                            end: call_end,
+                        },
+                    }],
+                    span: diag::Span {
+                        start: approval_start,
+                        end: approval_end,
+                    },
+                },
+                typed_ast::FuncDecl {
+                    name: add,
+                    params: vec![param(a), param(b)],
+                    ret: typed_ast::Type::Uint64,
+                    body: vec![typed_ast::Stmt::Return {
+                        expr: uint64(
+                            typed_ast::ExprKind::Binary {
+                                op: ast::BinOp::Add,
+                                lhs: Box::new(uint64(
+                                    typed_ast::ExprKind::Param(typed_ast::ParamId(0)),
+                                    a_use
+                                )),
+                                rhs: Box::new(uint64(
+                                    typed_ast::ExprKind::Param(typed_ast::ParamId(1)),
+                                    b_use
+                                )),
+                            },
+                            diag::Span {
+                                start: a_use.start,
+                                end: b_use.end,
+                            },
+                        ),
+                        span: diag::Span {
+                            start: add_return,
+                            end: b_use.end,
+                        },
+                    }],
+                    span: diag::Span {
+                        start: add_start,
+                        end: add_end,
+                    },
+                },
+                typed_ast::FuncDecl {
+                    name: double,
+                    params: vec![param(x)],
+                    ret: typed_ast::Type::Uint64,
+                    body: vec![typed_ast::Stmt::Return {
+                        expr: uint64(
+                            typed_ast::ExprKind::Binary {
+                                op: ast::BinOp::Mul,
+                                lhs: Box::new(uint64(
+                                    typed_ast::ExprKind::Param(typed_ast::ParamId(0)),
+                                    x_use
+                                )),
+                                rhs: Box::new(uint64(typed_ast::ExprKind::IntLit(2), two_use)),
+                            },
+                            diag::Span {
+                                start: x_use.start,
+                                end: two_use.end,
+                            },
+                        ),
+                        span: diag::Span {
+                            start: double_return,
+                            end: two_use.end,
+                        },
+                    }],
+                    span: diag::Span {
+                        start: double_start_decl,
+                        end: double_end_decl,
+                    },
+                },
+            ]
+        }
+    );
+}
+
+/// The function the `index`th function of `source` calls in its `return`.
+fn returned_callee(source: &str, index: usize) -> typed_ast::FuncId {
+    let program = check_ok(source);
+    let func = program.funcs.into_iter().nth(index).expect("the function");
+    let Some(typed_ast::Stmt::Return { expr, .. }) = func.body.into_iter().next() else {
+        panic!("a return statement")
+    };
+    let typed_ast::ExprKind::Call { callee, .. } = expr.kind else {
+        panic!("a call")
+    };
+    callee
+}
+
+#[test]
+fn a_call_may_precede_the_declaration() {
+    let source = "func approval() uint64 { return f() } func f() uint64 { return 1 }";
+    assert_eq!(returned_callee(source, 0), typed_ast::FuncId(1));
+}
+
+#[test]
+fn a_call_may_follow_the_declaration() {
+    let source = "func f() uint64 { return 1 } func approval() uint64 { return f() }";
+    assert_eq!(returned_callee(source, 1), typed_ast::FuncId(0));
+}
+
+#[test]
+fn an_undefined_function_is_reported() {
+    let source = wrap("return f()");
+    let mut span = testing::spans(&source);
+    span("return");
+
+    assert_eq!(
+        check_err(&source),
+        vec![diag::Entry {
+            kind: diag::Kind::UndefinedFunction {
+                name: "f".to_string(),
+            },
+            span: span("f"),
+        }]
+    );
+}
+
+#[test]
+fn a_variable_is_not_a_function() {
+    let source = wrap("var f uint64 = 1 return f()");
+    let mut span = testing::spans(&source);
+    span("var");
+    span("f");
+
+    assert_eq!(
+        check_err(&source),
+        vec![diag::Entry {
+            kind: diag::Kind::UndefinedFunction {
+                name: "f".to_string(),
+            },
+            span: span("f"),
+        }]
+    );
+}
+
+#[test]
+fn a_function_is_not_a_variable() {
+    let source = "func approval() uint64 { return f } func f() uint64 { return 1 }";
+    let mut span = testing::spans(source);
+    span("return");
+
+    assert_eq!(
+        check_err(source),
+        vec![diag::Entry {
+            kind: diag::Kind::UndefinedVariable {
+                name: "f".to_string(),
+            },
+            span: span("f"),
+        }]
+    );
+}
+
+/// `func approval() uint64 { return <call> }`, then `add`, taking two
+/// `uint64`s.
+fn calling(call: &str) -> String {
+    format!(
+        "func approval() uint64 {{ return {call} }} \
+         func add(a uint64, b uint64) uint64 {{ return a + b }}"
+    )
+}
+
+#[test]
+fn too_few_arguments_are_reported() {
+    let source = calling("add(1)");
+    assert_eq!(
+        check_err(&source),
+        vec![diag::Entry {
+            kind: diag::Kind::WrongArgumentCount {
+                name: "add".to_string(),
+                expected: 2,
+                found: 1,
+            },
+            span: testing::span_of(&source, "add(1)", 0),
+        }]
+    );
+}
+
+#[test]
+fn too_many_arguments_are_reported() {
+    let source = calling("add(1, 2, 3)");
+    assert_eq!(
+        check_err(&source),
+        vec![diag::Entry {
+            kind: diag::Kind::WrongArgumentCount {
+                name: "add".to_string(),
+                expected: 2,
+                found: 3,
+            },
+            span: testing::span_of(&source, "add(1, 2, 3)", 0),
+        }]
+    );
+}
+
+#[test]
+fn an_argument_must_have_the_parameters_type() {
+    let source = calling("add(1, true)");
+    assert_eq!(
+        check_err(&source),
+        vec![diag::Entry {
+            kind: diag::Kind::TypeMismatch {
+                expected: typed_ast::Type::Uint64,
+                found: typed_ast::Type::Bool,
+            },
+            span: testing::span_of(&source, "true", 0),
+        }]
+    );
+}
+
+#[test]
+fn every_argument_is_reported_in_source_order() {
+    let source = calling("add(true, false)");
+    let mismatch = |span| diag::Entry {
+        kind: diag::Kind::TypeMismatch {
+            expected: typed_ast::Type::Uint64,
+            found: typed_ast::Type::Bool,
+        },
+        span,
+    };
+    assert_eq!(
+        check_err(&source),
+        vec![
+            mismatch(testing::span_of(&source, "true", 0)),
+            mismatch(testing::span_of(&source, "false", 0)),
+        ]
+    );
+}
+
+#[test]
+fn a_miscounted_call_still_checks_its_arguments() {
+    let source = calling("add(x)");
+    assert_eq!(
+        check_err(&source),
+        vec![
+            diag::Entry {
+                kind: diag::Kind::WrongArgumentCount {
+                    name: "add".to_string(),
+                    expected: 2,
+                    found: 1,
+                },
+                span: testing::span_of(&source, "add(x)", 0),
+            },
+            diag::Entry {
+                kind: diag::Kind::UndefinedVariable {
+                    name: "x".to_string(),
+                },
+                span: testing::span_of(&source, "x", 0),
+            },
+        ]
+    );
+}
+
+#[test]
+fn an_unresolved_parameter_type_leaves_the_argument_silent() {
+    let source = "func approval() uint64 { return f(true) } func f(a bytes) uint64 { return 1 }";
+    assert_eq!(
+        check_err(source),
+        vec![diag::Entry {
+            kind: diag::Kind::UnknownType {
+                name: "bytes".to_string(),
+            },
+            span: testing::span_of(source, "bytes", 0),
+        }]
+    );
+}
+
+#[test]
+fn an_unresolved_return_type_leaves_the_call_silent() {
+    let source = "func approval() uint64 { return f() } func f() bytes { return 1 }";
+    assert_eq!(
+        check_err(source),
+        vec![diag::Entry {
+            kind: diag::Kind::UnknownType {
+                name: "bytes".to_string(),
+            },
+            span: testing::span_of(source, "bytes", 0),
+        }]
+    );
+}
+
+#[test]
+fn a_call_returning_bool_is_a_boolean_operand() {
+    let source = "func approval() bool { return !f() } func f() bool { return true }";
+    assert_eq!(check_ok(source).funcs.len(), 2);
+
+    let source = "func approval() bool { return !f() } func f() uint64 { return 1 }";
+    assert_eq!(
+        check_err(source),
+        vec![diag::Entry {
+            kind: diag::Kind::TypeMismatch {
+                expected: typed_ast::Type::Bool,
+                found: typed_ast::Type::Uint64,
+            },
+            span: testing::span_of(source, "f()", 0),
+        }]
+    );
+}
+
+#[test]
+fn the_entry_point_may_be_called() {
+    let source = "func approval() uint64 { return 1 } func f() uint64 { return approval() }";
+    assert_eq!(returned_callee(source, 1), typed_ast::FuncId(0));
+}
+
+#[test]
+fn a_signature_with_an_unknown_type_is_reported_once() {
+    let called = "func approval() uint64 { return f(1) } func f(a bytes) uint64 { return 1 }";
+    let uncalled = "func approval() uint64 { return 1 } func f(a bytes) uint64 { return 1 }";
+
+    for source in [called, uncalled] {
+        assert_eq!(
+            check_err(source),
+            vec![diag::Entry {
+                kind: diag::Kind::UnknownType {
+                    name: "bytes".to_string(),
+                },
+                span: testing::span_of(source, "bytes", 0),
+            }],
+            "{source}"
+        );
+    }
+}

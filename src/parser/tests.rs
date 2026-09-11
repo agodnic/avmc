@@ -1463,6 +1463,156 @@ fn negation_and_logic_report_what_they_do_not_order() {
     }
 }
 
+#[test]
+fn parses_a_call_with_no_arguments() {
+    let source = wrap("f()");
+    let mut span = testing::spans(&source);
+    span("return");
+    let callee = span("f");
+    let end = span(")").end;
+
+    assert_eq!(
+        returned(&source),
+        ast::Expr::Call {
+            callee: testing::name("f", callee),
+            args: vec![],
+            span: diag::Span {
+                start: callee.start,
+                end,
+            },
+        }
+    );
+}
+
+#[test]
+fn parses_a_call_with_arguments() {
+    let source = wrap("add(1, x)");
+    let mut span = testing::spans(&source);
+    span("return");
+    let callee = span("add");
+    let one = span("1");
+    let x = span("x");
+    let end = span(")").end;
+
+    assert_eq!(
+        returned(&source),
+        ast::Expr::Call {
+            callee: testing::name("add", callee),
+            args: vec![
+                ast::Expr::IntLit {
+                    value: 1,
+                    span: one,
+                },
+                ast::Expr::Var {
+                    name: testing::name("x", x),
+                    span: x,
+                },
+            ],
+            span: diag::Span {
+                start: callee.start,
+                end,
+            },
+        }
+    );
+}
+
+#[test]
+fn a_call_is_an_operand() {
+    let source = wrap("1 + f(2) * 3");
+    let ast::Expr::Binary {
+        op: ast::BinOp::Add,
+        rhs,
+        ..
+    } = returned(&source)
+    else {
+        panic!("an addition")
+    };
+    let ast::Expr::Binary {
+        op: ast::BinOp::Mul,
+        lhs,
+        ..
+    } = *rhs
+    else {
+        panic!("a multiplication")
+    };
+    assert!(matches!(*lhs, ast::Expr::Call { .. }));
+
+    let ast::Expr::Unary { operand, .. } = returned(&wrap("!f(x)")) else {
+        panic!("a negation")
+    };
+    assert!(matches!(*operand, ast::Expr::Call { .. }));
+}
+
+#[test]
+fn an_argument_forgets_the_enclosing_operator() {
+    let source = wrap("1 + f(2 % 3)");
+    let ast::Expr::Binary { rhs, .. } = returned(&source) else {
+        panic!("an addition")
+    };
+    let ast::Expr::Call { args, .. } = *rhs else {
+        panic!("a call")
+    };
+    assert!(matches!(
+        args.as_slice(),
+        [ast::Expr::Binary {
+            op: ast::BinOp::Mod,
+            ..
+        }]
+    ));
+}
+
+#[test]
+fn a_trailing_comma_in_arguments_is_reported() {
+    let source = wrap("f(1,)");
+    let mut span = testing::spans(&source);
+    span("return");
+    assert_eq!(
+        parse_err(&source),
+        diag::Entry {
+            kind: diag::Kind::UnexpectedToken {
+                expected: pass::OPERAND,
+                found: "`)`",
+            },
+            span: span(")"),
+        }
+    );
+}
+
+#[test]
+fn arguments_are_separated_by_commas() {
+    let source = wrap("f(1 2)");
+    let mut span = testing::spans(&source);
+    span("return");
+    span("1");
+    assert_eq!(
+        parse_err(&source),
+        diag::Entry {
+            kind: diag::Kind::UnexpectedToken {
+                expected: "`,` or `)`",
+                found: "an integer literal",
+            },
+            span: span("2"),
+        }
+    );
+}
+
+#[test]
+fn an_unclosed_call_is_reported() {
+    let source = "func approval() uint64 { return f(1 }";
+    let mut span = testing::spans(source);
+    span("return");
+    assert_eq!(
+        parse_err(source),
+        diag::Entry {
+            kind: diag::Kind::UnexpectedToken {
+                expected: "`,` or `)`",
+                found: "`}`",
+            },
+            span: span("}"),
+        }
+    );
+}
+
 /// `source` with every comment blanked out, so that the tokens around it
 /// keep the spans they had.
 fn blank_comments(source: &str) -> String {

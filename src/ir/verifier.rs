@@ -1,4 +1,4 @@
-use super::inst::{Function, Inst, ValueId};
+use super::inst::{Function, Inst, Program, ValueId};
 use crate::ast;
 use crate::typed_ast;
 
@@ -87,6 +87,13 @@ pub enum Violation {
         found: typed_ast::Type,
         /// The type the instruction needs.
         expected: typed_ast::Type,
+    },
+    /// An instruction calls a function the program does not define.
+    UnknownCallee {
+        /// The offending instruction's position.
+        index: usize,
+        /// The function it calls.
+        callee: typed_ast::FuncId,
     },
     /// A `Bool` constant holds something other than `0` or `1`.
     BoolOutOfRange {
@@ -183,6 +190,11 @@ impl std::fmt::Display for Violation {
                  expected {expected}",
                 value.0
             ),
+            Violation::UnknownCallee { index, callee } => write!(
+                f,
+                "well typed: instruction {index} calls f{} but the program does not define it",
+                callee.0
+            ),
             Violation::BoolOutOfRange { index, value } => write!(
                 f,
                 "well typed: instruction {index} defines a bool constant of {value}, expected 0 \
@@ -192,8 +204,9 @@ impl std::fmt::Display for Violation {
     }
 }
 
-/// Checks the v0 IR invariant, returning the first violation.
-pub fn verify(func: &Function) -> Result<(), Violation> {
+/// Checks the v0 IR invariant, returning the first violation. `program` is
+/// the unit `func` belongs to, which holds the functions it calls.
+pub fn verify(program: &Program, func: &Function) -> Result<(), Violation> {
     verify_return(func)?;
 
     if func.params.len() > typed_ast::ParamId::CAPACITY {
@@ -266,6 +279,13 @@ pub fn verify(func: &Function) -> Result<(), Violation> {
             Inst::LoadParam { dest, param, .. } => {
                 let ty = parameter(&func.params, *param, index)?;
                 (dest, ty)
+            }
+            Inst::Call {
+                dest, callee, args, ..
+            } => {
+                let called = callee_of(program, *callee, index)?;
+                consume(&mut stack, index, args, &called.params)?;
+                (dest, called.ret)
             }
             Inst::Return { value, .. } => {
                 consume(&mut stack, index, &[*value], &[func.ret])?;
@@ -366,6 +386,18 @@ fn parameter(
             param,
             count: params.len(),
         })
+}
+
+/// Checks that `callee` is a function the program defines, returning it.
+fn callee_of(
+    program: &Program,
+    callee: typed_ast::FuncId,
+    index: usize,
+) -> Result<&Function, Violation> {
+    usize::try_from(callee.0)
+        .ok()
+        .and_then(|position| program.funcs.get(position))
+        .ok_or(Violation::UnknownCallee { index, callee })
 }
 
 /// Checks that the last instruction is a `Return`, and no other one is.

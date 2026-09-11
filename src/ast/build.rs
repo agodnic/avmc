@@ -184,6 +184,27 @@ impl Builder<'_> {
                     span,
                 })
             }
+            cst::Expr::Call {
+                callee,
+                args,
+                rparen,
+                ..
+            } => {
+                let callee = self.name(*callee);
+                let span = diag::Span {
+                    start: callee.span.start,
+                    end: rparen.span.end,
+                };
+                let mut lowered = Vec::new();
+                for arg in args {
+                    lowered.push(self.expr(&arg.expr)?);
+                }
+                Some(Expr::Call {
+                    callee,
+                    args: lowered,
+                    span,
+                })
+            }
             cst::Expr::Paren { inner, .. } => self.expr(inner),
         }
     }

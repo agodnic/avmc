@@ -1,23 +1,72 @@
 use crate::ast;
 use crate::diag;
 use crate::typed_ast;
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 
 /// Checks `program`: its declared names, then every function in source order.
 ///
 /// Reports every problem it finds, and returns `None` if it found any.
 pub fn check(program: &ast::Program, diags: &mut diag::Sink) -> Option<typed_ast::Program> {
     let mut ok = check_duplicates(program, diags);
+    let signatures = Signatures::collect(program, diags);
     let mut funcs = Vec::new();
 
-    for func in &program.funcs {
-        match check_func(func, diags) {
+    for (func, signature) in program.funcs.iter().zip(&signatures.funcs) {
+        match check_func(func, signature, &signatures, diags) {
             Some(func) => funcs.push(func),
             None => ok = false,
         }
     }
 
     ok.then_some(typed_ast::Program { funcs })
+}
+
+/// A function's signature, with its written types resolved. A type of `None`
+/// is one that did not resolve.
+struct Signature {
+    params: Vec<Option<typed_ast::Type>>,
+    ret: Option<typed_ast::Type>,
+}
+
+/// Every function's signature, collected before any body is checked, so that
+/// a call may precede its callee.
+struct Signatures<'a> {
+    /// In declaration order, indexed by `FuncId`.
+    funcs: Vec<Signature>,
+    /// Each declared name, and the first declaration that took it.
+    by_name: HashMap<&'a str, typed_ast::FuncId>,
+}
+
+impl<'a> Signatures<'a> {
+    /// Resolves every declaration's written types, reporting each one that
+    /// names no type. A name declared twice keeps its first signature.
+    fn collect(program: &'a ast::Program, diags: &mut diag::Sink) -> Self {
+        let mut funcs = Vec::new();
+        let mut by_name = HashMap::new();
+
+        for (index, func) in program.funcs.iter().enumerate() {
+            funcs.push(Signature {
+                params: func
+                    .params
+                    .iter()
+                    .map(|param| resolve_type(&param.ty, diags))
+                    .collect(),
+                ret: resolve_type(&func.ret, diags),
+            });
+            if let Some(id) = typed_ast::FuncId::new(index) {
+                by_name.entry(func.name.text.as_str()).or_insert(id);
+            }
+        }
+
+        Self { funcs, by_name }
+    }
+
+    /// The function `name` declares, if one does.
+    fn lookup(&self, name: &str) -> Option<(typed_ast::FuncId, &Signature)> {
+        let id = *self.by_name.get(name)?;
+        let index = usize::try_from(id.0).ok()?;
+        Some((id, self.funcs.get(index)?))
+    }
 }
 
 /// Reports every declaration whose name was already declared, returning false
@@ -41,18 +90,23 @@ fn check_duplicates(program: &ast::Program, diags: &mut diag::Sink) -> bool {
     ok
 }
 
-/// Checks one function. The rules are independent: a return type that does
-/// not resolve still leaves the parameters and the body checked.
-fn check_func(func: &ast::FuncDecl, diags: &mut diag::Sink) -> Option<typed_ast::FuncDecl> {
+/// Checks one function against the signature already resolved for it. The
+/// rules are independent: a return type that does not resolve still leaves
+/// the parameters and the body checked.
+fn check_func(
+    func: &ast::FuncDecl,
+    signature: &Signature,
+    funcs: &Signatures,
+    diags: &mut diag::Sink,
+) -> Option<typed_ast::FuncDecl> {
     let mut scope = Scope::default();
-    let params = check_params(func, &mut scope, diags);
-    let ret = resolve_type(&func.ret, diags);
-    let body = check_body(func, ret, &mut scope, diags);
+    let params = check_params(func, signature, &mut scope, diags);
+    let body = check_body(func, signature.ret, funcs, &mut scope, diags);
 
     Some(typed_ast::FuncDecl {
         name: func.name.clone(),
         params: params?,
-        ret: ret?,
+        ret: signature.ret?,
         body: body?,
         span: func.span,
     })
@@ -81,14 +135,14 @@ impl Scope<'_> {
 /// order, and each is reported whether or not another failed.
 fn check_params<'a>(
     func: &'a ast::FuncDecl,
+    signature: &Signature,
     scope: &mut Scope<'a>,
     diags: &mut diag::Sink,
 ) -> Option<Vec<typed_ast::Param>> {
     let mut params = Vec::new();
     let mut ok = true;
 
-    for param in &func.params {
-        let ty = resolve_type(&param.ty, diags);
+    for (param, &ty) in func.params.iter().zip(&signature.params) {
         let declared = declare_param(param, ty, scope, diags).is_some();
         match ty.filter(|_| declared) {
             Some(ty) => params.push(typed_ast::Param {
@@ -125,6 +179,7 @@ fn resolve_type(ret: &ast::TypeRef, diags: &mut diag::Sink) -> Option<typed_ast:
 fn check_body<'a>(
     func: &'a ast::FuncDecl,
     ret: Option<typed_ast::Type>,
+    funcs: &Signatures,
     scope: &mut Scope<'a>,
     diags: &mut diag::Sink,
 ) -> Option<Vec<typed_ast::Stmt>> {
@@ -138,7 +193,7 @@ fn check_body<'a>(
         if returned && unreachable.is_none() {
             unreachable = Some(*span);
         }
-        match check_stmt(stmt, ret, scope, diags) {
+        match check_stmt(stmt, ret, funcs, scope, diags) {
             Some(stmt) => stmts.push(stmt),
             None => ok = false,
         }
@@ -170,6 +225,7 @@ fn check_body<'a>(
 fn check_stmt<'a>(
     stmt: &'a ast::Stmt,
     ret: Option<typed_ast::Type>,
+    funcs: &Signatures,
     scope: &mut Scope<'a>,
     diags: &mut diag::Sink,
 ) -> Option<typed_ast::Stmt> {
@@ -181,7 +237,7 @@ fn check_stmt<'a>(
             span,
         } => {
             // The initializer cannot see the name being declared.
-            let init = check_expr(init, scope, diags);
+            let init = check_expr(init, funcs, scope, diags);
             let ty = resolve_type(ty, diags);
             let agrees = check_type(init.as_ref(), ty, diags);
             // The name is declared with its written type even when the
@@ -197,7 +253,7 @@ fn check_stmt<'a>(
             })
         }
         ast::Stmt::Return { expr, span } => {
-            let expr = check_expr(expr, scope, diags)?;
+            let expr = check_expr(expr, funcs, scope, diags)?;
             check_type(Some(&expr), ret, diags).then_some(())?;
             Some(typed_ast::Stmt::Return { expr, span: *span })
         }
@@ -287,7 +343,12 @@ fn declare_param<'a>(
 /// Checks one expression, giving it its type. A name that resolves to nothing
 /// in scope and an operand of arithmetic that is not a `uint64` are what can
 /// fail.
-fn check_expr(expr: &ast::Expr, scope: &Scope, diags: &mut diag::Sink) -> Option<typed_ast::Expr> {
+fn check_expr(
+    expr: &ast::Expr,
+    funcs: &Signatures,
+    scope: &Scope,
+    diags: &mut diag::Sink,
+) -> Option<typed_ast::Expr> {
     let (kind, ty, span) = match expr {
         ast::Expr::IntLit { value, span } => (
             typed_ast::ExprKind::IntLit(*value),
@@ -301,8 +362,8 @@ fn check_expr(expr: &ast::Expr, scope: &Scope, diags: &mut diag::Sink) -> Option
         ),
         ast::Expr::Binary { op, lhs, rhs, span } => {
             // Both operands are checked, so both report.
-            let lhs = check_expr(lhs, scope, diags);
-            let rhs = check_expr(rhs, scope, diags);
+            let lhs = check_expr(lhs, funcs, scope, diags);
+            let rhs = check_expr(rhs, funcs, scope, diags);
             // Equality takes any one type: the right operand must match the
             // left.
             let lhs_expected = typed_ast::operand_type(*op);
@@ -321,7 +382,7 @@ fn check_expr(expr: &ast::Expr, scope: &Scope, diags: &mut diag::Sink) -> Option
             )
         }
         ast::Expr::Unary { op, operand, span } => {
-            let operand = check_expr(operand, scope, diags);
+            let operand = check_expr(operand, funcs, scope, diags);
             check_type(operand.as_ref(), Some(typed_ast::Type::Bool), diags).then_some(())?;
             (
                 typed_ast::ExprKind::Unary {
@@ -336,8 +397,88 @@ fn check_expr(expr: &ast::Expr, scope: &Scope, diags: &mut diag::Sink) -> Option
             let (kind, ty) = resolve_var(name, scope, diags)?;
             (kind, ty, *span)
         }
+        ast::Expr::Call { callee, args, span } => {
+            let (kind, ty) = check_call(callee, args, *span, funcs, scope, diags)?;
+            (kind, ty, *span)
+        }
     };
     Some(typed_ast::Expr { kind, ty, span })
+}
+
+/// Checks a call, which has the callee's return type. Functions and
+/// variables are separate namespaces: only a function makes a call defined.
+/// The arguments are checked, and reported, whatever else failed.
+fn check_call(
+    callee: &ast::Name,
+    args: &[ast::Expr],
+    span: diag::Span,
+    funcs: &Signatures,
+    scope: &Scope,
+    diags: &mut diag::Sink,
+) -> Option<(typed_ast::ExprKind, typed_ast::Type)> {
+    let called = funcs.lookup(&callee.text);
+    match called {
+        None => diags.push(diag::Entry {
+            kind: diag::Kind::UndefinedFunction {
+                name: callee.text.clone(),
+            },
+            span: callee.span,
+        }),
+        Some((_, signature)) if signature.params.len() != args.len() => diags.push(diag::Entry {
+            kind: diag::Kind::WrongArgumentCount {
+                name: callee.text.clone(),
+                expected: signature.params.len(),
+                found: args.len(),
+            },
+            span,
+        }),
+        Some(_) => {}
+    }
+
+    // A call that does not pass one argument per parameter has no parameter
+    // to check an argument against.
+    let matched = called.filter(|(_, signature)| signature.params.len() == args.len());
+    let params = matched.map(|(_, signature)| signature.params.as_slice());
+    let checked = check_args(args, params, funcs, scope, diags);
+
+    let (id, signature) = matched?;
+    Some((
+        typed_ast::ExprKind::Call {
+            callee: id,
+            args: checked?,
+        },
+        // A return type that did not resolve leaves the call silent: the
+        // declaration reported it.
+        signature.ret?,
+    ))
+}
+
+/// Checks a call's arguments against `params`, the callee's parameter types
+/// where the call passes one for each. They are checked in order, and each is
+/// reported whether or not another failed.
+fn check_args(
+    args: &[ast::Expr],
+    params: Option<&[Option<typed_ast::Type>]>,
+    funcs: &Signatures,
+    scope: &Scope,
+    diags: &mut diag::Sink,
+) -> Option<Vec<typed_ast::Expr>> {
+    let mut checked = Vec::new();
+    let mut ok = true;
+
+    for (index, arg) in args.iter().enumerate() {
+        let arg = check_expr(arg, funcs, scope, diags);
+        let expected = params
+            .and_then(|params| params.get(index).copied())
+            .flatten();
+        let agrees = check_type(arg.as_ref(), expected, diags);
+        match arg.filter(|_| agrees) {
+            Some(arg) => checked.push(arg),
+            None => ok = false,
+        }
+    }
+
+    ok.then_some(checked)
 }
 
 /// Resolves a name to the expression reading it and its type, reporting it if

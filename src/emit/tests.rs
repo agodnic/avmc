@@ -394,11 +394,18 @@ fn the_remainder_opcode() {
 }
 
 #[test]
-fn only_the_entry_point_is_emitted() {
+fn an_unreached_function_is_not_emitted() {
     assert_eq!(
         emit_ok("func f(a uint64) uint64 { return a } func approval() uint64 { return 1 }"),
         "#pragma version 13\ncallsub approval\nreturn\napproval:\nproto 0 1\npushint 1\nretsub\n"
     );
+}
+
+/// The subroutine for `func`, as the only function of its program.
+fn subroutine(func: ir::Function) -> String {
+    let program = ir::Program { funcs: vec![func] };
+    let func = program.funcs.first().expect("the function under test");
+    pass::function(&program, func)
 }
 
 #[test]
@@ -421,7 +428,7 @@ fn the_subroutine_of_a_function_with_parameters() {
         span: ZERO,
     };
     assert_eq!(
-        pass::function(&func),
+        subroutine(func),
         "add:\n\
          proto 2 1\n\
          pushint 0\n\
@@ -538,6 +545,86 @@ fn emits_the_logic_program() {
          ==\n\
          ||\n\
          &&\n\
+         retsub\n"
+    );
+}
+
+/// The example program of the calls milestone.
+const CALLS: &str = "func approval() uint64 {\n\treturn add(1, double(2))\n}\n\n\
+                     func add(a uint64, b uint64) uint64 {\n\treturn a + b\n}\n\n\
+                     func double(x uint64) uint64 {\n\treturn x * 2\n}\n";
+
+#[test]
+fn a_call_emits_callsub() {
+    assert_eq!(
+        emit_ok(CALLS),
+        "#pragma version 13\n\
+         callsub approval\n\
+         return\n\
+         approval:\n\
+         proto 0 1\n\
+         pushint 1\n\
+         pushint 2\n\
+         callsub double\n\
+         callsub add\n\
+         retsub\n\
+         add:\n\
+         proto 2 1\n\
+         frame_dig -2\n\
+         frame_dig -1\n\
+         +\n\
+         retsub\n\
+         double:\n\
+         proto 1 1\n\
+         frame_dig -1\n\
+         pushint 2\n\
+         *\n\
+         retsub\n"
+    );
+}
+
+#[test]
+fn reached_functions_follow_the_entry_point_in_source_order() {
+    let source = "func b() uint64 { return 1 } \
+                  func approval() uint64 { return a() } \
+                  func a() uint64 { return b() }";
+    assert_eq!(
+        emit_ok(source),
+        "#pragma version 13\n\
+         callsub approval\n\
+         return\n\
+         approval:\n\
+         proto 0 1\n\
+         callsub a\n\
+         retsub\n\
+         b:\n\
+         proto 0 1\n\
+         pushint 1\n\
+         retsub\n\
+         a:\n\
+         proto 0 1\n\
+         callsub b\n\
+         retsub\n"
+    );
+}
+
+#[test]
+fn a_function_reached_twice_is_emitted_once() {
+    let source = "func approval() uint64 { return f() + f() } func f() uint64 { return 1 }";
+    assert_eq!(
+        emit_ok(source),
+        "#pragma version 13\n\
+         callsub approval\n\
+         return\n\
+         approval:\n\
+         proto 0 1\n\
+         callsub f\n\
+         callsub f\n\
+         +\n\
+         retsub\n\
+         f:\n\
+         proto 0 1\n\
+         pushint 1\n\
          retsub\n"
     );
 }

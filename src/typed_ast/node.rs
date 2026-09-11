@@ -37,6 +37,18 @@ impl ParamId {
     }
 }
 
+/// A function's position in its program: declarations counted from 0.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct FuncId(pub u32);
+
+impl FuncId {
+    /// The position of the `index`th declaration, or `None` if a program
+    /// cannot hold that many.
+    pub fn new(index: usize) -> Option<Self> {
+        u32::try_from(index).ok().map(Self)
+    }
+}
+
 /// A whole source file.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Program {
@@ -129,6 +141,13 @@ pub enum ExprKind {
     Var(LocalId),
     /// A parameter, by position.
     Param(ParamId),
+    /// A call, by the position of the function it calls.
+    Call {
+        /// The function it calls.
+        callee: FuncId,
+        /// The arguments, in source order.
+        args: Vec<Expr>,
+    },
 }
 
 impl Expr {

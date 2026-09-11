@@ -177,12 +177,40 @@ impl Parser<'_> {
         }
 
         if self.peek_kind() == Some(lexer::TokenKind::Ident) {
-            return Some(cst::Expr::Var(self.name()?));
+            let name = self.name()?;
+            return match self.consume(lexer::TokenKind::LParen) {
+                Some(lparen) => self.call(name, lparen),
+                None => Some(cst::Expr::Var(name)),
+            };
         }
 
         Some(cst::Expr::IntLit(
             self.expect(lexer::TokenKind::IntLit, OPERAND)?,
         ))
+    }
+
+    /// `callee(args)`, the callee and its `(` already consumed. An argument
+    /// forgets the enclosing operator, as a parenthesized expression does.
+    fn call(&mut self, callee: lexer::Token, lparen: lexer::Token) -> Option<cst::Expr> {
+        let mut args = Vec::new();
+        let rparen = match self.consume(lexer::TokenKind::RParen) {
+            Some(rparen) => rparen,
+            None => loop {
+                let expr = self.expr(None)?;
+                let comma = self.consume(lexer::TokenKind::Comma);
+                args.push(cst::Arg { expr, comma });
+                if comma.is_none() {
+                    break self.expect(lexer::TokenKind::RParen, "`,` or `)`")?;
+                }
+            },
+        };
+
+        Some(cst::Expr::Call {
+            callee,
+            lparen,
+            args,
+            rparen,
+        })
     }
 
     /// `!` applied to an operand, `bang` being the operator token, which is
