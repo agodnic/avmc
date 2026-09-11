@@ -6,5 +6,5 @@ mod node;
 mod tests;
 mod ty;
 
-pub use node::{Expr, ExprKind, FuncDecl, LocalId, Param, ParamId, Program, Stmt};
+pub use node::{Expr, ExprKind, FuncDecl, FuncId, LocalId, Param, ParamId, Program, Stmt};
 pub use ty::{Type, operand_type, result_type};

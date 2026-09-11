@@ -80,6 +80,11 @@ const TRAILING_COMMENT: &str = "func approval() uint64 {\n\
 const PARAMETERS: &str = "func add(a uint64, b uint64) uint64 {\n\tvar sum uint64 = a + b\n\t\
                           return sum\n}\n\nfunc approval() uint64 {\n\treturn 1\n}\n";
 
+/// The example program of the calls milestone.
+const CALLS: &str = "func approval() uint64 {\n\treturn add(1, double(2))\n}\n\n\
+                     func add(a uint64, b uint64) uint64 {\n\treturn a + b\n}\n\n\
+                     func double(x uint64) uint64 {\n\treturn x * 2\n}\n";
+
 /// Every golden input, for the properties to run over.
 const GOLDEN: &[&str] = &[
     CANONICAL,
@@ -93,6 +98,7 @@ const GOLDEN: &[&str] = &[
     ONLY_COMMENTS,
     TRAILING_COMMENT,
     PARAMETERS,
+    CALLS,
     "",
     "//x\n",
     "//   spaced   \n",
@@ -150,6 +156,18 @@ fn parameters_are_formatted() {
     let canonical = "func add(a uint64, b uint64) uint64 {\n\treturn a + b\n}\n";
     assert_eq!(format_ok(messy), canonical);
     assert_eq!(format_ok(canonical), canonical);
+}
+
+#[test]
+fn calls_are_formatted() {
+    assert_eq!(
+        format_ok("func f() uint64 { return add ( 1 ,x+2 ) }"),
+        "func f() uint64 {\n\treturn add(1, x + 2)\n}\n"
+    );
+    assert_eq!(
+        format_ok("func f() uint64 { return f( ) }"),
+        "func f() uint64 {\n\treturn f()\n}\n"
+    );
 }
 
 #[test]

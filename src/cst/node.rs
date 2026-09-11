@@ -43,6 +43,15 @@ pub struct Param {
     pub comma: Option<lexer::Token>,
 }
 
+/// An argument, and the `,` after it if one follows.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Arg {
+    /// The argument itself.
+    pub expr: Expr,
+    /// The `,` separating it from the next argument; `None` on the last.
+    pub comma: Option<lexer::Token>,
+}
+
 /// A statement.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Stmt {
@@ -92,6 +101,17 @@ pub enum Expr {
         op: lexer::Token,
         /// The operand.
         operand: Box<Expr>,
+    },
+    /// `callee(args)`.
+    Call {
+        /// The called name.
+        callee: lexer::Token,
+        /// The `(` of the argument list.
+        lparen: lexer::Token,
+        /// The arguments, in source order.
+        args: Vec<Arg>,
+        /// The `)` of the argument list.
+        rparen: lexer::Token,
     },
     /// `( inner )`.
     Paren {

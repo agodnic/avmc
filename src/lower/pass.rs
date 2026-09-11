@@ -4,18 +4,20 @@ use crate::typed_ast;
 
 /// Lowers every function in `program`, in source order.
 pub fn lower(program: &typed_ast::Program, _diags: &mut diag::Sink) -> Option<ir::Program> {
-    let funcs: Vec<ir::Function> = program.funcs.iter().map(lower_func).collect();
+    let lowered = ir::Program {
+        funcs: program.funcs.iter().map(lower_func).collect(),
+    };
 
     #[cfg(debug_assertions)]
-    for func in &funcs {
+    for func in &lowered.funcs {
         // Only a compiler bug can reach this.
         #[expect(clippy::panic, reason = "a verifier failure is a compiler bug")]
-        if let Err(violation) = crate::ir::verify(func) {
+        if let Err(violation) = crate::ir::verify(&lowered, func) {
             panic!("{violation}");
         }
     }
 
-    Some(ir::Program { funcs })
+    Some(lowered)
 }
 
 /// Lowers one function. `ValueId`s restart at 0.
@@ -112,6 +114,20 @@ fn lower_expr(
                 dest,
                 op: *op,
                 operand,
+                span: expr.span,
+            });
+            dest
+        }
+        typed_ast::ExprKind::Call { callee, args } => {
+            let args = args
+                .iter()
+                .map(|arg| lower_expr(arg, insts, next_value))
+                .collect();
+            let dest = next_value_id(next_value);
+            insts.push(ir::Inst::Call {
+                dest,
+                callee: *callee,
+                args,
                 span: expr.span,
             });
             dest

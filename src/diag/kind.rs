@@ -45,6 +45,14 @@ pub enum Kind {
     EntryPointTakesParameters {
         name: &'static str,
     },
+    UndefinedFunction {
+        name: String,
+    },
+    WrongArgumentCount {
+        name: String,
+        expected: usize,
+        found: usize,
+    },
 }
 
 impl Kind {
@@ -66,6 +74,8 @@ impl Kind {
             Self::TypeMismatch { .. } => 13,
             Self::TooManyParameters { .. } => 14,
             Self::EntryPointTakesParameters { .. } => 15,
+            Self::UndefinedFunction { .. } => 16,
+            Self::WrongArgumentCount { .. } => 17,
         };
         Code {
             severity: Severity::Error,
@@ -107,6 +117,15 @@ impl fmt::Display for Kind {
             Self::EntryPointTakesParameters { name } => {
                 write!(f, "entry point `{name}` takes parameters")
             }
+            Self::UndefinedFunction { name } => write!(f, "undefined function `{name}`"),
+            Self::WrongArgumentCount {
+                name,
+                expected,
+                found,
+            } => write!(
+                f,
+                "wrong number of arguments to `{name}`: expected {expected}, found {found}"
+            ),
         }
     }
 }

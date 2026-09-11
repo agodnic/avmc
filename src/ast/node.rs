@@ -116,6 +116,16 @@ pub enum Expr {
         /// `name.span`.
         span: diag::Span,
     },
+    /// `callee(args)`. Unlike parentheses around an expression, the
+    /// parentheses of a call are part of it.
+    Call {
+        /// The called name.
+        callee: Name,
+        /// The arguments, in source order.
+        args: Vec<Expr>,
+        /// From the callee through the closing `)`.
+        span: diag::Span,
+    },
 }
 
 impl Expr {
@@ -126,7 +136,8 @@ impl Expr {
             | Expr::BoolLit { span, .. }
             | Expr::Binary { span, .. }
             | Expr::Unary { span, .. }
-            | Expr::Var { span, .. } => *span,
+            | Expr::Var { span, .. }
+            | Expr::Call { span, .. } => *span,
         }
     }
 }

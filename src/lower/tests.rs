@@ -637,3 +637,240 @@ fn logic_lowers_in_post_order() {
         ]
     );
 }
+
+/// The example program of the calls milestone.
+const CALLS: &str = "func approval() uint64 {\n\treturn add(1, double(2))\n}\n\n\
+                     func add(a uint64, b uint64) uint64 {\n\treturn a + b\n}\n\n\
+                     func double(x uint64) uint64 {\n\treturn x * 2\n}\n";
+
+#[test]
+fn a_call_lowers_to_its_arguments_then_a_call() {
+    let source = CALLS;
+    let mut span = testing::spans(source);
+
+    let approval_start = span("func").start;
+    span("approval");
+    span("uint64");
+    let approval_return = span("return").start;
+    let call_start = span("add").start;
+    let one = span("1");
+    let double_start = span("double").start;
+    let two = span("2");
+    let double_end = span(")").end;
+    let call_end = span(")").end;
+    let approval_end = span("}").end;
+
+    let add_start = span("func").start;
+    span("add");
+    span("a");
+    span("uint64");
+    span("b");
+    span("uint64");
+    span("uint64");
+    let add_return = span("return").start;
+    let a_use = span("a");
+    let b_use = span("b");
+    let add_end = span("}").end;
+
+    let double_decl_start = span("func").start;
+    span("double");
+    span("x");
+    span("uint64");
+    span("uint64");
+    let double_return = span("return").start;
+    let x_use = span("x");
+    let two_use = span("2");
+    let double_decl_end = span("}").end;
+
+    assert_eq!(
+        lower_ok(source),
+        ir::Program {
+            funcs: vec![
+                ir::Function {
+                    name: "approval".to_string(),
+                    ret: typed_ast::Type::Uint64,
+                    params: vec![],
+                    locals: vec![],
+                    insts: vec![
+                        ir::Inst::Const {
+                            dest: ir::ValueId(0),
+                            ty: typed_ast::Type::Uint64,
+                            value: 1,
+                            span: one,
+                        },
+                        ir::Inst::Const {
+                            dest: ir::ValueId(1),
+                            ty: typed_ast::Type::Uint64,
+                            value: 2,
+                            span: two,
+                        },
+                        ir::Inst::Call {
+                            dest: ir::ValueId(2),
+                            callee: typed_ast::FuncId(2),
+                            args: vec![ir::ValueId(1)],
+                            span: diag::Span {
+                                start: double_start,
+                                end: double_end,
+                            },
+                        },
+                        ir::Inst::Call {
+                            dest: ir::ValueId(3),
+                            callee: typed_ast::FuncId(1),
+                            args: vec![ir::ValueId(0), ir::ValueId(2)],
+                            span: diag::Span {
+                                start: call_start,
+                                end: call_end,
+                            },
+                        },
+                        ir::Inst::Return {
+                            value: ir::ValueId(3),
+                            span: diag::Span {
+                                start: approval_return,
+                                end: call_end,
+                            },
+                        },
+                    ],
+                    span: diag::Span {
+                        start: approval_start,
+                        end: approval_end,
+                    },
+                },
+                ir::Function {
+                    name: "add".to_string(),
+                    ret: typed_ast::Type::Uint64,
+                    params: vec![typed_ast::Type::Uint64; 2],
+                    locals: vec![],
+                    insts: vec![
+                        ir::Inst::LoadParam {
+                            dest: ir::ValueId(0),
+                            param: typed_ast::ParamId(0),
+                            span: a_use,
+                        },
+                        ir::Inst::LoadParam {
+                            dest: ir::ValueId(1),
+                            param: typed_ast::ParamId(1),
+                            span: b_use,
+                        },
+                        ir::Inst::Binary {
+                            dest: ir::ValueId(2),
+                            op: ast::BinOp::Add,
+                            lhs: ir::ValueId(0),
+                            rhs: ir::ValueId(1),
+                            span: diag::Span {
+                                start: a_use.start,
+                                end: b_use.end,
+                            },
+                        },
+                        ir::Inst::Return {
+                            value: ir::ValueId(2),
+                            span: diag::Span {
+                                start: add_return,
+                                end: b_use.end,
+                            },
+                        },
+                    ],
+                    span: diag::Span {
+                        start: add_start,
+                        end: add_end,
+                    },
+                },
+                ir::Function {
+                    name: "double".to_string(),
+                    ret: typed_ast::Type::Uint64,
+                    params: vec![typed_ast::Type::Uint64],
+                    locals: vec![],
+                    insts: vec![
+                        ir::Inst::LoadParam {
+                            dest: ir::ValueId(0),
+                            param: typed_ast::ParamId(0),
+                            span: x_use,
+                        },
+                        ir::Inst::Const {
+                            dest: ir::ValueId(1),
+                            ty: typed_ast::Type::Uint64,
+                            value: 2,
+                            span: two_use,
+                        },
+                        ir::Inst::Binary {
+                            dest: ir::ValueId(2),
+                            op: ast::BinOp::Mul,
+                            lhs: ir::ValueId(0),
+                            rhs: ir::ValueId(1),
+                            span: diag::Span {
+                                start: x_use.start,
+                                end: two_use.end,
+                            },
+                        },
+                        ir::Inst::Return {
+                            value: ir::ValueId(2),
+                            span: diag::Span {
+                                start: double_return,
+                                end: two_use.end,
+                            },
+                        },
+                    ],
+                    span: diag::Span {
+                        start: double_decl_start,
+                        end: double_decl_end,
+                    },
+                },
+            ],
+        }
+    );
+}
+
+#[test]
+fn a_call_inside_an_expression() {
+    let source = "func approval() uint64 { return 1 + double(2) } \
+                  func double(x uint64) uint64 { return x * 2 }";
+    let mut span = testing::spans(source);
+    let return_start = span("return").start;
+    let one = span("1");
+    let call_start = span("double").start;
+    let two = span("2");
+    let call_end = span(")").end;
+
+    assert_eq!(
+        lower_ok(source).funcs[0].insts,
+        vec![
+            ir::Inst::Const {
+                dest: ir::ValueId(0),
+                ty: typed_ast::Type::Uint64,
+                value: 1,
+                span: one,
+            },
+            ir::Inst::Const {
+                dest: ir::ValueId(1),
+                ty: typed_ast::Type::Uint64,
+                value: 2,
+                span: two,
+            },
+            ir::Inst::Call {
+                dest: ir::ValueId(2),
+                callee: typed_ast::FuncId(1),
+                args: vec![ir::ValueId(1)],
+                span: diag::Span {
+                    start: call_start,
+                    end: call_end,
+                },
+            },
+            ir::Inst::Binary {
+                dest: ir::ValueId(3),
+                op: ast::BinOp::Add,
+                lhs: ir::ValueId(0),
+                rhs: ir::ValueId(2),
+                span: diag::Span {
+                    start: one.start,
+                    end: call_end,
+                },
+            },
+            ir::Inst::Return {
+                value: ir::ValueId(3),
+                span: diag::Span {
+                    start: return_start,
+                    end: call_end,
+                },
+            },
+        ]
+    );
+}

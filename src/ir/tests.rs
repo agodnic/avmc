@@ -1,6 +1,6 @@
 //! Tests for the IR verifier.
 
-use super::inst::{Function, Inst, ValueId};
+use super::inst::{Function, Inst, Program, ValueId};
 use super::verifier::{self, Violation};
 use crate::ast;
 use crate::diag;
@@ -9,6 +9,21 @@ use crate::typed_ast;
 /// The span every hand-built instruction carries: the verifier ignores
 /// spans, so which one it is does not matter.
 const SPAN: diag::Span = diag::Span { start: 0, end: 0 };
+
+/// Verifies `func` as the only function of its program.
+fn verify(func: Function) -> Result<(), Violation> {
+    verify_calling(func, vec![])
+}
+
+/// Verifies `func` in a program that defines it first and `callees` after it,
+/// so the first callee is `FuncId(1)`.
+fn verify_calling(func: Function, callees: Vec<Function>) -> Result<(), Violation> {
+    let program = Program {
+        funcs: std::iter::once(func).chain(callees).collect(),
+    };
+    let func = program.funcs.first().expect("the function under test");
+    verifier::verify(&program, func)
+}
 
 /// A function taking nothing, with an empty frame.
 fn function(insts: Vec<Inst>) -> Function {
@@ -97,6 +112,21 @@ fn binary(dest: u32, op: ast::BinOp, lhs: u32, rhs: u32) -> Inst {
     }
 }
 
+fn call(dest: u32, callee: u32, args: Vec<u32>) -> Inst {
+    Inst::Call {
+        dest: ValueId(dest),
+        callee: typed_ast::FuncId(callee),
+        args: args.into_iter().map(ValueId).collect(),
+        span: SPAN,
+    }
+}
+
+/// A callee taking `params` and returning `ret`. Only its signature matters:
+/// the function under test is the caller.
+fn callee(ret: typed_ast::Type, params: Vec<typed_ast::Type>) -> Function {
+    shaped(ret, params, vec![], vec![])
+}
+
 fn unary(dest: u32, op: ast::UnOp, operand: u32) -> Inst {
     Inst::Unary {
         dest: ValueId(dest),
@@ -108,16 +138,13 @@ fn unary(dest: u32, op: ast::UnOp, operand: u32) -> Inst {
 
 #[test]
 fn const_then_return_is_valid() {
-    assert_eq!(
-        verifier::verify(&function(vec![constant(0, 1), ret(0)])),
-        Ok(())
-    );
+    assert_eq!(verify(function(vec![constant(0, 1), ret(0)])), Ok(()));
 }
 
 #[test]
 fn a_binary_over_two_constants_is_valid() {
     assert_eq!(
-        verifier::verify(&function(vec![
+        verify(function(vec![
             constant(0, 1),
             constant(1, 2),
             binary(2, ast::BinOp::Add, 0, 1),
@@ -131,7 +158,7 @@ fn a_binary_over_two_constants_is_valid() {
 fn a_right_leaning_tree_is_valid() {
     // `1 + 2 * 3`, which the definition-order invariant used to reject.
     assert_eq!(
-        verifier::verify(&function(vec![
+        verify(function(vec![
             constant(0, 1),
             constant(1, 2),
             constant(2, 3),
@@ -146,7 +173,7 @@ fn a_right_leaning_tree_is_valid() {
 #[test]
 fn swapped_operands_are_rejected() {
     assert_eq!(
-        verifier::verify(&function(vec![
+        verify(function(vec![
             constant(0, 1),
             constant(1, 2),
             binary(2, ast::BinOp::Sub, 1, 0),
@@ -164,7 +191,7 @@ fn swapped_operands_are_rejected() {
 #[test]
 fn a_binary_without_enough_live_values_is_rejected() {
     assert_eq!(
-        verifier::verify(&function(vec![
+        verify(function(vec![
             constant(0, 1),
             binary(1, ast::BinOp::Add, 0, 0),
             ret(1),
@@ -180,7 +207,7 @@ fn a_binary_without_enough_live_values_is_rejected() {
 #[test]
 fn a_value_left_on_the_stack_is_rejected() {
     assert_eq!(
-        verifier::verify(&function(vec![constant(0, 1), constant(1, 2), ret(1)])),
+        verify(function(vec![constant(0, 1), constant(1, 2), ret(1)])),
         Err(Violation::ValuesLeftOnStack { count: 1 })
     );
 }
@@ -188,7 +215,7 @@ fn a_value_left_on_the_stack_is_rejected() {
 #[test]
 fn using_a_value_that_is_not_on_top_is_rejected() {
     assert_eq!(
-        verifier::verify(&function(vec![constant(0, 1), constant(1, 2), ret(0)])),
+        verify(function(vec![constant(0, 1), constant(1, 2), ret(0)])),
         Err(Violation::UseOutOfOrder {
             index: 2,
             position: 0,
@@ -201,7 +228,7 @@ fn using_a_value_that_is_not_on_top_is_rejected() {
 #[test]
 fn sparse_definition_is_rejected() {
     assert_eq!(
-        verifier::verify(&function(vec![constant(1, 1), ret(1)])),
+        verify(function(vec![constant(1, 1), ret(1)])),
         Err(Violation::SparseDefinition {
             index: 0,
             dest: ValueId(1),
@@ -213,7 +240,7 @@ fn sparse_definition_is_rejected() {
 #[test]
 fn returning_an_undefined_value_is_rejected() {
     assert_eq!(
-        verifier::verify(&function(vec![ret(0)])),
+        verify(function(vec![ret(0)])),
         Err(Violation::StackUnderflow {
             index: 0,
             needed: 1,
@@ -225,7 +252,7 @@ fn returning_an_undefined_value_is_rejected() {
 #[test]
 fn missing_return_is_rejected() {
     assert_eq!(
-        verifier::verify(&function(vec![constant(0, 1)])),
+        verify(function(vec![constant(0, 1)])),
         Err(Violation::MissingReturn)
     );
 }
@@ -233,7 +260,7 @@ fn missing_return_is_rejected() {
 #[test]
 fn return_that_is_not_last_is_rejected() {
     assert_eq!(
-        verifier::verify(&function(vec![constant(0, 1), ret(0), constant(1, 2)])),
+        verify(function(vec![constant(0, 1), ret(0), constant(1, 2)])),
         Err(Violation::ReturnNotLast { index: 1 })
     );
 }
@@ -241,7 +268,7 @@ fn return_that_is_not_last_is_rejected() {
 #[test]
 fn storing_and_loading_a_slot_is_valid() {
     assert_eq!(
-        verifier::verify(&framed(
+        verify(framed(
             1,
             vec![constant(0, 1), store(0, 0), load(1, 0), ret(1)]
         )),
@@ -253,7 +280,7 @@ fn storing_and_loading_a_slot_is_valid() {
 fn two_slots_are_valid() {
     // The `var x = 1 + 2; var y = x * 3; return y - x` of the milestone.
     assert_eq!(
-        verifier::verify(&framed(
+        verify(framed(
             2,
             vec![
                 constant(0, 1),
@@ -277,7 +304,7 @@ fn two_slots_are_valid() {
 #[test]
 fn storing_a_value_that_is_not_on_top_is_rejected() {
     assert_eq!(
-        verifier::verify(&framed(
+        verify(framed(
             1,
             vec![constant(0, 1), constant(1, 2), store(0, 0), ret(1)]
         )),
@@ -293,7 +320,7 @@ fn storing_a_value_that_is_not_on_top_is_rejected() {
 #[test]
 fn storing_without_a_live_value_is_rejected() {
     assert_eq!(
-        verifier::verify(&framed(1, vec![store(0, 0), ret(0)])),
+        verify(framed(1, vec![store(0, 0), ret(0)])),
         Err(Violation::StackUnderflow {
             index: 0,
             needed: 1,
@@ -305,7 +332,7 @@ fn storing_without_a_live_value_is_rejected() {
 #[test]
 fn loading_from_an_empty_frame_is_rejected() {
     assert_eq!(
-        verifier::verify(&function(vec![load(0, 0), ret(0)])),
+        verify(function(vec![load(0, 0), ret(0)])),
         Err(Violation::LocalOutOfRange {
             index: 0,
             local: typed_ast::LocalId(0),
@@ -317,7 +344,7 @@ fn loading_from_an_empty_frame_is_rejected() {
 #[test]
 fn storing_past_the_frame_is_rejected() {
     assert_eq!(
-        verifier::verify(&framed(
+        verify(framed(
             2,
             vec![constant(0, 1), store(2, 0), constant(1, 2), ret(1)]
         )),
@@ -332,7 +359,7 @@ fn storing_past_the_frame_is_rejected() {
 #[test]
 fn a_parameter_load_has_the_parameters_type() {
     assert_eq!(
-        verifier::verify(&shaped(
+        verify(shaped(
             typed_ast::Type::Uint64,
             vec![typed_ast::Type::Bool],
             vec![],
@@ -356,7 +383,7 @@ fn a_parameter_load_has_the_parameters_type() {
 #[test]
 fn a_parameter_out_of_range_is_a_violation() {
     assert_eq!(
-        verifier::verify(&shaped(
+        verify(shaped(
             typed_ast::Type::Uint64,
             vec![typed_ast::Type::Uint64],
             vec![],
@@ -374,7 +401,7 @@ fn a_parameter_out_of_range_is_a_violation() {
 fn too_many_parameters_is_a_violation() {
     let count = typed_ast::ParamId::CAPACITY + 1;
     assert_eq!(
-        verifier::verify(&shaped(
+        verify(shaped(
             typed_ast::Type::Uint64,
             vec![typed_ast::Type::Uint64; count],
             vec![],
@@ -388,7 +415,7 @@ fn too_many_parameters_is_a_violation() {
 fn a_frame_past_the_capacity_is_rejected() {
     let count = typed_ast::LocalId::CAPACITY + 1;
     assert_eq!(
-        verifier::verify(&framed(count, vec![constant(0, 1), ret(0)])),
+        verify(framed(count, vec![constant(0, 1), ret(0)])),
         Err(Violation::FrameTooLarge { count })
     );
 }
@@ -396,7 +423,7 @@ fn a_frame_past_the_capacity_is_rejected() {
 #[test]
 fn a_frame_at_the_capacity_is_valid() {
     assert_eq!(
-        verifier::verify(&framed(
+        verify(framed(
             typed_ast::LocalId::CAPACITY,
             vec![constant(0, 1), ret(0)]
         )),
@@ -408,7 +435,7 @@ fn a_frame_at_the_capacity_is_valid() {
 fn a_bool_constant_is_returned() {
     for value in [0, 1] {
         assert_eq!(
-            verifier::verify(&shaped(
+            verify(shaped(
                 typed_ast::Type::Bool,
                 vec![],
                 vec![],
@@ -422,7 +449,7 @@ fn a_bool_constant_is_returned() {
 #[test]
 fn a_bool_constant_outside_its_range_is_rejected() {
     assert_eq!(
-        verifier::verify(&shaped(
+        verify(shaped(
             typed_ast::Type::Bool,
             vec![],
             vec![],
@@ -435,7 +462,7 @@ fn a_bool_constant_outside_its_range_is_rejected() {
 #[test]
 fn returning_a_uint64_as_a_bool_is_rejected() {
     assert_eq!(
-        verifier::verify(&shaped(
+        verify(shaped(
             typed_ast::Type::Bool,
             vec![],
             vec![],
@@ -454,7 +481,7 @@ fn returning_a_uint64_as_a_bool_is_rejected() {
 #[test]
 fn returning_a_bool_as_a_uint64_is_rejected() {
     assert_eq!(
-        verifier::verify(&function(vec![
+        verify(function(vec![
             constant_of(0, typed_ast::Type::Bool, 1),
             ret(0)
         ])),
@@ -471,7 +498,7 @@ fn returning_a_bool_as_a_uint64_is_rejected() {
 #[test]
 fn storing_and_loading_a_bool_slot_is_valid() {
     assert_eq!(
-        verifier::verify(&shaped(
+        verify(shaped(
             typed_ast::Type::Bool,
             vec![],
             vec![typed_ast::Type::Bool],
@@ -489,7 +516,7 @@ fn storing_and_loading_a_bool_slot_is_valid() {
 #[test]
 fn storing_a_bool_in_a_uint64_slot_is_rejected() {
     assert_eq!(
-        verifier::verify(&framed(
+        verify(framed(
             1,
             vec![
                 constant_of(0, typed_ast::Type::Bool, 1),
@@ -511,7 +538,7 @@ fn storing_a_bool_in_a_uint64_slot_is_rejected() {
 #[test]
 fn a_load_carries_its_slots_type() {
     assert_eq!(
-        verifier::verify(&shaped(
+        verify(shaped(
             typed_ast::Type::Uint64,
             vec![],
             vec![typed_ast::Type::Bool],
@@ -535,7 +562,7 @@ fn a_load_carries_its_slots_type() {
 #[test]
 fn a_bool_as_the_left_operand_of_a_binary_is_rejected() {
     assert_eq!(
-        verifier::verify(&function(vec![
+        verify(function(vec![
             constant_of(0, typed_ast::Type::Bool, 1),
             constant(1, 2),
             binary(2, ast::BinOp::Add, 0, 1),
@@ -554,7 +581,7 @@ fn a_bool_as_the_left_operand_of_a_binary_is_rejected() {
 #[test]
 fn a_bool_as_the_right_operand_of_a_binary_is_rejected() {
     assert_eq!(
-        verifier::verify(&function(vec![
+        verify(function(vec![
             constant(0, 1),
             constant_of(1, typed_ast::Type::Bool, 1),
             binary(2, ast::BinOp::Add, 0, 1),
@@ -573,7 +600,7 @@ fn a_bool_as_the_right_operand_of_a_binary_is_rejected() {
 #[test]
 fn an_operand_out_of_order_is_rejected_before_its_type() {
     assert_eq!(
-        verifier::verify(&framed(
+        verify(framed(
             1,
             vec![
                 constant(0, 1),
@@ -605,7 +632,7 @@ const COMPARISONS: [ast::BinOp; 6] = [
 fn a_comparison_of_two_uint64s_is_valid() {
     for op in COMPARISONS {
         assert_eq!(
-            verifier::verify(&shaped(
+            verify(shaped(
                 typed_ast::Type::Bool,
                 vec![],
                 vec![],
@@ -620,7 +647,7 @@ fn a_comparison_of_two_uint64s_is_valid() {
 #[test]
 fn returning_a_comparison_as_a_uint64_is_rejected() {
     assert_eq!(
-        verifier::verify(&function(vec![
+        verify(function(vec![
             constant(0, 1),
             constant(1, 2),
             binary(2, ast::BinOp::Lt, 0, 1),
@@ -639,7 +666,7 @@ fn returning_a_comparison_as_a_uint64_is_rejected() {
 #[test]
 fn equality_over_uint64s_still_yields_a_bool() {
     assert_eq!(
-        verifier::verify(&function(vec![
+        verify(function(vec![
             constant(0, 1),
             constant(1, 2),
             binary(2, ast::BinOp::Eq, 0, 1),
@@ -659,7 +686,7 @@ fn equality_over_uint64s_still_yields_a_bool() {
 fn equality_over_two_bools_is_valid() {
     for op in [ast::BinOp::Eq, ast::BinOp::Ne] {
         assert_eq!(
-            verifier::verify(&shaped(
+            verify(shaped(
                 typed_ast::Type::Bool,
                 vec![],
                 vec![],
@@ -679,7 +706,7 @@ fn equality_over_two_bools_is_valid() {
 #[test]
 fn ordering_two_bools_is_rejected() {
     assert_eq!(
-        verifier::verify(&shaped(
+        verify(shaped(
             typed_ast::Type::Bool,
             vec![],
             vec![],
@@ -703,7 +730,7 @@ fn ordering_two_bools_is_rejected() {
 #[test]
 fn comparing_a_uint64_with_a_bool_is_rejected() {
     assert_eq!(
-        verifier::verify(&shaped(
+        verify(shaped(
             typed_ast::Type::Bool,
             vec![],
             vec![],
@@ -728,7 +755,7 @@ fn comparing_a_uint64_with_a_bool_is_rejected() {
 fn comparing_a_bool_with_a_uint64_is_rejected() {
     // The left operand fixes the type the right one must have.
     assert_eq!(
-        verifier::verify(&shaped(
+        verify(shaped(
             typed_ast::Type::Bool,
             vec![],
             vec![],
@@ -752,7 +779,7 @@ fn comparing_a_bool_with_a_uint64_is_rejected() {
 #[test]
 fn an_equality_without_enough_live_values_is_rejected() {
     assert_eq!(
-        verifier::verify(&shaped(
+        verify(shaped(
             typed_ast::Type::Bool,
             vec![],
             vec![],
@@ -774,7 +801,7 @@ fn an_equality_without_enough_live_values_is_rejected() {
 fn logic_over_two_bools_is_valid() {
     for op in [ast::BinOp::And, ast::BinOp::Or] {
         assert_eq!(
-            verifier::verify(&shaped(
+            verify(shaped(
                 typed_ast::Type::Bool,
                 vec![],
                 vec![],
@@ -794,7 +821,7 @@ fn logic_over_two_bools_is_valid() {
 #[test]
 fn a_uint64_as_an_operand_of_logic_is_rejected() {
     assert_eq!(
-        verifier::verify(&shaped(
+        verify(shaped(
             typed_ast::Type::Bool,
             vec![],
             vec![],
@@ -818,7 +845,7 @@ fn a_uint64_as_an_operand_of_logic_is_rejected() {
 #[test]
 fn negating_a_bool_is_valid() {
     assert_eq!(
-        verifier::verify(&shaped(
+        verify(shaped(
             typed_ast::Type::Bool,
             vec![],
             vec![],
@@ -835,7 +862,7 @@ fn negating_a_bool_is_valid() {
 #[test]
 fn negating_a_uint64_is_rejected() {
     assert_eq!(
-        verifier::verify(&shaped(
+        verify(shaped(
             typed_ast::Type::Bool,
             vec![],
             vec![],
@@ -854,7 +881,7 @@ fn negating_a_uint64_is_rejected() {
 #[test]
 fn negating_without_a_live_value_is_rejected() {
     assert_eq!(
-        verifier::verify(&shaped(
+        verify(shaped(
             typed_ast::Type::Bool,
             vec![],
             vec![],
@@ -871,7 +898,7 @@ fn negating_without_a_live_value_is_rejected() {
 #[test]
 fn negating_a_value_that_is_not_on_top_is_rejected() {
     assert_eq!(
-        verifier::verify(&shaped(
+        verify(shaped(
             typed_ast::Type::Bool,
             vec![],
             vec![],
@@ -895,7 +922,7 @@ fn negating_a_value_that_is_not_on_top_is_rejected() {
 fn a_comparison_joined_by_logic_is_valid() {
     // `!(1 < 2 && true)`.
     assert_eq!(
-        verifier::verify(&shaped(
+        verify(shaped(
             typed_ast::Type::Bool,
             vec![],
             vec![],
@@ -965,5 +992,110 @@ fn violations_describe_themselves() {
     assert_eq!(
         Violation::BoolOutOfRange { index: 0, value: 2 }.to_string(),
         "well typed: instruction 0 defines a bool constant of 2, expected 0 or 1"
+    );
+}
+
+#[test]
+fn a_call_consumes_its_arguments_in_order() {
+    let insts = vec![
+        constant(0, 1),
+        constant(1, 2),
+        call(2, 1, vec![0, 1]),
+        ret(2),
+    ];
+    assert_eq!(
+        verify_calling(
+            function(insts),
+            vec![callee(
+                typed_ast::Type::Uint64,
+                vec![typed_ast::Type::Uint64; 2]
+            )]
+        ),
+        Ok(())
+    );
+
+    let swapped = vec![
+        constant(0, 1),
+        constant(1, 2),
+        call(2, 1, vec![1, 0]),
+        ret(2),
+    ];
+    assert_eq!(
+        verify_calling(
+            function(swapped),
+            vec![callee(
+                typed_ast::Type::Uint64,
+                vec![typed_ast::Type::Uint64; 2]
+            )]
+        ),
+        Err(Violation::UseOutOfOrder {
+            index: 2,
+            position: 0,
+            value: ValueId(1),
+            expected: ValueId(0),
+        })
+    );
+}
+
+#[test]
+fn a_call_argument_of_the_wrong_type_is_a_violation() {
+    assert_eq!(
+        verify_calling(
+            function(vec![constant(0, 1), call(1, 1, vec![0]), ret(1)]),
+            vec![callee(typed_ast::Type::Uint64, vec![typed_ast::Type::Bool])]
+        ),
+        Err(Violation::OperandType {
+            index: 1,
+            position: 0,
+            value: ValueId(0),
+            found: typed_ast::Type::Uint64,
+            expected: typed_ast::Type::Bool,
+        })
+    );
+}
+
+#[test]
+fn a_call_with_too_few_live_values_is_a_violation() {
+    assert_eq!(
+        verify_calling(
+            function(vec![constant(0, 1), call(1, 1, vec![0, 1]), ret(1)]),
+            vec![callee(
+                typed_ast::Type::Uint64,
+                vec![typed_ast::Type::Uint64; 2]
+            )]
+        ),
+        Err(Violation::StackUnderflow {
+            index: 1,
+            needed: 2,
+            available: 1,
+        })
+    );
+}
+
+#[test]
+fn an_unknown_callee_is_a_violation() {
+    assert_eq!(
+        verify(function(vec![constant(0, 1), call(1, 1, vec![0]), ret(1)])),
+        Err(Violation::UnknownCallee {
+            index: 1,
+            callee: typed_ast::FuncId(1),
+        })
+    );
+}
+
+#[test]
+fn a_call_defines_the_callees_return_type() {
+    assert_eq!(
+        verify_calling(
+            function(vec![call(0, 1, vec![]), ret(0)]),
+            vec![callee(typed_ast::Type::Bool, vec![])]
+        ),
+        Err(Violation::OperandType {
+            index: 1,
+            position: 0,
+            value: ValueId(0),
+            found: typed_ast::Type::Bool,
+            expected: typed_ast::Type::Uint64,
+        })
     );
 }

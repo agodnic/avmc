@@ -71,6 +71,17 @@ pub enum Inst {
         /// The expression it came from.
         span: diag::Span,
     },
+    /// Defines `dest` as what `callee` returns for `args`, consumed in order.
+    Call {
+        /// The value it defines.
+        dest: ValueId,
+        /// The function it calls.
+        callee: typed_ast::FuncId,
+        /// The arguments, consumed in order.
+        args: Vec<ValueId>,
+        /// The call it came from.
+        span: diag::Span,
+    },
     /// Returns `value` from the enclosing function.
     Return {
         /// The value it returns.
@@ -90,6 +101,7 @@ impl Inst {
             | Inst::Store { span, .. }
             | Inst::Load { span, .. }
             | Inst::LoadParam { span, .. }
+            | Inst::Call { span, .. }
             | Inst::Return { span, .. } => *span,
         }
     }

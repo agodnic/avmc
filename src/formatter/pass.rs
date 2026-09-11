@@ -152,6 +152,24 @@ impl Printer<'_> {
                 self.token(op, sep);
                 self.expr(operand, Sep::Tight);
             }
+            cst::Expr::Call {
+                callee,
+                lparen,
+                args,
+                rparen,
+            } => {
+                self.token(callee, sep);
+                self.token(lparen, Sep::Tight);
+                for (index, arg) in args.iter().enumerate() {
+                    // The first argument follows `(`; the rest follow a `,`.
+                    let sep = if index == 0 { Sep::Tight } else { Sep::Space };
+                    self.expr(&arg.expr, sep);
+                    if let Some(comma) = &arg.comma {
+                        self.token(comma, Sep::Tight);
+                    }
+                }
+                self.token(rparen, Sep::Tight);
+            }
             cst::Expr::Paren {
                 lparen,
                 inner,

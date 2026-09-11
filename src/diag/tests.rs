@@ -89,6 +89,22 @@ fn samples() -> Vec<(Kind, &'static str, &'static str)> {
             "E0015",
             "entry point `approval` takes parameters",
         ),
+        (
+            Kind::UndefinedFunction {
+                name: "f".to_string(),
+            },
+            "E0016",
+            "undefined function `f`",
+        ),
+        (
+            Kind::WrongArgumentCount {
+                name: "add".to_string(),
+                expected: 2,
+                found: 1,
+            },
+            "E0017",
+            "wrong number of arguments to `add`: expected 2, found 1",
+        ),
     ];
 
     // Exhaustive, with no wildcard arm, so that adding a variant to
@@ -109,7 +125,9 @@ fn samples() -> Vec<(Kind, &'static str, &'static str)> {
             | Kind::TooManyVariables { .. }
             | Kind::TypeMismatch { .. }
             | Kind::TooManyParameters { .. }
-            | Kind::EntryPointTakesParameters { .. } => {}
+            | Kind::EntryPointTakesParameters { .. }
+            | Kind::UndefinedFunction { .. }
+            | Kind::WrongArgumentCount { .. } => {}
         }
     }
 
