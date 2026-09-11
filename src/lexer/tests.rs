@@ -4,7 +4,7 @@ use super::pass;
 use super::token::{Token, TokenKind};
 use crate::diag;
 
-/// The approval program of the v0 milestone, with comments.
+/// The approval program, with comments.
 const COMMENTED_APPROVAL: &str = "// The approval program.\nfunc approval() uint64 {\n  var x uint64 = 1 + 2 // one more than two\n  return x\n}\n";
 
 /// Lexes `source`, asserting that it produced no diagnostics.

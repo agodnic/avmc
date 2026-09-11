@@ -1,7 +1,7 @@
 use super::inst::ValueId;
 use crate::typed_ast;
 
-/// A way a function can fail the v0 IR invariant.
+/// A way a function can fail the IR invariant.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Violation {
     /// An instruction defines a value out of the dense numbering.

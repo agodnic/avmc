@@ -3,7 +3,7 @@ use super::violation::Violation;
 use crate::ast;
 use crate::typed_ast;
 
-/// Checks the v0 IR invariant, returning the first violation. `program` is
+/// Checks the IR invariant, returning the first violation. `program` is
 /// the unit `func` belongs to, which holds the functions it calls.
 pub fn verify(program: &Program, func: &Function) -> Result<(), Violation> {
     verify_return(func)?;

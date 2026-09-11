@@ -8,7 +8,7 @@
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
 
-/// The example program of the v0 milestone.
+/// The example program.
 const EXAMPLE: &str = "func approval() uint64 { return 1 }";
 
 /// The TEAL the example program compiles to.

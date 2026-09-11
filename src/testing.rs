@@ -7,7 +7,7 @@ use crate::parser;
 use crate::typeck;
 use crate::typed_ast;
 
-/// The example program of the v0 milestone.
+/// The example program used by the stage tests.
 pub(crate) const EXAMPLE: &str = "func approval() uint64 { return 1 }";
 
 /// The span of the `nth` occurrence of `text` in `source`, counting from 0.
