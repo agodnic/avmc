@@ -1,7 +1,8 @@
 //! Tests for the IR verifier.
 
 use super::inst::{Function, Inst, Program, ValueId};
-use super::verifier::{self, Violation};
+use super::verifier;
+use super::violation::Violation;
 use crate::ast;
 use crate::diag;
 use crate::typed_ast;
