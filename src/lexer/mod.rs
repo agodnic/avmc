@@ -2,7 +2,7 @@
 
 mod pass;
 #[cfg(test)]
-mod tests;
+mod pass_test;
 mod token;
 
 pub use pass::lex;
