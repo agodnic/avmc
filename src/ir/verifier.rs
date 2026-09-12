@@ -28,17 +28,7 @@ pub fn verify(program: &Program, func: &Function) -> Result<(), Violation> {
 
     for (index, inst) in func.insts.iter().enumerate() {
         let (dest, ty) = match inst {
-            Inst::Const {
-                dest, ty, value, ..
-            } => {
-                if *ty == typed_ast::Type::Bool && *value > 1 {
-                    return Err(Violation::BoolOutOfRange {
-                        index,
-                        value: *value,
-                    });
-                }
-                (dest, *ty)
-            }
+            Inst::Const { dest, value, .. } => (dest, value.ty()),
             Inst::Binary {
                 dest, op, lhs, rhs, ..
             } => {

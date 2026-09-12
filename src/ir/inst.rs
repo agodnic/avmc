@@ -6,17 +6,40 @@ use crate::typed_ast;
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct ValueId(pub u32);
 
+/// A constant, of one of the types the language has.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ConstValue {
+    Uint64(u64),
+    Bool(bool),
+}
+
+impl ConstValue {
+    /// The type it has.
+    pub fn ty(&self) -> typed_ast::Type {
+        match self {
+            ConstValue::Uint64(_) => typed_ast::Type::Uint64,
+            ConstValue::Bool(_) => typed_ast::Type::Bool,
+        }
+    }
+
+    /// The word the AVM holds it as: a `bool` is `0` or `1`.
+    pub fn word(&self) -> u64 {
+        match self {
+            ConstValue::Uint64(value) => *value,
+            ConstValue::Bool(value) => u64::from(*value),
+        }
+    }
+}
+
 /// A single instruction.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Inst {
-    /// Defines `dest` as the constant `value` of type `ty`.
+    /// Defines `dest` as the constant `value`.
     Const {
         /// The value it defines.
         dest: ValueId,
-        /// The type it has.
-        ty: typed_ast::Type,
-        /// The constant it holds: for a `Bool`, `0` or `1`.
-        value: u64,
+        /// The constant it holds.
+        value: ConstValue,
         /// The literal it came from.
         span: diag::Span,
     },

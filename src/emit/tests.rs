@@ -54,14 +54,17 @@ fn hand_built(ret: typed_ast::Type, locals: Vec<typed_ast::Type>, insts: Vec<ir:
 }
 
 fn constant(dest: u32, value: u64) -> ir::Inst {
-    constant_of(dest, typed_ast::Type::Uint64, value)
-}
-
-fn constant_of(dest: u32, ty: typed_ast::Type, value: u64) -> ir::Inst {
     ir::Inst::Const {
         dest: ir::ValueId(dest),
-        ty,
-        value,
+        value: ir::ConstValue::Uint64(value),
+        span: ZERO,
+    }
+}
+
+fn constant_bool(dest: u32, value: bool) -> ir::Inst {
+    ir::Inst::Const {
+        dest: ir::ValueId(dest),
+        value: ir::ConstValue::Bool(value),
         span: ZERO,
     }
 }
@@ -193,7 +196,7 @@ fn a_bool_constant_is_returned() {
         hand_built(
             typed_ast::Type::Bool,
             vec![],
-            vec![constant_of(0, typed_ast::Type::Bool, 1), ret(0)]
+            vec![constant_bool(0, true), ret(0)]
         ),
         "#pragma version 13\n\
          callsub approval\n\
@@ -232,12 +235,7 @@ fn a_boolean_literal_is_compiled() {
 #[test]
 fn a_bool_slot_starts_as_false() {
     // `var ok bool = true; return ok`, as a later slice will lower it.
-    let insts = vec![
-        constant_of(0, typed_ast::Type::Bool, 1),
-        store(0, 0),
-        load(1, 0),
-        ret(1),
-    ];
+    let insts = vec![constant_bool(0, true), store(0, 0), load(1, 0), ret(1)];
     assert_eq!(
         hand_built(typed_ast::Type::Bool, vec![typed_ast::Type::Bool], insts),
         "#pragma version 13\n\
@@ -284,8 +282,8 @@ fn a_comparison_emits_its_mnemonic() {
 fn logic_emits_its_mnemonic() {
     for (op, mnemonic) in [(ast::BinOp::And, "&&"), (ast::BinOp::Or, "||")] {
         let insts = vec![
-            constant_of(0, typed_ast::Type::Bool, 1),
-            constant_of(1, typed_ast::Type::Bool, 0),
+            constant_bool(0, true),
+            constant_bool(1, false),
             binary(2, op, 0, 1),
             ret(2),
         ];
@@ -299,11 +297,7 @@ fn logic_emits_its_mnemonic() {
 
 #[test]
 fn negation_emits_its_mnemonic() {
-    let insts = vec![
-        constant_of(0, typed_ast::Type::Bool, 1),
-        unary(1, ast::UnOp::Not, 0),
-        ret(1),
-    ];
+    let insts = vec![constant_bool(0, true), unary(1, ast::UnOp::Not, 0), ret(1)];
     assert_eq!(
         hand_built(typed_ast::Type::Bool, vec![], insts),
         format!("{PROLOGUE}pushint 1\n!\nretsub\n")
@@ -317,7 +311,7 @@ fn a_comparison_joined_by_logic() {
         constant(0, 1),
         constant(1, 2),
         binary(2, ast::BinOp::Lt, 0, 1),
-        constant_of(3, typed_ast::Type::Bool, 1),
+        constant_bool(3, true),
         binary(4, ast::BinOp::And, 2, 3),
         unary(5, ast::UnOp::Not, 4),
         ret(5),

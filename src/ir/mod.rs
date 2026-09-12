@@ -9,6 +9,6 @@ mod violation;
 #[cfg(test)]
 mod violation_test;
 
-pub use inst::{Function, Inst, Program, ValueId};
+pub use inst::{ConstValue, Function, Inst, Program, ValueId};
 pub use verifier::verify;
 pub use violation::Violation;

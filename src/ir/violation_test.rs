@@ -53,8 +53,4 @@ fn violations_describe_themselves() {
         .to_string(),
         "well typed: instruction 2 uses %0 of type bool as operand 0, expected uint64"
     );
-    assert_eq!(
-        Violation::BoolOutOfRange { index: 0, value: 2 }.to_string(),
-        "well typed: instruction 0 defines a bool constant of 2, expected 0 or 1"
-    );
 }

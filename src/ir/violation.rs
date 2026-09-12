@@ -94,13 +94,6 @@ pub enum Violation {
         /// The function it calls.
         callee: typed_ast::FuncId,
     },
-    /// A `Bool` constant holds something other than `0` or `1`.
-    BoolOutOfRange {
-        /// The offending instruction's position.
-        index: usize,
-        /// The constant it holds.
-        value: u64,
-    },
 }
 
 impl std::fmt::Display for Violation {
@@ -193,11 +186,6 @@ impl std::fmt::Display for Violation {
                 f,
                 "well typed: instruction {index} calls f{} but the program does not define it",
                 callee.0
-            ),
-            Violation::BoolOutOfRange { index, value } => write!(
-                f,
-                "well typed: instruction {index} defines a bool constant of {value}, expected 0 \
-                 or 1"
             ),
         }
     }

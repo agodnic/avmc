@@ -73,8 +73,7 @@ fn lower_expr(
             let dest = next_value_id(next_value);
             insts.push(ir::Inst::Const {
                 dest,
-                ty: typed_ast::Type::Uint64,
-                value: *value,
+                value: ir::ConstValue::Uint64(*value),
                 span: expr.span,
             });
             dest
@@ -83,8 +82,7 @@ fn lower_expr(
             let dest = next_value_id(next_value);
             insts.push(ir::Inst::Const {
                 dest,
-                ty: typed_ast::Type::Bool,
-                value: u64::from(*value),
+                value: ir::ConstValue::Bool(*value),
                 span: expr.span,
             });
             dest
