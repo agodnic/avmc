@@ -1,7 +1,6 @@
-//! Tests for the driver.
+//! Tests for the compilation pipeline.
 
 use super::pipeline::compile;
-use super::render::render;
 use crate::diag;
 use crate::testing;
 
@@ -29,14 +28,6 @@ const CALLS: &str = "func approval() uint64 {\n\treturn add(1, double(2))\n}\n\n
 const RECURSION: &str = "func approval() uint64 {\n\treturn f(1)\n}\n\n\
                          func f(n uint64) uint64 {\n\treturn g(n)\n}\n\n\
                          func g(n uint64) uint64 {\n\treturn f(n)\n}\n";
-
-/// A diagnostic covering `span`, for [`render`] to format.
-fn diagnostic(span: diag::Span) -> diag::Entry {
-    diag::Entry {
-        kind: diag::Kind::MissingEntryPoint { name: "approval" },
-        span,
-    }
-}
 
 #[test]
 fn example_program_compiles() {
@@ -144,63 +135,6 @@ fn lexing_stops_the_pipeline() {
     assert_eq!(
         compile_err("func approval() uint64 { return @ }"),
         [diag::Kind::UnexpectedCharacter]
-    );
-}
-
-#[test]
-fn renders_the_start_of_an_empty_source() {
-    assert_eq!(
-        render(&diagnostic(diag::Span { start: 0, end: 0 }), "a.txt", ""),
-        "a.txt:1:1: error[E0008]: missing entry point `approval`"
-    );
-}
-
-#[test]
-fn renders_a_position_on_a_later_line() {
-    let source = "func f() {\n  return @\n}";
-    assert_eq!(
-        render(
-            &diagnostic(testing::span_of(source, "@", 0)),
-            "a.txt",
-            source
-        ),
-        "a.txt:2:10: error[E0008]: missing entry point `approval`"
-    );
-}
-
-#[test]
-fn counts_columns_in_chars_not_bytes() {
-    let source = "é@";
-    assert_eq!(
-        render(
-            &diagnostic(testing::span_of(source, "@", 0)),
-            "a.txt",
-            source
-        ),
-        "a.txt:1:2: error[E0008]: missing entry point `approval`"
-    );
-}
-
-#[test]
-fn renders_the_end_of_input() {
-    let source = "ab\n";
-    let span = diag::Span {
-        start: source.len(),
-        end: source.len(),
-    };
-    assert_eq!(
-        render(&diagnostic(span), "a.txt", source),
-        "a.txt:2:1: error[E0008]: missing entry point `approval`"
-    );
-}
-
-#[test]
-fn renders_a_non_boundary_offset_as_the_end_of_input() {
-    let source = "é\n";
-    let span = diag::Span { start: 1, end: 1 };
-    assert_eq!(
-        render(&diagnostic(span), "a.txt", source),
-        "a.txt:2:1: error[E0008]: missing entry point `approval`"
     );
 }
 
