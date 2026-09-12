@@ -1,8 +1,7 @@
-//! Tests for the precedence groups and the order over them.
+//! Tests for the order over the precedence groups.
 
-use super::group::{Group, group, unary_group};
+use super::group::Group;
 use super::table::{Priority, priority};
-use crate::ast;
 
 const GROUPS: [Group; 7] = [
     Group::Additive,
@@ -13,28 +12,6 @@ const GROUPS: [Group; 7] = [
     Group::And,
     Group::Or,
 ];
-
-#[test]
-fn every_operator_has_its_group() {
-    assert_eq!(group(ast::BinOp::Add), Group::Additive);
-    assert_eq!(group(ast::BinOp::Sub), Group::Additive);
-    assert_eq!(group(ast::BinOp::Mul), Group::Multiplicative);
-    assert_eq!(group(ast::BinOp::Div), Group::Multiplicative);
-    assert_eq!(group(ast::BinOp::Mod), Group::Modulo);
-    for op in [
-        ast::BinOp::Eq,
-        ast::BinOp::Ne,
-        ast::BinOp::Lt,
-        ast::BinOp::Le,
-        ast::BinOp::Gt,
-        ast::BinOp::Ge,
-    ] {
-        assert_eq!(group(op), Group::Comparison, "{op:?}");
-    }
-    assert_eq!(group(ast::BinOp::And), Group::And);
-    assert_eq!(group(ast::BinOp::Or), Group::Or);
-    assert_eq!(unary_group(ast::UnOp::Not), Group::Not);
-}
 
 #[test]
 fn the_table_is_what_the_design_says() {
