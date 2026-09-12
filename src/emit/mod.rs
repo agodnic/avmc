@@ -2,6 +2,6 @@
 
 mod pass;
 #[cfg(test)]
-mod tests;
+mod pass_test;
 
 pub use pass::emit;
