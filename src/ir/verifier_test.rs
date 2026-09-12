@@ -1,6 +1,6 @@
 //! Tests for the IR verifier.
 
-use super::inst::{Function, Inst, Program, ValueId};
+use super::inst::{ConstValue, Function, Inst, Program, ValueId};
 use super::verifier;
 use super::violation::Violation;
 use crate::ast;
@@ -60,14 +60,17 @@ fn shaped(
 }
 
 fn constant(dest: u32, value: u64) -> Inst {
-    constant_of(dest, typed_ast::Type::Uint64, value)
-}
-
-fn constant_of(dest: u32, ty: typed_ast::Type, value: u64) -> Inst {
     Inst::Const {
         dest: ValueId(dest),
-        ty,
-        value,
+        value: ConstValue::Uint64(value),
+        span: SPAN,
+    }
+}
+
+fn constant_bool(dest: u32, value: bool) -> Inst {
+    Inst::Const {
+        dest: ValueId(dest),
+        value: ConstValue::Bool(value),
         span: SPAN,
     }
 }
@@ -434,30 +437,17 @@ fn a_frame_at_the_capacity_is_valid() {
 
 #[test]
 fn a_bool_constant_is_returned() {
-    for value in [0, 1] {
+    for value in [false, true] {
         assert_eq!(
             verify(shaped(
                 typed_ast::Type::Bool,
                 vec![],
                 vec![],
-                vec![constant_of(0, typed_ast::Type::Bool, value), ret(0)]
+                vec![constant_bool(0, value), ret(0)]
             )),
             Ok(())
         );
     }
-}
-
-#[test]
-fn a_bool_constant_outside_its_range_is_rejected() {
-    assert_eq!(
-        verify(shaped(
-            typed_ast::Type::Bool,
-            vec![],
-            vec![],
-            vec![constant_of(0, typed_ast::Type::Bool, 2), ret(0)]
-        )),
-        Err(Violation::BoolOutOfRange { index: 0, value: 2 })
-    );
 }
 
 #[test]
@@ -482,10 +472,7 @@ fn returning_a_uint64_as_a_bool_is_rejected() {
 #[test]
 fn returning_a_bool_as_a_uint64_is_rejected() {
     assert_eq!(
-        verify(function(vec![
-            constant_of(0, typed_ast::Type::Bool, 1),
-            ret(0)
-        ])),
+        verify(function(vec![constant_bool(0, true), ret(0)])),
         Err(Violation::OperandType {
             index: 1,
             position: 0,
@@ -503,12 +490,7 @@ fn storing_and_loading_a_bool_slot_is_valid() {
             typed_ast::Type::Bool,
             vec![],
             vec![typed_ast::Type::Bool],
-            vec![
-                constant_of(0, typed_ast::Type::Bool, 1),
-                store(0, 0),
-                load(1, 0),
-                ret(1),
-            ]
+            vec![constant_bool(0, true), store(0, 0), load(1, 0), ret(1),]
         )),
         Ok(())
     );
@@ -519,12 +501,7 @@ fn storing_a_bool_in_a_uint64_slot_is_rejected() {
     assert_eq!(
         verify(framed(
             1,
-            vec![
-                constant_of(0, typed_ast::Type::Bool, 1),
-                store(0, 0),
-                load(1, 0),
-                ret(1),
-            ]
+            vec![constant_bool(0, true), store(0, 0), load(1, 0), ret(1),]
         )),
         Err(Violation::OperandType {
             index: 1,
@@ -543,12 +520,7 @@ fn a_load_carries_its_slots_type() {
             typed_ast::Type::Uint64,
             vec![],
             vec![typed_ast::Type::Bool],
-            vec![
-                constant_of(0, typed_ast::Type::Bool, 1),
-                store(0, 0),
-                load(1, 0),
-                ret(1),
-            ]
+            vec![constant_bool(0, true), store(0, 0), load(1, 0), ret(1),]
         )),
         Err(Violation::OperandType {
             index: 3,
@@ -564,7 +536,7 @@ fn a_load_carries_its_slots_type() {
 fn a_bool_as_the_left_operand_of_a_binary_is_rejected() {
     assert_eq!(
         verify(function(vec![
-            constant_of(0, typed_ast::Type::Bool, 1),
+            constant_bool(0, true),
             constant(1, 2),
             binary(2, ast::BinOp::Add, 0, 1),
             ret(2),
@@ -584,7 +556,7 @@ fn a_bool_as_the_right_operand_of_a_binary_is_rejected() {
     assert_eq!(
         verify(function(vec![
             constant(0, 1),
-            constant_of(1, typed_ast::Type::Bool, 1),
+            constant_bool(1, true),
             binary(2, ast::BinOp::Add, 0, 1),
             ret(2),
         ])),
@@ -603,12 +575,7 @@ fn an_operand_out_of_order_is_rejected_before_its_type() {
     assert_eq!(
         verify(framed(
             1,
-            vec![
-                constant(0, 1),
-                constant_of(1, typed_ast::Type::Bool, 0),
-                store(0, 0),
-                ret(1),
-            ]
+            vec![constant(0, 1), constant_bool(1, false), store(0, 0), ret(1),]
         )),
         Err(Violation::UseOutOfOrder {
             index: 2,
@@ -692,8 +659,8 @@ fn equality_over_two_bools_is_valid() {
                 vec![],
                 vec![],
                 vec![
-                    constant_of(0, typed_ast::Type::Bool, 1),
-                    constant_of(1, typed_ast::Type::Bool, 0),
+                    constant_bool(0, true),
+                    constant_bool(1, false),
                     binary(2, op, 0, 1),
                     ret(2),
                 ]
@@ -712,8 +679,8 @@ fn ordering_two_bools_is_rejected() {
             vec![],
             vec![],
             vec![
-                constant_of(0, typed_ast::Type::Bool, 1),
-                constant_of(1, typed_ast::Type::Bool, 0),
+                constant_bool(0, true),
+                constant_bool(1, false),
                 binary(2, ast::BinOp::Lt, 0, 1),
                 ret(2),
             ]
@@ -737,7 +704,7 @@ fn comparing_a_uint64_with_a_bool_is_rejected() {
             vec![],
             vec![
                 constant(0, 1),
-                constant_of(1, typed_ast::Type::Bool, 1),
+                constant_bool(1, true),
                 binary(2, ast::BinOp::Eq, 0, 1),
                 ret(2),
             ]
@@ -761,7 +728,7 @@ fn comparing_a_bool_with_a_uint64_is_rejected() {
             vec![],
             vec![],
             vec![
-                constant_of(0, typed_ast::Type::Bool, 1),
+                constant_bool(0, true),
                 constant(1, 1),
                 binary(2, ast::BinOp::Eq, 0, 1),
                 ret(2),
@@ -785,7 +752,7 @@ fn an_equality_without_enough_live_values_is_rejected() {
             vec![],
             vec![],
             vec![
-                constant_of(0, typed_ast::Type::Bool, 1),
+                constant_bool(0, true),
                 binary(1, ast::BinOp::Eq, 0, 1),
                 ret(2),
             ]
@@ -807,8 +774,8 @@ fn logic_over_two_bools_is_valid() {
                 vec![],
                 vec![],
                 vec![
-                    constant_of(0, typed_ast::Type::Bool, 1),
-                    constant_of(1, typed_ast::Type::Bool, 0),
+                    constant_bool(0, true),
+                    constant_bool(1, false),
                     binary(2, op, 0, 1),
                     ret(2),
                 ]
@@ -828,7 +795,7 @@ fn a_uint64_as_an_operand_of_logic_is_rejected() {
             vec![],
             vec![
                 constant(0, 1),
-                constant_of(1, typed_ast::Type::Bool, 1),
+                constant_bool(1, true),
                 binary(2, ast::BinOp::And, 0, 1),
                 ret(2),
             ]
@@ -850,11 +817,7 @@ fn negating_a_bool_is_valid() {
             typed_ast::Type::Bool,
             vec![],
             vec![],
-            vec![
-                constant_of(0, typed_ast::Type::Bool, 1),
-                unary(1, ast::UnOp::Not, 0),
-                ret(1),
-            ]
+            vec![constant_bool(0, true), unary(1, ast::UnOp::Not, 0), ret(1),]
         )),
         Ok(())
     );
@@ -904,8 +867,8 @@ fn negating_a_value_that_is_not_on_top_is_rejected() {
             vec![],
             vec![],
             vec![
-                constant_of(0, typed_ast::Type::Bool, 1),
-                constant_of(1, typed_ast::Type::Bool, 0),
+                constant_bool(0, true),
+                constant_bool(1, false),
                 unary(2, ast::UnOp::Not, 0),
                 ret(2),
             ]
@@ -931,7 +894,7 @@ fn a_comparison_joined_by_logic_is_valid() {
                 constant(0, 1),
                 constant(1, 2),
                 binary(2, ast::BinOp::Lt, 0, 1),
-                constant_of(3, typed_ast::Type::Bool, 1),
+                constant_bool(3, true),
                 binary(4, ast::BinOp::And, 2, 3),
                 unary(5, ast::UnOp::Not, 4),
                 ret(5),

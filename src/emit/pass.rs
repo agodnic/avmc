@@ -147,7 +147,7 @@ fn opcode(inst: &ir::Inst) -> &'static str {
 /// the top of the stack, where the instructions that defined them left them.
 fn line(program: &ir::Program, inst: &ir::Inst, params: usize) -> String {
     match inst {
-        ir::Inst::Const { value, .. } => format!("{} {value}", opcode(inst)),
+        ir::Inst::Const { value, .. } => format!("{} {}", opcode(inst), value.word()),
         ir::Inst::Store { local, .. } | ir::Inst::Load { local, .. } => {
             format!("{} {}", opcode(inst), local.0)
         }

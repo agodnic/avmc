@@ -29,8 +29,7 @@ fn example_program() {
                 insts: vec![
                     ir::Inst::Const {
                         dest: ir::ValueId(0),
-                        ty: typed_ast::Type::Uint64,
-                        value: 1,
+                        value: ir::ConstValue::Uint64(1),
                         span: testing::span_of(source, "1", 0),
                     },
                     ir::Inst::Return {
@@ -52,20 +51,17 @@ fn arithmetic_lowers_in_post_order() {
         vec![
             ir::Inst::Const {
                 dest: ir::ValueId(0),
-                ty: typed_ast::Type::Uint64,
-                value: 1,
+                value: ir::ConstValue::Uint64(1),
                 span: testing::span_of(source, "1", 0),
             },
             ir::Inst::Const {
                 dest: ir::ValueId(1),
-                ty: typed_ast::Type::Uint64,
-                value: 2,
+                value: ir::ConstValue::Uint64(2),
                 span: testing::span_of(source, "2", 0),
             },
             ir::Inst::Const {
                 dest: ir::ValueId(2),
-                ty: typed_ast::Type::Uint64,
-                value: 3,
+                value: ir::ConstValue::Uint64(3),
                 span: testing::span_of(source, "3", 0),
             },
             ir::Inst::Binary {
@@ -98,14 +94,12 @@ fn parenthesised_arithmetic() {
         vec![
             ir::Inst::Const {
                 dest: ir::ValueId(0),
-                ty: typed_ast::Type::Uint64,
-                value: 1,
+                value: ir::ConstValue::Uint64(1),
                 span: testing::span_of(source, "1", 0),
             },
             ir::Inst::Const {
                 dest: ir::ValueId(1),
-                ty: typed_ast::Type::Uint64,
-                value: 2,
+                value: ir::ConstValue::Uint64(2),
                 span: testing::span_of(source, "2", 0),
             },
             ir::Inst::Binary {
@@ -117,8 +111,7 @@ fn parenthesised_arithmetic() {
             },
             ir::Inst::Const {
                 dest: ir::ValueId(3),
-                ty: typed_ast::Type::Uint64,
-                value: 3,
+                value: ir::ConstValue::Uint64(3),
                 span: testing::span_of(source, "3", 0),
             },
             ir::Inst::Binary {
@@ -133,14 +126,12 @@ fn parenthesised_arithmetic() {
             },
             ir::Inst::Const {
                 dest: ir::ValueId(5),
-                ty: typed_ast::Type::Uint64,
-                value: 4,
+                value: ir::ConstValue::Uint64(4),
                 span: testing::span_of(source, "4", 1),
             },
             ir::Inst::Const {
                 dest: ir::ValueId(6),
-                ty: typed_ast::Type::Uint64,
-                value: 5,
+                value: ir::ConstValue::Uint64(5),
                 span: testing::span_of(source, "5", 0),
             },
             ir::Inst::Binary {
@@ -181,8 +172,7 @@ fn a_boolean_literal_lowers_to_a_bool_constant() {
             insts: vec![
                 ir::Inst::Const {
                     dest: ir::ValueId(0),
-                    ty: typed_ast::Type::Bool,
-                    value: 1,
+                    value: ir::ConstValue::Bool(true),
                     span: testing::span_of(source, "true", 0),
                 },
                 ir::Inst::Return {
@@ -199,8 +189,7 @@ fn a_boolean_literal_lowers_to_a_bool_constant() {
         lower_ok(source).funcs[0].insts[0],
         ir::Inst::Const {
             dest: ir::ValueId(0),
-            ty: typed_ast::Type::Bool,
-            value: 0,
+            value: ir::ConstValue::Bool(false),
             span: testing::span_of(source, "false", 0),
         }
     );
@@ -233,8 +222,7 @@ fn the_booleans_program_lowers_to_the_frame() {
             insts: vec![
                 ir::Inst::Const {
                     dest: ir::ValueId(0),
-                    ty: typed_ast::Type::Bool,
-                    value: 1,
+                    value: ir::ConstValue::Bool(true),
                     span: literal,
                 },
                 ir::Inst::Store {
@@ -303,14 +291,12 @@ fn variables_lower_to_the_frame() {
             insts: vec![
                 ir::Inst::Const {
                     dest: ir::ValueId(0),
-                    ty: typed_ast::Type::Uint64,
-                    value: 1,
+                    value: ir::ConstValue::Uint64(1),
                     span: one,
                 },
                 ir::Inst::Const {
                     dest: ir::ValueId(1),
-                    ty: typed_ast::Type::Uint64,
-                    value: 2,
+                    value: ir::ConstValue::Uint64(2),
                     span: two,
                 },
                 ir::Inst::Binary {
@@ -338,8 +324,7 @@ fn variables_lower_to_the_frame() {
                 },
                 ir::Inst::Const {
                     dest: ir::ValueId(4),
-                    ty: typed_ast::Type::Uint64,
-                    value: 3,
+                    value: ir::ConstValue::Uint64(3),
                     span: three,
                 },
                 ir::Inst::Binary {
@@ -474,8 +459,7 @@ fn a_parameter_lowers_to_a_load() {
                     insts: vec![
                         ir::Inst::Const {
                             dest: ir::ValueId(0),
-                            ty: typed_ast::Type::Uint64,
-                            value: 1,
+                            value: ir::ConstValue::Uint64(1),
                             span: one,
                         },
                         ir::Inst::Return {
@@ -511,8 +495,7 @@ fn each_function_numbers_its_own_values() {
                     insts: vec![
                         ir::Inst::Const {
                             dest: ir::ValueId(0),
-                            ty: typed_ast::Type::Uint64,
-                            value: 1,
+                            value: ir::ConstValue::Uint64(1),
                             span: testing::span_of(source, "1", 0),
                         },
                         ir::Inst::Return {
@@ -530,8 +513,7 @@ fn each_function_numbers_its_own_values() {
                     insts: vec![
                         ir::Inst::Const {
                             dest: ir::ValueId(0),
-                            ty: typed_ast::Type::Uint64,
-                            value: 2,
+                            value: ir::ConstValue::Uint64(2),
                             span: testing::span_of(source, "2", 0),
                         },
                         ir::Inst::Return {
@@ -554,14 +536,12 @@ fn a_comparison_lowers_like_arithmetic() {
         vec![
             ir::Inst::Const {
                 dest: ir::ValueId(0),
-                ty: typed_ast::Type::Uint64,
-                value: 1,
+                value: ir::ConstValue::Uint64(1),
                 span: testing::span_of(source, "1", 0),
             },
             ir::Inst::Const {
                 dest: ir::ValueId(1),
-                ty: typed_ast::Type::Uint64,
-                value: 2,
+                value: ir::ConstValue::Uint64(2),
                 span: testing::span_of(source, "2", 0),
             },
             ir::Inst::Binary {
@@ -587,8 +567,7 @@ fn negation_lowers_after_its_operand() {
         vec![
             ir::Inst::Const {
                 dest: ir::ValueId(0),
-                ty: typed_ast::Type::Bool,
-                value: 1,
+                value: ir::ConstValue::Bool(true),
                 span: testing::span_of(source, "true", 0),
             },
             ir::Inst::Unary {
@@ -613,14 +592,12 @@ fn logic_lowers_in_post_order() {
         vec![
             ir::Inst::Const {
                 dest: ir::ValueId(0),
-                ty: typed_ast::Type::Bool,
-                value: 1,
+                value: ir::ConstValue::Bool(true),
                 span: testing::span_of(source, "true", 0),
             },
             ir::Inst::Const {
                 dest: ir::ValueId(1),
-                ty: typed_ast::Type::Bool,
-                value: 0,
+                value: ir::ConstValue::Bool(false),
                 span: testing::span_of(source, "false", 0),
             },
             ir::Inst::Binary {
@@ -694,14 +671,12 @@ fn a_call_lowers_to_its_arguments_then_a_call() {
                     insts: vec![
                         ir::Inst::Const {
                             dest: ir::ValueId(0),
-                            ty: typed_ast::Type::Uint64,
-                            value: 1,
+                            value: ir::ConstValue::Uint64(1),
                             span: one,
                         },
                         ir::Inst::Const {
                             dest: ir::ValueId(1),
-                            ty: typed_ast::Type::Uint64,
-                            value: 2,
+                            value: ir::ConstValue::Uint64(2),
                             span: two,
                         },
                         ir::Inst::Call {
@@ -787,8 +762,7 @@ fn a_call_lowers_to_its_arguments_then_a_call() {
                         },
                         ir::Inst::Const {
                             dest: ir::ValueId(1),
-                            ty: typed_ast::Type::Uint64,
-                            value: 2,
+                            value: ir::ConstValue::Uint64(2),
                             span: two_use,
                         },
                         ir::Inst::Binary {
@@ -835,14 +809,12 @@ fn a_call_inside_an_expression() {
         vec![
             ir::Inst::Const {
                 dest: ir::ValueId(0),
-                ty: typed_ast::Type::Uint64,
-                value: 1,
+                value: ir::ConstValue::Uint64(1),
                 span: one,
             },
             ir::Inst::Const {
                 dest: ir::ValueId(1),
-                ty: typed_ast::Type::Uint64,
-                value: 2,
+                value: ir::ConstValue::Uint64(2),
                 span: two,
             },
             ir::Inst::Call {
