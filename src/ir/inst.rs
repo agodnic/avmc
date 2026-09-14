@@ -114,22 +114,6 @@ pub enum Inst {
     },
 }
 
-impl Inst {
-    /// The source it came from.
-    pub fn span(&self) -> diag::Span {
-        match self {
-            Inst::Const { span, .. }
-            | Inst::Binary { span, .. }
-            | Inst::Unary { span, .. }
-            | Inst::Store { span, .. }
-            | Inst::Load { span, .. }
-            | Inst::LoadParam { span, .. }
-            | Inst::Call { span, .. }
-            | Inst::Return { span, .. } => *span,
-        }
-    }
-}
-
 /// A function's body, as instructions.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Function {
