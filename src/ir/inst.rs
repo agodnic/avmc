@@ -6,6 +6,11 @@ use crate::typed_ast;
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct ValueId(pub u32);
 
+/// A position in a function's instruction list, named so that a branch can
+/// target it. Numbered per function.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct LabelId(pub u32);
+
 /// A constant, of one of the types the language has.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ConstValue {
@@ -110,6 +115,27 @@ pub enum Inst {
         /// The value it returns.
         value: ValueId,
         /// The `return` statement it came from.
+        span: diag::Span,
+    },
+    /// Marks the position `label` names. Defines nothing.
+    Label {
+        label: LabelId,
+        /// The statement it came from.
+        span: diag::Span,
+    },
+    /// Continues at `target`.
+    Jump {
+        target: LabelId,
+        /// The statement it came from.
+        span: diag::Span,
+    },
+    /// Continues at `target` if `cond` is `false`, and at the next
+    /// instruction otherwise.
+    BranchIfZero {
+        /// The condition, consumed. A `bool`.
+        cond: ValueId,
+        target: LabelId,
+        /// The statement it came from.
         span: diag::Span,
     },
 }

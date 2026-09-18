@@ -1,4 +1,4 @@
-use super::inst::{Function, Inst, Program, ValueId};
+use super::inst::{Function, Inst, LabelId, Program, ValueId};
 use super::violation::Violation;
 use crate::ast;
 use crate::typed_ast;
@@ -7,6 +7,8 @@ use crate::typed_ast;
 /// the unit `func` belongs to, which holds the functions it calls.
 pub fn verify(program: &Program, func: &Function) -> Result<(), Violation> {
     verify_return(func)?;
+    // Collected before the walk, so that a forward branch resolves.
+    let labels = labels(func)?;
 
     if func.params.len() > typed_ast::ParamId::CAPACITY {
         return Err(Violation::TooManyParams {
@@ -78,6 +80,21 @@ pub fn verify(program: &Program, func: &Function) -> Result<(), Violation> {
             }
             Inst::Return { value, .. } => {
                 consume(&mut stack, index, &[*value], &[func.ret])?;
+                continue;
+            }
+            Inst::Label { .. } => {
+                empty(&stack, index)?;
+                continue;
+            }
+            Inst::Jump { target, .. } => {
+                defined(&labels, *target, index)?;
+                empty(&stack, index)?;
+                continue;
+            }
+            Inst::BranchIfZero { cond, target, .. } => {
+                defined(&labels, *target, index)?;
+                consume(&mut stack, index, &[*cond], &[typed_ast::Type::Bool])?;
+                empty(&stack, index)?;
                 continue;
             }
         };
@@ -189,12 +206,56 @@ fn callee_of(
         .ok_or(Violation::UnknownCallee { index, callee })
 }
 
-/// Checks that the last instruction is a `Return`, and no other one is.
-fn verify_return(func: &Function) -> Result<(), Violation> {
-    let last = func.insts.len().checked_sub(1);
+/// Checks that nothing is live at `index`: every path reaching a label must
+/// agree on what the stack holds, and the empty stack is the one they share.
+fn empty(stack: &[(ValueId, typed_ast::Type)], index: usize) -> Result<(), Violation> {
+    if stack.is_empty() {
+        return Ok(());
+    }
+    Err(Violation::ValuesLiveAcrossBranch {
+        index,
+        count: stack.len(),
+    })
+}
+
+/// Checks that `target` is a label the function defines.
+fn defined(labels: &[LabelId], target: LabelId, index: usize) -> Result<(), Violation> {
+    if labels.contains(&target) {
+        return Ok(());
+    }
+    Err(Violation::UndefinedLabel {
+        index,
+        label: target,
+    })
+}
+
+/// The labels the function defines, rejecting one it defines twice.
+fn labels(func: &Function) -> Result<Vec<LabelId>, Violation> {
+    let mut labels = Vec::new();
     for (index, inst) in func.insts.iter().enumerate() {
-        if matches!(inst, Inst::Return { .. }) && Some(index) != last {
-            return Err(Violation::ReturnNotLast { index });
+        let Inst::Label { label, .. } = inst else {
+            continue;
+        };
+        if labels.contains(label) {
+            return Err(Violation::DuplicateLabel {
+                index,
+                label: *label,
+            });
+        }
+        labels.push(*label);
+    }
+    Ok(labels)
+}
+
+/// Checks that the last instruction is a `Return`, and that nothing follows a
+/// `Return` or a `Jump` but a `Label`. Together these leave no way to run off
+/// the end of a function.
+fn verify_return(func: &Function) -> Result<(), Violation> {
+    let pairs = func.insts.iter().zip(func.insts.iter().skip(1));
+    for (index, (before, after)) in pairs.enumerate() {
+        let ends_a_path = matches!(before, Inst::Return { .. } | Inst::Jump { .. });
+        if ends_a_path && !matches!(after, Inst::Label { .. }) {
+            return Err(Violation::DeadCode { index: index + 1 });
         }
     }
     match func.insts.last() {

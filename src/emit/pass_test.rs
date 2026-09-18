@@ -112,6 +112,28 @@ fn load_param(dest: u32, param: u8) -> ir::Inst {
     }
 }
 
+fn label(n: u32) -> ir::Inst {
+    ir::Inst::Label {
+        label: ir::LabelId(n),
+        span: ZERO,
+    }
+}
+
+fn jump(n: u32) -> ir::Inst {
+    ir::Inst::Jump {
+        target: ir::LabelId(n),
+        span: ZERO,
+    }
+}
+
+fn branch_if_zero(cond: u32, n: u32) -> ir::Inst {
+    ir::Inst::BranchIfZero {
+        cond: ir::ValueId(cond),
+        target: ir::LabelId(n),
+        span: ZERO,
+    }
+}
+
 fn ret(value: u32) -> ir::Inst {
     ir::Inst::Return {
         value: ir::ValueId(value),
@@ -122,6 +144,85 @@ fn ret(value: u32) -> ir::Inst {
 /// `var x uint64 = 1; return x`, as the next slice will lower it.
 fn one_slot() -> Vec<ir::Inst> {
     vec![constant(0, 1), store(0, 0), load(1, 0), ret(1)]
+}
+
+/// A branch over a return, as the verifier's
+/// `a_forward_branch_over_a_return_is_valid` builds it.
+fn forward_branch() -> Vec<ir::Inst> {
+    vec![
+        constant_bool(0, true),
+        branch_if_zero(0, 0),
+        constant(1, 1),
+        ret(1),
+        label(0),
+        constant(2, 2),
+        ret(2),
+    ]
+}
+
+/// Two paths joined by a jump, as the verifier's `a_jump_joins_two_paths`
+/// builds it.
+fn joined_paths() -> Vec<ir::Inst> {
+    vec![
+        constant_bool(0, true),
+        branch_if_zero(0, 0),
+        constant(1, 10),
+        store(0, 1),
+        jump(1),
+        label(0),
+        constant(2, 20),
+        store(0, 2),
+        label(1),
+        load(3, 0),
+        ret(3),
+    ]
+}
+
+#[test]
+fn a_branch_and_its_label_name_the_function() {
+    assert_eq!(
+        hand_built(typed_ast::Type::Uint64, vec![], forward_branch()),
+        "#pragma version 13\n\
+         callsub approval\n\
+         return\n\
+         approval:\n\
+         proto 0 1\n\
+         pushint 1\n\
+         bz approval@0\n\
+         pushint 1\n\
+         retsub\n\
+         approval@0:\n\
+         pushint 2\n\
+         retsub\n"
+    );
+}
+
+#[test]
+fn a_jump_emits_b() {
+    assert_eq!(
+        hand_built(
+            typed_ast::Type::Uint64,
+            vec![typed_ast::Type::Uint64],
+            joined_paths()
+        ),
+        "#pragma version 13\n\
+         callsub approval\n\
+         return\n\
+         approval:\n\
+         proto 0 1\n\
+         pushint 0\n\
+         pushint 1\n\
+         bz approval@0\n\
+         pushint 10\n\
+         frame_bury 0\n\
+         b approval@1\n\
+         approval@0:\n\
+         pushint 20\n\
+         frame_bury 0\n\
+         approval@1:\n\
+         frame_dig 0\n\
+         retsub\n"
+    );
 }
 
 #[test]

@@ -1,4 +1,4 @@
-use super::inst::ValueId;
+use super::inst::{LabelId, ValueId};
 use crate::typed_ast;
 
 /// A way a function can fail the IR invariants.
@@ -39,13 +39,36 @@ pub enum Violation {
         /// How many of them there are.
         count: usize,
     },
-    /// An instruction returns without being the last one.
-    ReturnNotLast {
+    /// An instruction follows a `Return` or a `Jump` without being a `Label`,
+    /// so nothing can reach it.
+    DeadCode {
         /// The offending instruction's position.
         index: usize,
     },
     /// The function's last instruction is not a `Return`.
     MissingReturn,
+    /// Two instructions define the same label.
+    DuplicateLabel {
+        /// The second definition's position.
+        index: usize,
+        /// The label they both define.
+        label: LabelId,
+    },
+    /// An instruction targets a label nothing defines.
+    UndefinedLabel {
+        /// The offending instruction's position.
+        index: usize,
+        /// The label it names.
+        label: LabelId,
+    },
+    /// Values are live where a branch joins or leaves, so the paths meeting
+    /// there disagree on what the stack holds.
+    ValuesLiveAcrossBranch {
+        /// The offending instruction's position.
+        index: usize,
+        /// How many values are live.
+        count: usize,
+    },
     /// The frame holds more slots than one can address.
     FrameTooLarge {
         /// How many slots it holds.
@@ -132,13 +155,28 @@ impl std::fmt::Display for Violation {
                 f,
                 "consumed in stack order: {count} values are left unconsumed"
             ),
-            Violation::ReturnNotLast { index } => write!(
+            Violation::DeadCode { index } => write!(
                 f,
-                "ends with `Return`: instruction {index} returns but is not the last"
+                "ends with `Return`: instruction {index} follows a `Return` or a `Jump` and is \
+                 not a `Label`"
             ),
             Violation::MissingReturn => write!(
                 f,
                 "ends with `Return`: the function does not end with a return"
+            ),
+            Violation::DuplicateLabel { index, label } => write!(
+                f,
+                "labels resolve: instruction {index} defines L{} again",
+                label.0
+            ),
+            Violation::UndefinedLabel { index, label } => write!(
+                f,
+                "labels resolve: instruction {index} names L{}, which nothing defines",
+                label.0
+            ),
+            Violation::ValuesLiveAcrossBranch { index, count } => write!(
+                f,
+                "nothing live across a branch: instruction {index} has {count} values live"
             ),
             Violation::FrameTooLarge { count } => write!(
                 f,

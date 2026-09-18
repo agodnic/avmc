@@ -69,7 +69,7 @@ pub(super) fn function(program: &ir::Program, func: &ir::Function) -> String {
         teal.push('\n');
     }
     for inst in &func.insts {
-        teal.push_str(&line(program, inst, params));
+        teal.push_str(&line(program, func, inst));
         teal.push('\n');
     }
     teal
@@ -110,54 +110,61 @@ fn entry_point(program: &ir::Program, diags: &mut diag::Sink) -> Option<usize> {
     Some(index)
 }
 
-/// The opcode an instruction emits.
-fn opcode(inst: &ir::Inst) -> &'static str {
-    match inst {
-        ir::Inst::Const { .. } => "pushint",
-        ir::Inst::Binary { op, .. } => match op {
-            ast::BinOp::Add => "+",
-            ast::BinOp::Sub => "-",
-            ast::BinOp::Mul => "*",
-            ast::BinOp::Div => "/",
-            ast::BinOp::Mod => "%",
-            ast::BinOp::Eq => "==",
-            ast::BinOp::Ne => "!=",
-            ast::BinOp::Lt => "<",
-            ast::BinOp::Le => "<=",
-            ast::BinOp::Gt => ">",
-            ast::BinOp::Ge => ">=",
-            ast::BinOp::And => "&&",
-            ast::BinOp::Or => "||",
-        },
-        ir::Inst::Unary { op, .. } => match op {
-            ast::UnOp::Not => "!",
-        },
-        ir::Inst::Call { .. } => "callsub",
-        ir::Inst::Store { .. } => "frame_bury",
-        ir::Inst::Load { .. } | ir::Inst::LoadParam { .. } => "frame_dig",
-        ir::Inst::Return { .. } => "retsub",
+/// The opcode a binary operator emits.
+fn binary_opcode(op: ast::BinOp) -> &'static str {
+    match op {
+        ast::BinOp::Add => "+",
+        ast::BinOp::Sub => "-",
+        ast::BinOp::Mul => "*",
+        ast::BinOp::Div => "/",
+        ast::BinOp::Mod => "%",
+        ast::BinOp::Eq => "==",
+        ast::BinOp::Ne => "!=",
+        ast::BinOp::Lt => "<",
+        ast::BinOp::Le => "<=",
+        ast::BinOp::Gt => ">",
+        ast::BinOp::Ge => ">=",
+        ast::BinOp::And => "&&",
+        ast::BinOp::Or => "||",
     }
 }
 
-/// The line an instruction emits, without its terminator. `params` is how
-/// many parameters the enclosing function takes, and `program` names the
-/// function a call calls.
+/// The opcode a prefix operator emits.
+fn unary_opcode(op: ast::UnOp) -> &'static str {
+    match op {
+        ast::UnOp::Not => "!",
+    }
+}
+
+/// The name a label carries in the TEAL text: the function's, `@`, and the
+/// label number. `@` cannot occur in an identifier, so this never collides
+/// with a function's own label.
+fn label_name(func: &ir::Function, label: ir::LabelId) -> String {
+    format!("{}@{}", func.name, label.0)
+}
+
+/// The line an instruction emits, without its terminator. `func` is the
+/// function it belongs to, and `program` names the function a call calls.
 ///
 /// `ValueId`s are not consulted: every instruction consumes its operands from
 /// the top of the stack, where the instructions that defined them left them.
-fn line(program: &ir::Program, inst: &ir::Inst, params: usize) -> String {
+fn line(program: &ir::Program, func: &ir::Function, inst: &ir::Inst) -> String {
     match inst {
-        ir::Inst::Const { value, .. } => format!("{} {}", opcode(inst), value.word()),
-        ir::Inst::Store { local, .. } | ir::Inst::Load { local, .. } => {
-            format!("{} {}", opcode(inst), local.0)
-        }
+        ir::Inst::Const { value, .. } => format!("pushint {}", value.word()),
+        ir::Inst::Binary { op, .. } => binary_opcode(*op).to_string(),
+        ir::Inst::Unary { op, .. } => unary_opcode(*op).to_string(),
+        ir::Inst::Store { local, .. } => format!("frame_bury {}", local.0),
+        ir::Inst::Load { local, .. } => format!("frame_dig {}", local.0),
         ir::Inst::LoadParam { param, .. } => {
-            format!("{} {}", opcode(inst), offset(*param, params))
+            format!("frame_dig {}", offset(*param, func.params.len()))
         }
-        ir::Inst::Call { .. } => format!("{} {}", opcode(inst), callee_name(program, inst)),
-        ir::Inst::Binary { .. } | ir::Inst::Unary { .. } | ir::Inst::Return { .. } => {
-            opcode(inst).to_string()
-        }
+        ir::Inst::Call { .. } => format!("callsub {}", callee_name(program, inst)),
+        ir::Inst::Return { .. } => "retsub".to_string(),
+        // A label is a position, not an opcode: it names the line that
+        // follows it.
+        ir::Inst::Label { label, .. } => format!("{}:", label_name(func, *label)),
+        ir::Inst::Jump { target, .. } => format!("b {}", label_name(func, *target)),
+        ir::Inst::BranchIfZero { target, .. } => format!("bz {}", label_name(func, *target)),
     }
 }
 
