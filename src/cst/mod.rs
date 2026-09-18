@@ -8,4 +8,4 @@ mod node;
 mod node_test;
 
 pub use flatten::tokens;
-pub use node::{Arg, Block, Expr, FuncDecl, Param, Program, Stmt};
+pub use node::{Arg, Block, Expr, FuncDecl, IfStmt, Param, Program, Stmt};

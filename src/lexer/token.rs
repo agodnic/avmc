@@ -9,6 +9,8 @@ pub enum TokenKind {
     Return,
     /// The keyword `var`.
     Var,
+    /// The keyword `if`.
+    If,
     /// The keyword `true`.
     True,
     /// The keyword `false`.

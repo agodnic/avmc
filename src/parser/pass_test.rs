@@ -279,17 +279,152 @@ fn a_declaration_without_an_initializer_is_reported() {
 }
 
 #[test]
-fn a_statement_must_start_with_var_or_return() {
+fn a_statement_must_start_with_var_if_or_return() {
     let source = "func f() uint64 { 1 }";
     let mut span = testing::spans(source);
     assert_eq!(
         parse_err(source),
         diag::Entry {
             kind: diag::Kind::UnexpectedToken {
-                expected: "`var`, `return` or `}`",
+                expected: "`var`, `if`, `return` or `}`",
                 found: "an integer literal",
             },
             span: span("1"),
+        }
+    );
+}
+
+/// The first statement of `source`'s single function.
+fn first_stmt(source: &str) -> ast::Stmt {
+    let mut funcs = parse_ok(source).funcs.into_iter();
+    let func = funcs.next().expect("one function");
+    assert!(funcs.next().is_none());
+    func.body.into_iter().next().expect("a statement")
+}
+
+#[test]
+fn parses_an_if_statement() {
+    let source = "func f() uint64 { if x { return 1 } }";
+    let mut span = testing::spans(source);
+
+    let start = span("if").start;
+    let cond = span("x");
+    let return_start = span("return").start;
+    let literal = span("1");
+    let inner_end = span("}").end;
+    let end = span("}").end;
+
+    assert_eq!(
+        first_stmt(source),
+        ast::Stmt::If(ast::IfStmt {
+            cond: ast::Expr::Var {
+                name: testing::name("x", cond),
+                span: cond,
+            },
+            then: vec![ast::Stmt::Return {
+                expr: ast::Expr::IntLit {
+                    value: 1,
+                    span: literal,
+                },
+                span: diag::Span {
+                    start: return_start,
+                    end: literal.end,
+                },
+            }],
+            span: diag::Span {
+                start,
+                end: inner_end,
+            },
+        })
+    );
+    // The `if` ends at its own `}`, not the function's.
+    assert_ne!(inner_end, end);
+}
+
+#[test]
+fn an_if_body_may_be_empty() {
+    let source = "func f() uint64 { if x { } return 1 }";
+    let ast::Stmt::If(stmt) = first_stmt(source) else {
+        panic!("an if statement")
+    };
+    assert_eq!(stmt.then, vec![]);
+}
+
+#[test]
+fn if_statements_nest() {
+    let source = "func f() uint64 { if x { if y { return 1 } } return 2 }";
+    let ast::Stmt::If(outer) = first_stmt(source) else {
+        panic!("an if statement")
+    };
+    let [ast::Stmt::If(inner)] = outer.then.as_slice() else {
+        panic!("a nested if statement")
+    };
+    assert!(matches!(inner.cond, ast::Expr::Var { .. }));
+    assert_eq!(inner.then.len(), 1);
+}
+
+#[test]
+fn a_parenthesized_condition_is_the_expression() {
+    let parenthesized = "func f() uint64 { if (x) { return 1 } }";
+    let plain = "func f() uint64 { if x { return 1 } }";
+    // Parentheses are not a node, so only the spans differ.
+    let (ast::Stmt::If(parenthesized), ast::Stmt::If(plain)) =
+        (first_stmt(parenthesized), first_stmt(plain))
+    else {
+        panic!("two if statements")
+    };
+    let named = |cond| match cond {
+        ast::Expr::Var { name, .. } => name.text,
+        _ => panic!("a variable"),
+    };
+    assert_eq!(named(parenthesized.cond), "x");
+    assert_eq!(named(plain.cond), "x");
+}
+
+#[test]
+fn an_if_needs_a_block() {
+    let source = "func f() uint64 { if x == 1 return 1 }";
+    assert_eq!(
+        parse_err(source),
+        diag::Entry {
+            kind: diag::Kind::UnexpectedToken {
+                expected: "`{`",
+                found: "`return`",
+            },
+            span: testing::span_of(source, "return", 0),
+        }
+    );
+}
+
+#[test]
+fn an_if_needs_a_condition() {
+    let source = "func f() uint64 { if { return 1 } }";
+    assert_eq!(
+        parse_err(source),
+        diag::Entry {
+            kind: diag::Kind::UnexpectedToken {
+                expected: pass::OPERAND,
+                found: "`{`",
+            },
+            span: testing::span_of(source, "{", 1),
+        }
+    );
+}
+
+#[test]
+fn an_unterminated_if_is_reported_at_end_of_input() {
+    let source = "func f() uint64 { if x > 1 { return 1";
+    assert_eq!(
+        parse_err(source),
+        diag::Entry {
+            kind: diag::Kind::UnexpectedToken {
+                expected: "`var`, `if`, `return` or `}`",
+                found: "end of input",
+            },
+            span: diag::Span {
+                start: source.len(),
+                end: source.len(),
+            },
         }
     );
 }
@@ -996,7 +1131,7 @@ fn an_unterminated_body_is_reported_at_end_of_input() {
         parse_err(source),
         diag::Entry {
             kind: diag::Kind::UnexpectedToken {
-                expected: "`var`, `return` or `}`",
+                expected: "`var`, `if`, `return` or `}`",
                 found: "end of input",
             },
             span: diag::Span {

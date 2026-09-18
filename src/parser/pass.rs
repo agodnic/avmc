@@ -96,10 +96,26 @@ impl Parser<'_> {
         if self.peek_kind() == Some(lexer::TokenKind::Var) {
             return self.var_stmt();
         }
+        if self.peek_kind() == Some(lexer::TokenKind::If) {
+            return self.if_stmt();
+        }
 
-        let ret = self.expect(lexer::TokenKind::Return, "`var`, `return` or `}`")?;
+        let ret = self.expect(lexer::TokenKind::Return, "`var`, `if`, `return` or `}`")?;
         let expr = self.expr(None)?;
         Some(cst::Stmt::Return { ret, expr })
+    }
+
+    /// `if cond { then }`. The condition needs no parentheses: it ends at the
+    /// `{`, which is no operator.
+    fn if_stmt(&mut self) -> Option<cst::Stmt> {
+        let keyword = self.expect(lexer::TokenKind::If, "`if`")?;
+        let cond = self.expr(None)?;
+        let then = self.block()?;
+        Some(cst::Stmt::If(cst::IfStmt {
+            keyword,
+            cond,
+            then,
+        }))
     }
 
     /// `var name type = init`.
@@ -313,6 +329,7 @@ fn describe(kind: lexer::TokenKind) -> &'static str {
         lexer::TokenKind::Func => "`func`",
         lexer::TokenKind::Return => "`return`",
         lexer::TokenKind::Var => "`var`",
+        lexer::TokenKind::If => "`if`",
         lexer::TokenKind::True => "`true`",
         lexer::TokenKind::False => "`false`",
         lexer::TokenKind::Ident => "an identifier",

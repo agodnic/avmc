@@ -29,6 +29,44 @@ const RECURSION: &str = "func approval() uint64 {\n\treturn f(1)\n}\n\n\
                          func f(n uint64) uint64 {\n\treturn g(n)\n}\n\n\
                          func g(n uint64) uint64 {\n\treturn f(n)\n}\n";
 
+/// The example program of the `if` milestone.
+const IF: &str = "func approval() uint64 {\n\tvar x uint64 = 3\n\tif x > 2 {\n\t\t\
+                  var y uint64 = x * 2\n\t\treturn y\n\t}\n\treturn x\n}\n";
+
+#[test]
+fn the_if_program_compiles() {
+    let mut diags = diag::Sink::default();
+    assert_eq!(
+        compile(IF, &mut diags),
+        Some(
+            "#pragma version 13\n\
+             callsub approval\n\
+             return\n\
+             approval:\n\
+             proto 0 1\n\
+             pushint 0\n\
+             pushint 0\n\
+             pushint 3\n\
+             frame_bury 0\n\
+             frame_dig 0\n\
+             pushint 2\n\
+             >\n\
+             bz approval@0\n\
+             frame_dig 0\n\
+             pushint 2\n\
+             *\n\
+             frame_bury 1\n\
+             frame_dig 1\n\
+             retsub\n\
+             approval@0:\n\
+             frame_dig 0\n\
+             retsub\n"
+                .to_string()
+        )
+    );
+    assert!(diags.is_empty());
+}
+
 #[test]
 fn example_program_compiles() {
     let mut diags = diag::Sink::default();

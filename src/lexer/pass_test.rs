@@ -156,10 +156,32 @@ fn empty_input_produces_only_the_end_of_input_token() {
 
 #[test]
 fn keyword_prefixes_are_identifiers() {
-    let source = "func_ returns";
+    let source = "func_ returns iff if_ If";
     let expected = spans(
         source,
-        &[(TokenKind::Ident, "func_"), (TokenKind::Ident, "returns")],
+        &[
+            (TokenKind::Ident, "func_"),
+            (TokenKind::Ident, "returns"),
+            (TokenKind::Ident, "iff"),
+            (TokenKind::Ident, "if_"),
+            (TokenKind::Ident, "If"),
+        ],
+    );
+    assert_eq!(lex_ok(source), expected);
+}
+
+#[test]
+fn lexes_the_if_keyword() {
+    let source = "if x > 1 {";
+    let expected = spans(
+        source,
+        &[
+            (TokenKind::If, "if"),
+            (TokenKind::Ident, "x"),
+            (TokenKind::Gt, ">"),
+            (TokenKind::IntLit, "1"),
+            (TokenKind::LBrace, "{"),
+        ],
     );
     assert_eq!(lex_ok(source), expected);
 }

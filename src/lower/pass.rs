@@ -20,36 +20,24 @@ pub fn lower(program: &typed_ast::Program, _diags: &mut diag::Sink) -> Option<ir
     Some(lowered)
 }
 
-/// Lowers one function. `ValueId`s restart at 0.
+/// Lowers one function. `ValueId`s and `LabelId`s restart at 0.
 fn lower_func(func: &typed_ast::FuncDecl) -> ir::Function {
     let mut insts = Vec::new();
-    // The frame, which grows with every declaration the body walks past.
+    // The frame, which grows with every declaration the body walks past, in
+    // the order the checker numbered them.
     let mut locals = Vec::new();
     // The number of values defined so far, which keeps definitions dense.
     let mut next_value = 0;
+    // The number of labels made so far.
+    let mut next_label = 0;
 
-    for stmt in &func.body {
-        match stmt {
-            typed_ast::Stmt::Var {
-                local,
-                ty,
-                init,
-                span,
-            } => {
-                let value = lower_expr(init, &mut insts, &mut next_value);
-                insts.push(ir::Inst::Store {
-                    local: *local,
-                    value,
-                    span: *span,
-                });
-                locals.push(*ty);
-            }
-            typed_ast::Stmt::Return { expr, span } => {
-                let value = lower_expr(expr, &mut insts, &mut next_value);
-                insts.push(ir::Inst::Return { value, span: *span });
-            }
-        }
-    }
+    lower_block(
+        &func.body,
+        &mut insts,
+        &mut locals,
+        &mut next_value,
+        &mut next_label,
+    );
 
     ir::Function {
         name: func.name.text.clone(),
@@ -58,6 +46,55 @@ fn lower_func(func: &typed_ast::FuncDecl) -> ir::Function {
         locals,
         insts,
         span: func.span,
+    }
+}
+
+/// Lowers a block's statements in order, recursing into the block of an `if`:
+/// its declarations take frame slots of their own, after the ones before it.
+fn lower_block(
+    stmts: &[typed_ast::Stmt],
+    insts: &mut Vec<ir::Inst>,
+    locals: &mut Vec<typed_ast::Type>,
+    next_value: &mut u32,
+    next_label: &mut u32,
+) {
+    for stmt in stmts {
+        match stmt {
+            typed_ast::Stmt::Var {
+                local,
+                ty,
+                init,
+                span,
+            } => {
+                let value = lower_expr(init, insts, next_value);
+                insts.push(ir::Inst::Store {
+                    local: *local,
+                    value,
+                    span: *span,
+                });
+                locals.push(*ty);
+            }
+            typed_ast::Stmt::Return { expr, span } => {
+                let value = lower_expr(expr, insts, next_value);
+                insts.push(ir::Inst::Return { value, span: *span });
+            }
+            // The block runs when the condition holds, so the branch skips it
+            // when the condition is false, landing on the label after it.
+            typed_ast::Stmt::If(stmt) => {
+                let cond = lower_expr(&stmt.cond, insts, next_value);
+                let target = next_label_id(next_label);
+                insts.push(ir::Inst::BranchIfZero {
+                    cond,
+                    target,
+                    span: stmt.span,
+                });
+                lower_block(&stmt.then, insts, locals, next_value, next_label);
+                insts.push(ir::Inst::Label {
+                    label: target,
+                    span: stmt.span,
+                });
+            }
+        }
     }
 }
 
@@ -151,4 +188,11 @@ fn next_value_id(next_value: &mut u32) -> ir::ValueId {
     let dest = ir::ValueId(*next_value);
     *next_value += 1;
     dest
+}
+
+/// The next `LabelId`, advancing `next_label` past it.
+fn next_label_id(next_label: &mut u32) -> ir::LabelId {
+    let label = ir::LabelId(*next_label);
+    *next_label += 1;
+    label
 }
