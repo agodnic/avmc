@@ -43,7 +43,7 @@ impl Parser<'_> {
         let lparen = self.expect(lexer::TokenKind::LParen, "`(`")?;
         let (params, rparen) = self.params()?;
         let ret = self.name()?;
-        let body = self.block()?;
+        let body = self.block("`{`")?;
 
         Some(cst::FuncDecl {
             func,
@@ -56,9 +56,10 @@ impl Parser<'_> {
         })
     }
 
-    /// `{ stmts }`.
-    fn block(&mut self) -> Option<cst::Block> {
-        let lbrace = self.expect(lexer::TokenKind::LBrace, "`{`")?;
+    /// `{ stmts }`. `expected` describes what the grammar allows in place of
+    /// the `{`, which after an `else` is an `if` as well.
+    fn block(&mut self, expected: &'static str) -> Option<cst::Block> {
+        let lbrace = self.expect(lexer::TokenKind::LBrace, expected)?;
 
         let mut stmts = Vec::new();
         while self.peek_kind() != Some(lexer::TokenKind::RBrace) {
@@ -105,17 +106,43 @@ impl Parser<'_> {
         Some(cst::Stmt::Return { ret, expr })
     }
 
-    /// `if cond { then }`. The condition needs no parentheses: it ends at the
-    /// `{`, which is no operator.
     fn if_stmt(&mut self) -> Option<cst::Stmt> {
+        Some(cst::Stmt::If(self.if_parts()?))
+    }
+
+    /// `if cond { then } else ...`. The condition needs no parentheses: it
+    /// ends at the `{`, which is no operator.
+    fn if_parts(&mut self) -> Option<cst::IfStmt> {
         let keyword = self.expect(lexer::TokenKind::If, "`if`")?;
         let cond = self.expr(None)?;
-        let then = self.block()?;
-        Some(cst::Stmt::If(cst::IfStmt {
+        let then = self.block("`{`")?;
+        let else_branch = match self.consume(lexer::TokenKind::Else) {
+            None => None,
+            Some(keyword) => Some(self.else_branch(keyword)?),
+        };
+
+        Some(cst::IfStmt {
             keyword,
             cond,
             then,
-        }))
+            else_branch,
+        })
+    }
+
+    /// What follows an `if` statement's block, the `else` already consumed.
+    /// Go asks for `else` on the `}` line; here newlines are trivia, so it
+    /// may start the next one.
+    fn else_branch(&mut self, keyword: lexer::Token) -> Option<cst::Else> {
+        if self.peek_kind() == Some(lexer::TokenKind::If) {
+            let stmt = self.if_parts()?;
+            return Some(cst::Else::If {
+                keyword,
+                stmt: Box::new(stmt),
+            });
+        }
+
+        let block = self.block("`{` or `if`")?;
+        Some(cst::Else::Block { keyword, block })
     }
 
     /// `var name type = init`.
@@ -330,6 +357,7 @@ fn describe(kind: lexer::TokenKind) -> &'static str {
         lexer::TokenKind::Return => "`return`",
         lexer::TokenKind::Var => "`var`",
         lexer::TokenKind::If => "`if`",
+        lexer::TokenKind::Else => "`else`",
         lexer::TokenKind::True => "`true`",
         lexer::TokenKind::False => "`false`",
         lexer::TokenKind::Ident => "an identifier",

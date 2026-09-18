@@ -1882,6 +1882,7 @@ fn checks_the_if_program() {
                                 },
                             },
                         ],
+                        else_branch: None,
                         span: diag::Span {
                             start: if_start,
                             end: if_end,
@@ -2001,8 +2002,17 @@ fn slots(program: &typed_ast::Program) -> Vec<typed_ast::LocalId> {
             match stmt {
                 typed_ast::Stmt::Var { local, .. } => found.push(*local),
                 typed_ast::Stmt::Return { .. } => {}
-                typed_ast::Stmt::If(stmt) => walk(&stmt.then, found),
+                typed_ast::Stmt::If(stmt) => walk_if(stmt, found),
             }
+        }
+    }
+
+    fn walk_if(stmt: &typed_ast::IfStmt, found: &mut Vec<typed_ast::LocalId>) {
+        walk(&stmt.then, found);
+        match &stmt.else_branch {
+            None => {}
+            Some(typed_ast::Else::Block(stmts)) => walk(stmts, found),
+            Some(typed_ast::Else::If(stmt)) => walk_if(stmt, found),
         }
     }
 
@@ -2098,6 +2108,218 @@ fn an_if_after_a_return_is_unreachable() {
             kind: diag::Kind::UnreachableStatement,
             span: testing::span_of(&source, "if true { return 2 }", 0),
         }]
+    );
+}
+
+/// The example program of the `else` milestone.
+const ELSE: &str = "func approval() uint64 {\n\tvar x uint64 = 3\n\tif x > 5 {\n\t\t\
+                    return 2\n\t} else if x > 2 {\n\t\treturn 1\n\t} else {\n\t\t\
+                    return 0\n\t}\n}\n";
+
+#[test]
+fn checks_the_else_program() {
+    let source = ELSE;
+    let mut span = testing::spans(source);
+
+    let start = span("func").start;
+    let func_name = testing::name("approval", span("approval"));
+    span("uint64");
+
+    let x_decl_start = span("var").start;
+    span("x");
+    span("uint64");
+    let three = span("3");
+
+    let if_start = span("if").start;
+    let x_gt_five = span("x");
+    let five = span("5");
+    let return_two_start = span("return").start;
+    let two = span("2");
+    span("}");
+
+    let else_if_start = span("if").start;
+    let x_gt_two = span("x");
+    let two_cond = span("2");
+    let return_one_start = span("return").start;
+    let one = span("1");
+    span("}");
+
+    let return_zero_start = span("return").start;
+    let zero = span("0");
+    // Both `if` statements run through the `}` of the last `else`.
+    let if_end = span("}").end;
+    let end = span("}").end;
+
+    let uint64 = |kind, span| typed_ast::Expr {
+        kind,
+        ty: typed_ast::Type::Uint64,
+        span,
+    };
+    let greater = |left: diag::Span, right: diag::Span, lhs, rhs| typed_ast::Expr {
+        kind: typed_ast::ExprKind::Binary {
+            op: ast::BinOp::Gt,
+            lhs: Box::new(uint64(lhs, left)),
+            rhs: Box::new(uint64(rhs, right)),
+        },
+        ty: typed_ast::Type::Bool,
+        span: diag::Span {
+            start: left.start,
+            end: right.end,
+        },
+    };
+    let returns = |start: usize, literal: diag::Span, value| typed_ast::Stmt::Return {
+        expr: uint64(typed_ast::ExprKind::IntLit(value), literal),
+        span: diag::Span {
+            start,
+            end: literal.end,
+        },
+    };
+
+    assert_eq!(
+        check_ok(source),
+        typed_ast::Program {
+            funcs: vec![typed_ast::FuncDecl {
+                name: func_name,
+                params: vec![],
+                ret: typed_ast::Type::Uint64,
+                body: vec![
+                    typed_ast::Stmt::Var {
+                        local: typed_ast::LocalId(0),
+                        ty: typed_ast::Type::Uint64,
+                        init: uint64(typed_ast::ExprKind::IntLit(3), three),
+                        span: diag::Span {
+                            start: x_decl_start,
+                            end: three.end,
+                        },
+                    },
+                    typed_ast::Stmt::If(typed_ast::IfStmt {
+                        cond: greater(
+                            x_gt_five,
+                            five,
+                            typed_ast::ExprKind::Var(typed_ast::LocalId(0)),
+                            typed_ast::ExprKind::IntLit(5),
+                        ),
+                        then: vec![returns(return_two_start, two, 2)],
+                        else_branch: Some(typed_ast::Else::If(Box::new(typed_ast::IfStmt {
+                            cond: greater(
+                                x_gt_two,
+                                two_cond,
+                                typed_ast::ExprKind::Var(typed_ast::LocalId(0)),
+                                typed_ast::ExprKind::IntLit(2),
+                            ),
+                            then: vec![returns(return_one_start, one, 1)],
+                            else_branch: Some(typed_ast::Else::Block(vec![returns(
+                                return_zero_start,
+                                zero,
+                                0
+                            )])),
+                            span: diag::Span {
+                                start: else_if_start,
+                                end: if_end,
+                            },
+                        }))),
+                        span: diag::Span {
+                            start: if_start,
+                            end: if_end,
+                        },
+                    }),
+                ],
+                span: diag::Span { start, end },
+            }]
+        }
+    );
+}
+
+#[test]
+fn an_if_whose_arms_both_return_terminates() {
+    let source = wrap("if true { return 1 } else { return 2 }");
+    check_ok(&source);
+}
+
+#[test]
+fn an_if_whose_else_does_not_return_does_not_terminate() {
+    let source = wrap("if true { return 1 } else { var x uint64 = 2 }");
+    assert_eq!(
+        check_err(&source),
+        vec![diag::Entry {
+            kind: diag::Kind::MissingReturn,
+            span: testing::span_of(&source, "approval", 0),
+        }]
+    );
+}
+
+#[test]
+fn an_else_if_chain_without_a_final_else_does_not_terminate() {
+    let source = wrap("if true { return 1 } else if false { return 2 }");
+    assert_eq!(
+        check_err(&source),
+        vec![diag::Entry {
+            kind: diag::Kind::MissingReturn,
+            span: testing::span_of(&source, "approval", 0),
+        }]
+    );
+}
+
+#[test]
+fn a_statement_after_a_terminating_if_is_unreachable() {
+    let source = wrap("if true { return 1 } else { return 2 } return 3");
+    assert_eq!(
+        check_err(&source),
+        vec![diag::Entry {
+            kind: diag::Kind::UnreachableStatement,
+            span: testing::span_of(&source, "return 3", 0),
+        }]
+    );
+}
+
+#[test]
+fn the_else_block_has_its_own_scope() {
+    let source = wrap("if true { var y uint64 = 1 return y } else { return y }");
+    assert_eq!(
+        check_err(&source),
+        vec![diag::Entry {
+            kind: diag::Kind::UndefinedVariable {
+                name: "y".to_string(),
+            },
+            span: testing::span_of(&source, "y", 2),
+        }]
+    );
+
+    // Each arm may declare the name, and the two take distinct slots.
+    let sibling = wrap("if true { var y uint64 = 1 return y } else { var y uint64 = 2 return y }");
+    assert_eq!(
+        slots(&check_ok(&sibling)),
+        vec![typed_ast::LocalId(0), typed_ast::LocalId(1)]
+    );
+}
+
+#[test]
+fn an_else_if_condition_must_be_a_bool() {
+    let source = wrap("if true { return 1 } else if 2 { return 3 } else { return 4 }");
+    assert_eq!(
+        check_err(&source),
+        vec![diag::Entry {
+            kind: diag::Kind::TypeMismatch {
+                expected: typed_ast::Type::Bool,
+                found: typed_ast::Type::Uint64,
+            },
+            span: testing::span_of(&source, "2", 0),
+        }]
+    );
+}
+
+#[test]
+fn every_arm_is_reported_in_source_order() {
+    let source = wrap("if true { return q } else if true { return w } else { return z }");
+    let undefined = |name: &str| diag::Entry {
+        kind: diag::Kind::UndefinedVariable {
+            name: name.to_string(),
+        },
+        span: testing::span_of(&source, name, 0),
+    };
+    assert_eq!(
+        check_err(&source),
+        vec![undefined("q"), undefined("w"), undefined("z")]
     );
 }
 

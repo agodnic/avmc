@@ -145,6 +145,42 @@ fn ret(value: u32) -> ir::Inst {
 const IF: &str = "func approval() uint64 {\n\tvar x uint64 = 3\n\tif x > 2 {\n\t\t\
                   var y uint64 = x * 2\n\t\treturn y\n\t}\n\treturn x\n}\n";
 
+/// The example program of the `else` milestone.
+const ELSE: &str = "func approval() uint64 {\n\tvar x uint64 = 3\n\tif x > 5 {\n\t\t\
+                    return 2\n\t} else if x > 2 {\n\t\treturn 1\n\t} else {\n\t\t\
+                    return 0\n\t}\n}\n";
+
+#[test]
+fn emits_the_else_program() {
+    assert_eq!(
+        emit_ok(ELSE),
+        "#pragma version 13\n\
+         callsub approval\n\
+         return\n\
+         approval:\n\
+         proto 0 1\n\
+         pushint 0\n\
+         pushint 3\n\
+         frame_bury 0\n\
+         frame_dig 0\n\
+         pushint 5\n\
+         >\n\
+         bz approval@0\n\
+         pushint 2\n\
+         retsub\n\
+         approval@0:\n\
+         frame_dig 0\n\
+         pushint 2\n\
+         >\n\
+         bz approval@1\n\
+         pushint 1\n\
+         retsub\n\
+         approval@1:\n\
+         pushint 0\n\
+         retsub\n"
+    );
+}
+
 #[test]
 fn emits_the_if_program() {
     assert_eq!(

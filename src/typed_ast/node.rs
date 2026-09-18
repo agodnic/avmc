@@ -101,19 +101,30 @@ pub enum Stmt {
         /// From `return` through the expression.
         span: diag::Span,
     },
-    /// `if cond { then }`.
+    /// `if cond { then } else ...`.
     If(IfStmt),
 }
 
-/// `if cond { then }`.
+/// `if cond { then } else ...`.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct IfStmt {
     /// The condition. A `bool`.
     pub cond: Expr,
     /// The statements run when the condition holds, in source order.
     pub then: Vec<Stmt>,
-    /// From `if` through the closing `}`.
+    /// What follows the block, if anything does.
+    pub else_branch: Option<Else>,
+    /// From `if` through the last closing `}`, whichever arm closes it.
     pub span: diag::Span,
+}
+
+/// What follows an `if` statement's block.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Else {
+    /// `else { ... }`: the statements, in source order.
+    Block(Vec<Stmt>),
+    /// `else if ...`.
+    If(Box<IfStmt>),
 }
 
 /// An expression and its type.

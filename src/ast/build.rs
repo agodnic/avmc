@@ -1,6 +1,6 @@
 //! Building the AST from the concrete syntax tree.
 
-use super::node::{BinOp, Expr, FuncDecl, IfStmt, Name, Param, Program, Stmt, TypeRef, UnOp};
+use super::node::{BinOp, Else, Expr, FuncDecl, IfStmt, Name, Param, Program, Stmt, TypeRef, UnOp};
 use crate::cst;
 use crate::diag;
 use crate::lexer;
@@ -34,6 +34,7 @@ pub(crate) fn binary_op(kind: lexer::TokenKind) -> Option<BinOp> {
         | lexer::TokenKind::Return
         | lexer::TokenKind::Var
         | lexer::TokenKind::If
+        | lexer::TokenKind::Else
         | lexer::TokenKind::True
         | lexer::TokenKind::False
         | lexer::TokenKind::Ident
@@ -52,6 +53,15 @@ pub(crate) fn binary_op(kind: lexer::TokenKind) -> Option<BinOp> {
 /// The prefix operator a token denotes, if it denotes one.
 fn unary_op(kind: lexer::TokenKind) -> Option<UnOp> {
     (kind == lexer::TokenKind::Bang).then_some(UnOp::Not)
+}
+
+/// One past the last `}` of an `if`, whichever arm closes it.
+fn if_end(stmt: &cst::IfStmt) -> usize {
+    match &stmt.else_branch {
+        None => stmt.then.rbrace.span.end,
+        Some(cst::Else::Block { block, .. }) => block.rbrace.span.end,
+        Some(cst::Else::If { stmt, .. }) => if_end(stmt),
+    }
 }
 
 struct Builder<'a> {
@@ -74,11 +84,7 @@ impl Builder<'_> {
         let ret = TypeRef {
             name: self.name(func.ret),
         };
-
-        let mut body = Vec::new();
-        for stmt in &func.body.stmts {
-            body.push(self.stmt(stmt)?);
-        }
+        let body = self.stmts(&func.body.stmts)?;
 
         Some(FuncDecl {
             name,
@@ -134,19 +140,36 @@ impl Builder<'_> {
                 };
                 Some(Stmt::Return { expr, span })
             }
-            cst::Stmt::If(stmt) => {
-                let cond = self.expr(&stmt.cond)?;
-                let mut then = Vec::new();
-                for inner in &stmt.then.stmts {
-                    then.push(self.stmt(inner)?);
-                }
-                let span = diag::Span {
-                    start: stmt.keyword.span.start,
-                    end: stmt.then.rbrace.span.end,
-                };
-                Some(Stmt::If(IfStmt { cond, then, span }))
-            }
+            cst::Stmt::If(stmt) => Some(Stmt::If(self.if_stmt(stmt)?)),
         }
+    }
+
+    fn if_stmt(&mut self, stmt: &cst::IfStmt) -> Option<IfStmt> {
+        let cond = self.expr(&stmt.cond)?;
+        let then = self.stmts(&stmt.then.stmts)?;
+        let else_branch = match &stmt.else_branch {
+            None => None,
+            Some(cst::Else::Block { block, .. }) => Some(Else::Block(self.stmts(&block.stmts)?)),
+            Some(cst::Else::If { stmt, .. }) => Some(Else::If(Box::new(self.if_stmt(stmt)?))),
+        };
+
+        Some(IfStmt {
+            cond,
+            then,
+            else_branch,
+            span: diag::Span {
+                start: stmt.keyword.span.start,
+                end: if_end(stmt),
+            },
+        })
+    }
+
+    fn stmts(&mut self, stmts: &[cst::Stmt]) -> Option<Vec<Stmt>> {
+        let mut built = Vec::new();
+        for stmt in stmts {
+            built.push(self.stmt(stmt)?);
+        }
+        Some(built)
     }
 
     fn expr(&mut self, expr: &cst::Expr) -> Option<Expr> {
