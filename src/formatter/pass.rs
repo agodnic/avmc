@@ -141,10 +141,27 @@ impl Printer<'_> {
                 self.token_with_blanks(ret, Sep::Tight, blanks);
                 self.expr(expr, Sep::Space);
             }
-            cst::Stmt::If(stmt) => {
-                self.token_with_blanks(&stmt.keyword, Sep::Tight, blanks);
-                self.expr(&stmt.cond, Sep::Space);
-                self.block(&stmt.then, Sep::Space);
+            cst::Stmt::If(stmt) => self.if_stmt(stmt, Sep::Tight, blanks),
+        }
+    }
+
+    /// Prints an `if`, with its `else` arm on the `}` line. A nested `else
+    /// if` prints at the same indentation, so a chain never drifts right.
+    fn if_stmt(&mut self, stmt: &cst::IfStmt, sep: Sep, blanks: Blanks) {
+        self.token_with_blanks(&stmt.keyword, sep, blanks);
+        self.expr(&stmt.cond, Sep::Space);
+        self.block(&stmt.then, Sep::Space);
+        // A comment between `}` and `else` ends the `}` line, and `else`
+        // then starts the next one.
+        match &stmt.else_branch {
+            None => {}
+            Some(cst::Else::Block { keyword, block }) => {
+                self.token(keyword, Sep::Space);
+                self.block(block, Sep::Space);
+            }
+            Some(cst::Else::If { keyword, stmt }) => {
+                self.token(keyword, Sep::Space);
+                self.if_stmt(stmt, Sep::Space, Blanks::All);
             }
         }
     }

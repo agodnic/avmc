@@ -200,8 +200,8 @@ fn check_body<'a>(
     scope: &mut Scope<'a>,
     diags: &mut diag::Sink,
 ) -> Option<Vec<typed_ast::Stmt>> {
-    let (stmts, terminates) = check_block(&func.body, ret, funcs, scope, diags);
-    if !terminates {
+    let stmts = check_block(&func.body, ret, funcs, scope, diags);
+    if !block_terminates(&func.body) {
         diags.push(diag::Entry {
             kind: diag::Kind::MissingReturn,
             span: func.name.span,
@@ -211,32 +211,29 @@ fn check_body<'a>(
     stmts
 }
 
-/// Checks `stmts` in order, and says whether the block terminates: whether a
-/// `return` runs. Nothing may follow one — of which only the first is
-/// reported, once every statement has checked.
+/// Checks `stmts` in order. Nothing may follow a statement that terminates —
+/// of which only the first is reported, once every statement has checked.
 fn check_block<'a>(
     stmts: &'a [ast::Stmt],
     ret: Option<typed_ast::Type>,
     funcs: &Signatures,
     scope: &mut Scope<'a>,
     diags: &mut diag::Sink,
-) -> (Option<Vec<typed_ast::Stmt>>, bool) {
+) -> Option<Vec<typed_ast::Stmt>> {
     let mut checked = Vec::new();
     let mut ok = true;
-    let mut returned = false;
+    let mut terminated = false;
     let mut unreachable = None;
 
     for stmt in stmts {
-        if returned && unreachable.is_none() {
+        if terminated && unreachable.is_none() {
             unreachable = Some(stmt.span());
         }
         match check_stmt(stmt, ret, funcs, scope, diags) {
             Some(stmt) => checked.push(stmt),
             None => ok = false,
         }
-        // An `if` never terminates: without an `else` its condition may be
-        // false.
-        returned |= matches!(stmt, ast::Stmt::Return { .. });
+        terminated |= terminates(stmt);
     }
 
     if let Some(span) = unreachable {
@@ -246,7 +243,32 @@ fn check_block<'a>(
         });
         ok = false;
     }
-    (ok.then_some(checked), returned)
+    ok.then_some(checked)
+}
+
+/// Whether running `stmt` always leaves the enclosing function.
+fn terminates(stmt: &ast::Stmt) -> bool {
+    match stmt {
+        ast::Stmt::Var { .. } => false,
+        ast::Stmt::Return { .. } => true,
+        ast::Stmt::If(stmt) => if_terminates(stmt),
+    }
+}
+
+/// Whether a block terminates: whether one of its statements does.
+fn block_terminates(stmts: &[ast::Stmt]) -> bool {
+    stmts.iter().any(terminates)
+}
+
+/// An `if` terminates when both its arms do. Without an `else` its condition
+/// may be false, and the statement after it runs.
+fn if_terminates(stmt: &ast::IfStmt) -> bool {
+    let else_terminates = match &stmt.else_branch {
+        None => return false,
+        Some(ast::Else::Block(stmts)) => block_terminates(stmts),
+        Some(ast::Else::If(stmt)) => if_terminates(stmt),
+    };
+    else_terminates && block_terminates(&stmt.then)
 }
 
 /// Checks one statement, adding what it declares to `locals`. `ret` is the
@@ -289,20 +311,41 @@ fn check_stmt<'a>(
             check_type(Some(&expr), ret, diags).then_some(())?;
             Some(typed_ast::Stmt::Return { expr, span: *span })
         }
-        ast::Stmt::If(stmt) => {
-            let cond = check_expr(&stmt.cond, funcs, scope, diags);
-            let agrees = check_type(cond.as_ref(), Some(typed_ast::Type::Bool), diags);
-            // The block is checked, and reported, whether or not the
-            // condition was a `bool`.
-            let (then, _) = check_scoped_block(&stmt.then, ret, funcs, scope, diags);
-            agrees.then_some(())?;
-            Some(typed_ast::Stmt::If(typed_ast::IfStmt {
-                cond: cond?,
-                then: then?,
-                span: stmt.span,
-            }))
-        }
+        ast::Stmt::If(stmt) => Some(typed_ast::Stmt::If(check_if(
+            stmt, ret, funcs, scope, diags,
+        )?)),
     }
+}
+
+/// Checks an `if`. Its condition and each of its arms are checked, and
+/// reported, whatever the others did.
+fn check_if<'a>(
+    stmt: &'a ast::IfStmt,
+    ret: Option<typed_ast::Type>,
+    funcs: &Signatures,
+    scope: &mut Scope<'a>,
+    diags: &mut diag::Sink,
+) -> Option<typed_ast::IfStmt> {
+    let cond = check_expr(&stmt.cond, funcs, scope, diags);
+    let agrees = check_type(cond.as_ref(), Some(typed_ast::Type::Bool), diags);
+    let then = check_scoped_block(&stmt.then, ret, funcs, scope, diags);
+    // The inner `Option` says what follows the block; the outer one says
+    // whether checking it succeeded.
+    let else_branch = match &stmt.else_branch {
+        None => Some(None),
+        Some(ast::Else::Block(stmts)) => check_scoped_block(stmts, ret, funcs, scope, diags)
+            .map(|stmts| Some(typed_ast::Else::Block(stmts))),
+        Some(ast::Else::If(stmt)) => check_if(stmt, ret, funcs, scope, diags)
+            .map(|stmt| Some(typed_ast::Else::If(Box::new(stmt)))),
+    };
+
+    agrees.then_some(())?;
+    Some(typed_ast::IfStmt {
+        cond: cond?,
+        then: then?,
+        else_branch: else_branch?,
+        span: stmt.span,
+    })
 }
 
 /// Checks a nested block, whose declarations take frame slots of their own
@@ -313,7 +356,7 @@ fn check_scoped_block<'a>(
     funcs: &Signatures,
     scope: &mut Scope<'a>,
     diags: &mut diag::Sink,
-) -> (Option<Vec<typed_ast::Stmt>>, bool) {
+) -> Option<Vec<typed_ast::Stmt>> {
     let height = scope.visible.len();
     let checked = check_block(stmts, ret, funcs, scope, diags);
     scope.visible.truncate(height);

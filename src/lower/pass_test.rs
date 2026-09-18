@@ -1000,6 +1000,232 @@ fn an_if_branches_over_its_block() {
     );
 }
 
+#[test]
+fn an_if_with_an_else_branches_to_it() {
+    let source = "func approval() uint64 {\n\tvar x uint64 = 3\n\tif x > 5 {\n\t\t\
+                  return 2\n\t} else if x > 2 {\n\t\treturn 1\n\t} else {\n\t\t\
+                  return 0\n\t}\n}\n";
+    let mut span = testing::spans(source);
+
+    let func_start = span("func").start;
+    span("approval");
+    span("uint64");
+    let x_decl_start = span("var").start;
+    span("x");
+    span("uint64");
+    let three = span("3");
+
+    let if_start = span("if").start;
+    let x_gt_five = span("x");
+    let five = span("5");
+    let return_two_start = span("return").start;
+    let two = span("2");
+    span("}");
+
+    let else_if_start = span("if").start;
+    let x_gt_two = span("x");
+    let two_cond = span("2");
+    let return_one_start = span("return").start;
+    let one = span("1");
+    span("}");
+
+    let return_zero_start = span("return").start;
+    let zero = span("0");
+    // Both `if` statements run through the `}` of the last `else`.
+    let if_end = span("}").end;
+    let end = span("}").end;
+
+    let through = |start: diag::Span, end: diag::Span| diag::Span {
+        start: start.start,
+        end: end.end,
+    };
+    let outer_if = diag::Span {
+        start: if_start,
+        end: if_end,
+    };
+    let inner_if = diag::Span {
+        start: else_if_start,
+        end: if_end,
+    };
+    let returns = |start: usize, literal: diag::Span| diag::Span {
+        start,
+        end: literal.end,
+    };
+
+    assert_eq!(
+        lower_ok(source),
+        ir::Program {
+            funcs: vec![ir::Function {
+                name: "approval".to_string(),
+                ret: typed_ast::Type::Uint64,
+                params: vec![],
+                locals: vec![typed_ast::Type::Uint64],
+                insts: vec![
+                    ir::Inst::Const {
+                        dest: ir::ValueId(0),
+                        value: ir::ConstValue::Uint64(3),
+                        span: three,
+                    },
+                    ir::Inst::Store {
+                        local: typed_ast::LocalId(0),
+                        value: ir::ValueId(0),
+                        span: diag::Span {
+                            start: x_decl_start,
+                            end: three.end,
+                        },
+                    },
+                    ir::Inst::Load {
+                        dest: ir::ValueId(1),
+                        local: typed_ast::LocalId(0),
+                        span: x_gt_five,
+                    },
+                    ir::Inst::Const {
+                        dest: ir::ValueId(2),
+                        value: ir::ConstValue::Uint64(5),
+                        span: five,
+                    },
+                    ir::Inst::Binary {
+                        dest: ir::ValueId(3),
+                        op: ast::BinOp::Gt,
+                        lhs: ir::ValueId(1),
+                        rhs: ir::ValueId(2),
+                        span: through(x_gt_five, five),
+                    },
+                    ir::Inst::BranchIfZero {
+                        cond: ir::ValueId(3),
+                        target: ir::LabelId(0),
+                        span: outer_if,
+                    },
+                    ir::Inst::Const {
+                        dest: ir::ValueId(4),
+                        value: ir::ConstValue::Uint64(2),
+                        span: two,
+                    },
+                    // The block returns, so nothing jumps over the `else`.
+                    ir::Inst::Return {
+                        value: ir::ValueId(4),
+                        span: returns(return_two_start, two),
+                    },
+                    ir::Inst::Label {
+                        label: ir::LabelId(0),
+                        span: outer_if,
+                    },
+                    ir::Inst::Load {
+                        dest: ir::ValueId(5),
+                        local: typed_ast::LocalId(0),
+                        span: x_gt_two,
+                    },
+                    ir::Inst::Const {
+                        dest: ir::ValueId(6),
+                        value: ir::ConstValue::Uint64(2),
+                        span: two_cond,
+                    },
+                    ir::Inst::Binary {
+                        dest: ir::ValueId(7),
+                        op: ast::BinOp::Gt,
+                        lhs: ir::ValueId(5),
+                        rhs: ir::ValueId(6),
+                        span: through(x_gt_two, two_cond),
+                    },
+                    ir::Inst::BranchIfZero {
+                        cond: ir::ValueId(7),
+                        target: ir::LabelId(1),
+                        span: inner_if,
+                    },
+                    ir::Inst::Const {
+                        dest: ir::ValueId(8),
+                        value: ir::ConstValue::Uint64(1),
+                        span: one,
+                    },
+                    ir::Inst::Return {
+                        value: ir::ValueId(8),
+                        span: returns(return_one_start, one),
+                    },
+                    ir::Inst::Label {
+                        label: ir::LabelId(1),
+                        span: inner_if,
+                    },
+                    ir::Inst::Const {
+                        dest: ir::ValueId(9),
+                        value: ir::ConstValue::Uint64(0),
+                        span: zero,
+                    },
+                    ir::Inst::Return {
+                        value: ir::ValueId(9),
+                        span: returns(return_zero_start, zero),
+                    },
+                ],
+                span: diag::Span {
+                    start: func_start,
+                    end,
+                },
+            }]
+        }
+    );
+}
+
+/// The control-flow instructions of `source`'s single function, in order:
+/// the TEAL opcode each becomes, or `"label"`, and the label it names.
+fn control_flow(source: &str) -> Vec<(&'static str, ir::LabelId)> {
+    lower_ok(source)
+        .funcs
+        .first()
+        .expect("one function")
+        .insts
+        .iter()
+        .filter_map(|inst| match inst {
+            ir::Inst::BranchIfZero { target, .. } => Some(("bz", *target)),
+            ir::Inst::Jump { target, .. } => Some(("b", *target)),
+            ir::Inst::Label { label, .. } => Some(("label", *label)),
+            _ => None,
+        })
+        .collect()
+}
+
+#[test]
+fn an_if_block_that_falls_through_jumps_over_the_else() {
+    let source = "func approval() uint64 { var c bool = true \
+                  if c { var t uint64 = 1 } else { var u uint64 = 2 } return 0 }";
+    assert_eq!(
+        control_flow(source),
+        vec![
+            ("bz", ir::LabelId(0)),
+            ("b", ir::LabelId(1)),
+            ("label", ir::LabelId(0)),
+            ("label", ir::LabelId(1)),
+        ]
+    );
+}
+
+#[test]
+fn an_else_that_falls_through_needs_no_end_label() {
+    let source = "func approval() uint64 { var c bool = true \
+                  if c { return 1 } else { var u uint64 = 2 } return 0 }";
+    assert_eq!(
+        control_flow(source),
+        vec![("bz", ir::LabelId(0)), ("label", ir::LabelId(0))]
+    );
+}
+
+#[test]
+fn labels_are_numbered_when_first_named() {
+    // The outer `else` label is named first, then the inner `if`'s end, and
+    // the outer end only once the block has lowered.
+    let source = "func approval() uint64 { var a bool = true var b bool = false \
+                  if a { if b { var t uint64 = 1 } } else { return 3 } return 4 }";
+    assert_eq!(
+        control_flow(source),
+        vec![
+            ("bz", ir::LabelId(0)),
+            ("bz", ir::LabelId(1)),
+            ("label", ir::LabelId(1)),
+            ("b", ir::LabelId(2)),
+            ("label", ir::LabelId(0)),
+            ("label", ir::LabelId(2)),
+        ]
+    );
+}
+
 /// The labels each `if` of `source`'s single function branches to, in the
 /// order the branches are emitted.
 fn branch_targets(source: &str) -> Vec<ir::LabelId> {

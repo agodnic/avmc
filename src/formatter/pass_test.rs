@@ -89,6 +89,11 @@ const CALLS: &str = "func approval() uint64 {\n\treturn add(1, double(2))\n}\n\n
 const IF: &str = "func approval() uint64 {\n\tvar x uint64 = 3\n\tif x > 2 {\n\t\t\
                   var y uint64 = x * 2\n\t\treturn y\n\t}\n\treturn x\n}\n";
 
+/// The example program of the `else` milestone.
+const ELSE: &str = "func approval() uint64 {\n\tvar x uint64 = 3\n\tif x > 5 {\n\t\t\
+                    return 2\n\t} else if x > 2 {\n\t\treturn 1\n\t} else {\n\t\t\
+                    return 0\n\t}\n}\n";
+
 /// Every golden input, for the properties to run over.
 const GOLDEN: &[&str] = &[
     CANONICAL,
@@ -104,6 +109,7 @@ const GOLDEN: &[&str] = &[
     PARAMETERS,
     CALLS,
     IF,
+    ELSE,
     "",
     "//x\n",
     "//   spaced   \n",
@@ -188,6 +194,30 @@ fn an_if_is_formatted() {
         format_ok(empty),
         "func f() uint64 {\n\tif x {\n\t}\n\treturn 1\n}\n"
     );
+}
+
+#[test]
+fn an_else_is_formatted_on_the_closing_brace_line() {
+    let messy = "func approval() uint64 {\n\tvar x uint64 = 3\n\
+                 if x>5{return 2}else if x>2{return 1}else{return 0}\n}\n";
+    assert_eq!(format_ok(messy), ELSE);
+    assert_eq!(format_ok(ELSE), ELSE);
+}
+
+#[test]
+fn an_else_if_chain_does_not_drift_right() {
+    let chain = "func f() uint64 {\n\tif a {\n\t\treturn 1\n\t} else if b {\n\t\t\
+                 return 2\n\t} else if c {\n\t\treturn 3\n\t} else {\n\t\t\
+                 return 4\n\t}\n}\n";
+    assert_eq!(format_ok(chain), chain);
+}
+
+#[test]
+fn a_comment_before_else_moves_else_to_the_next_line() {
+    let commented = "func f() uint64 {\n\tif x {\n\t\treturn 1\n\t} // so far so good\n\
+                     \telse {\n\t\treturn 2\n\t}\n}\n";
+    assert_eq!(format_ok(commented), commented);
+    assert_eq!(format_ok(&format_ok(commented)), commented);
 }
 
 #[test]

@@ -27,6 +27,12 @@ const IF: &str = "func approval() uint64 {\n\tvar x uint64 = 3\n\tif x > 2 {\n\t
                   // doubled\n\t\tvar y uint64 = x * 2\n\t\treturn y\n\t}\n\t\
                   return x\n}\n";
 
+/// The example program of the `else` milestone, with a comment between a `}`
+/// and its `else`.
+const ELSE: &str = "func approval() uint64 {\n\tvar x uint64 = 3\n\tif x > 5 {\n\t\t\
+                    return 2\n\t} // so far so good\n\telse if x > 2 {\n\t\treturn 1\n\t\
+                    } else {\n\t\treturn 0\n\t}\n}\n";
+
 /// Lexes and parses `source`, asserting that both succeeded without
 /// diagnostics.
 fn parse_cst(source: &str) -> Program {
@@ -45,6 +51,7 @@ fn the_tree_is_lossless() {
         PARAMETERS,
         CALLS,
         IF,
+        ELSE,
         "func f() uint64 { return (1 + 2) * 3 // grouped\n}\n",
     ];
 

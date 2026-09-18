@@ -155,8 +155,22 @@ fn empty_input_produces_only_the_end_of_input_token() {
 }
 
 #[test]
+fn lexes_the_else_keyword() {
+    let source = "} else {";
+    let expected = spans(
+        source,
+        &[
+            (TokenKind::RBrace, "}"),
+            (TokenKind::Else, "else"),
+            (TokenKind::LBrace, "{"),
+        ],
+    );
+    assert_eq!(lex_ok(source), expected);
+}
+
+#[test]
 fn keyword_prefixes_are_identifiers() {
-    let source = "func_ returns iff if_ If";
+    let source = "func_ returns iff if_ If elsewhere Else";
     let expected = spans(
         source,
         &[
@@ -165,6 +179,8 @@ fn keyword_prefixes_are_identifiers() {
             (TokenKind::Ident, "iff"),
             (TokenKind::Ident, "if_"),
             (TokenKind::Ident, "If"),
+            (TokenKind::Ident, "elsewhere"),
+            (TokenKind::Ident, "Else"),
         ],
     );
     assert_eq!(lex_ok(source), expected);

@@ -82,11 +82,11 @@ pub enum Stmt {
         /// The returned expression.
         expr: Expr,
     },
-    /// `if cond { then }`.
+    /// `if cond { then } else ...`.
     If(IfStmt),
 }
 
-/// `if cond { then }`.
+/// `if cond { then } else ...`.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct IfStmt {
     /// The `if` keyword.
@@ -95,6 +95,25 @@ pub struct IfStmt {
     pub cond: Expr,
     /// The block run when the condition holds.
     pub then: Block,
+    /// What follows the block, if anything does.
+    pub else_branch: Option<Else>,
+}
+
+/// What follows an `if` statement's block.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Else {
+    /// `else { ... }`.
+    Block {
+        /// The `else` keyword.
+        keyword: lexer::Token,
+        block: Block,
+    },
+    /// `else if ...`.
+    If {
+        /// The `else` keyword.
+        keyword: lexer::Token,
+        stmt: Box<IfStmt>,
+    },
 }
 
 /// An expression.

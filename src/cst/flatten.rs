@@ -1,4 +1,4 @@
-use super::node::{Arg, Block, Expr, FuncDecl, IfStmt, Param, Program, Stmt};
+use super::node::{Arg, Block, Else, Expr, FuncDecl, IfStmt, Param, Program, Stmt};
 use crate::lexer;
 
 /// The tokens of `program` in source order, ending with `eof`.
@@ -57,6 +57,17 @@ fn push_if(tokens: &mut Vec<lexer::Token>, stmt: &IfStmt) {
     tokens.push(stmt.keyword);
     push_expr(tokens, &stmt.cond);
     push_block(tokens, &stmt.then);
+    match &stmt.else_branch {
+        None => {}
+        Some(Else::Block { keyword, block }) => {
+            tokens.push(*keyword);
+            push_block(tokens, block);
+        }
+        Some(Else::If { keyword, stmt }) => {
+            tokens.push(*keyword);
+            push_if(tokens, stmt);
+        }
+    }
 }
 
 fn push_expr(tokens: &mut Vec<lexer::Token>, expr: &Expr) {

@@ -331,6 +331,7 @@ fn parses_an_if_statement() {
                     end: literal.end,
                 },
             }],
+            else_branch: None,
             span: diag::Span {
                 start,
                 end: inner_end,
@@ -379,6 +380,125 @@ fn a_parenthesized_condition_is_the_expression() {
     };
     assert_eq!(named(parenthesized.cond), "x");
     assert_eq!(named(plain.cond), "x");
+}
+
+#[test]
+fn parses_an_if_with_an_else() {
+    let source = "func f() uint64 { if x { return 1 } else { return 2 } }";
+    let mut span = testing::spans(source);
+
+    let start = span("if").start;
+    let cond = span("x");
+    let then_start = span("return").start;
+    let one = span("1");
+    span("}");
+    let else_start = span("return").start;
+    let two = span("2");
+    let else_end = span("}").end;
+    let end = span("}").end;
+
+    let ast::Stmt::If(stmt) = first_stmt(source) else {
+        panic!("an if statement")
+    };
+    assert_eq!(
+        stmt,
+        ast::IfStmt {
+            cond: ast::Expr::Var {
+                name: testing::name("x", cond),
+                span: cond,
+            },
+            then: vec![ast::Stmt::Return {
+                expr: ast::Expr::IntLit {
+                    value: 1,
+                    span: one,
+                },
+                span: diag::Span {
+                    start: then_start,
+                    end: one.end,
+                },
+            }],
+            else_branch: Some(ast::Else::Block(vec![ast::Stmt::Return {
+                expr: ast::Expr::IntLit {
+                    value: 2,
+                    span: two,
+                },
+                span: diag::Span {
+                    start: else_start,
+                    end: two.end,
+                },
+            }])),
+            // The span runs through the `}` of the `else`, not the block's.
+            span: diag::Span {
+                start,
+                end: else_end,
+            },
+        }
+    );
+    assert_ne!(else_end, end);
+}
+
+#[test]
+fn parses_an_else_if_chain() {
+    let source = "func f() uint64 { if a { return 1 } else if b { return 2 } \
+                  else if c { return 3 } else { return 4 } }";
+    let ast::Stmt::If(stmt) = first_stmt(source) else {
+        panic!("an if statement")
+    };
+
+    // Each `else if` nests inside the one before it, to the right.
+    let named = |stmt: &ast::IfStmt| match &stmt.cond {
+        ast::Expr::Var { name, .. } => name.text.clone(),
+        _ => panic!("a variable"),
+    };
+    assert_eq!(named(&stmt), "a");
+    let Some(ast::Else::If(second)) = &stmt.else_branch else {
+        panic!("an else if")
+    };
+    assert_eq!(named(second), "b");
+    let Some(ast::Else::If(third)) = &second.else_branch else {
+        panic!("an else if")
+    };
+    assert_eq!(named(third), "c");
+    assert!(matches!(third.else_branch, Some(ast::Else::Block(_))));
+}
+
+#[test]
+fn an_else_may_start_the_next_line() {
+    let source = "func f() uint64 {\n\tif x {\n\t\treturn 1\n\t}\n\telse {\n\t\treturn 2\n\t}\n}\n";
+    let ast::Stmt::If(stmt) = first_stmt(source) else {
+        panic!("an if statement")
+    };
+    assert!(matches!(stmt.else_branch, Some(ast::Else::Block(_))));
+}
+
+#[test]
+fn an_else_needs_a_block_or_an_if() {
+    let source = "func f() uint64 { if x { } else return 1 }";
+    assert_eq!(
+        parse_err(source),
+        diag::Entry {
+            kind: diag::Kind::UnexpectedToken {
+                expected: "`{` or `if`",
+                found: "`return`",
+            },
+            span: testing::span_of(source, "return", 0),
+        }
+    );
+}
+
+#[test]
+fn an_else_without_an_if_is_reported() {
+    let source = "func f() uint64 { else { } return 1 }";
+    assert_eq!(
+        parse_err(source),
+        diag::Entry {
+            kind: diag::Kind::UnexpectedToken {
+                expected: "`var`, `if`, `return` or `}`",
+                found: "`else`",
+            },
+            span: testing::span_of(source, "else", 0),
+        }
+    );
 }
 
 #[test]

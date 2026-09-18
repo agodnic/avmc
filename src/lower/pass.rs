@@ -78,24 +78,72 @@ fn lower_block(
                 let value = lower_expr(expr, insts, next_value);
                 insts.push(ir::Inst::Return { value, span: *span });
             }
-            // The block runs when the condition holds, so the branch skips it
-            // when the condition is false, landing on the label after it.
             typed_ast::Stmt::If(stmt) => {
-                let cond = lower_expr(&stmt.cond, insts, next_value);
-                let target = next_label_id(next_label);
-                insts.push(ir::Inst::BranchIfZero {
-                    cond,
-                    target,
-                    span: stmt.span,
-                });
-                lower_block(&stmt.then, insts, locals, next_value, next_label);
-                insts.push(ir::Inst::Label {
-                    label: target,
-                    span: stmt.span,
-                });
+                lower_if(stmt, insts, locals, next_value, next_label);
             }
         }
     }
+}
+
+/// Lowers an `if`. The branch skips the block when the condition is false,
+/// landing on the label the `else` arm starts at, or on the one after the
+/// block when there is no `else`.
+fn lower_if(
+    stmt: &typed_ast::IfStmt,
+    insts: &mut Vec<ir::Inst>,
+    locals: &mut Vec<typed_ast::Type>,
+    next_value: &mut u32,
+    next_label: &mut u32,
+) {
+    let cond = lower_expr(&stmt.cond, insts, next_value);
+    let target = next_label_id(next_label);
+    insts.push(ir::Inst::BranchIfZero {
+        cond,
+        target,
+        span: stmt.span,
+    });
+    lower_block(&stmt.then, insts, locals, next_value, next_label);
+
+    let Some(branch) = &stmt.else_branch else {
+        insts.push(ir::Inst::Label {
+            label: target,
+            span: stmt.span,
+        });
+        return;
+    };
+
+    // A block that terminates ends in a `Return`, so the jump over the
+    // `else` arm is pushed exactly when the block can fall through — and
+    // the label it targets exactly when something names it.
+    let end = (!ends_a_path(insts)).then(|| {
+        let end = next_label_id(next_label);
+        insts.push(ir::Inst::Jump {
+            target: end,
+            span: stmt.span,
+        });
+        end
+    });
+    insts.push(ir::Inst::Label {
+        label: target,
+        span: stmt.span,
+    });
+    match branch {
+        typed_ast::Else::Block(stmts) => {
+            lower_block(stmts, insts, locals, next_value, next_label);
+        }
+        typed_ast::Else::If(stmt) => lower_if(stmt, insts, locals, next_value, next_label),
+    }
+    if let Some(end) = end {
+        insts.push(ir::Inst::Label {
+            label: end,
+            span: stmt.span,
+        });
+    }
+}
+
+/// Whether the last instruction pushed leaves the enclosing function.
+fn ends_a_path(insts: &[ir::Inst]) -> bool {
+    matches!(insts.last(), Some(ir::Inst::Return { .. }))
 }
 
 /// Lowers one expression in post-order, appending its instructions to `insts`
