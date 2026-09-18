@@ -75,7 +75,7 @@ impl Builder<'_> {
         };
 
         let mut body = Vec::new();
-        for stmt in &func.body {
+        for stmt in &func.body.stmts {
             body.push(self.stmt(stmt)?);
         }
 
@@ -86,7 +86,7 @@ impl Builder<'_> {
             body,
             span: diag::Span {
                 start: func.func.span.start,
-                end: func.rbrace.span.end,
+                end: func.body.rbrace.span.end,
             },
         })
     }
