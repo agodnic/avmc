@@ -1,6 +1,6 @@
 //! Tests for the IR verifier.
 
-use super::inst::{ConstValue, Function, Inst, Program, ValueId};
+use super::inst::{ConstValue, Function, Inst, LabelId, Program, ValueId};
 use super::verifier;
 use super::violation::Violation;
 use crate::ast;
@@ -78,6 +78,28 @@ fn constant_bool(dest: u32, value: bool) -> Inst {
 fn ret(value: u32) -> Inst {
     Inst::Return {
         value: ValueId(value),
+        span: SPAN,
+    }
+}
+
+fn label(n: u32) -> Inst {
+    Inst::Label {
+        label: LabelId(n),
+        span: SPAN,
+    }
+}
+
+fn jump(n: u32) -> Inst {
+    Inst::Jump {
+        target: LabelId(n),
+        span: SPAN,
+    }
+}
+
+fn branch_if_zero(cond: u32, n: u32) -> Inst {
+    Inst::BranchIfZero {
+        cond: ValueId(cond),
+        target: LabelId(n),
         span: SPAN,
     }
 }
@@ -262,10 +284,203 @@ fn missing_return_is_rejected() {
 }
 
 #[test]
-fn return_that_is_not_last_is_rejected() {
+fn an_instruction_after_a_return_is_dead_code() {
     assert_eq!(
-        verify(function(vec![constant(0, 1), ret(0), constant(1, 2)])),
-        Err(Violation::ReturnNotLast { index: 1 })
+        verify(function(vec![
+            constant(0, 1),
+            ret(0),
+            constant(1, 2),
+            ret(1)
+        ])),
+        Err(Violation::DeadCode { index: 2 })
+    );
+}
+
+#[test]
+fn an_instruction_after_a_jump_is_dead_code() {
+    assert_eq!(
+        verify(function(vec![label(0), jump(0), constant(0, 1), ret(0)])),
+        Err(Violation::DeadCode { index: 2 })
+    );
+}
+
+#[test]
+fn a_function_ending_in_a_label_is_missing_a_return() {
+    assert_eq!(
+        verify(function(vec![constant(0, 1), ret(0), label(0)])),
+        Err(Violation::MissingReturn)
+    );
+}
+
+#[test]
+fn a_function_ending_in_a_jump_is_missing_a_return() {
+    assert_eq!(
+        verify(function(vec![label(0), jump(0)])),
+        Err(Violation::MissingReturn)
+    );
+}
+
+/// `if !cond { return 1 } return 2`, as a later slice will lower it.
+fn forward_branch() -> Vec<Inst> {
+    vec![
+        constant_bool(0, true),
+        branch_if_zero(0, 0),
+        constant(1, 1),
+        ret(1),
+        label(0),
+        constant(2, 2),
+        ret(2),
+    ]
+}
+
+/// Two paths storing to the same slot, joining at `L1` to read it back.
+fn joined_paths() -> Vec<Inst> {
+    vec![
+        constant_bool(0, true),
+        branch_if_zero(0, 0),
+        constant(1, 10),
+        store(0, 1),
+        jump(1),
+        label(0),
+        constant(2, 20),
+        store(0, 2),
+        label(1),
+        load(3, 0),
+        ret(3),
+    ]
+}
+
+#[test]
+fn a_forward_branch_over_a_return_is_valid() {
+    assert_eq!(verify(function(forward_branch())), Ok(()));
+}
+
+#[test]
+fn a_jump_joins_two_paths() {
+    assert_eq!(verify(framed(1, joined_paths())), Ok(()));
+}
+
+#[test]
+fn a_backward_branch_resolves() {
+    // The verifier does not care that it loops.
+    assert_eq!(
+        verify(function(vec![
+            label(0),
+            constant_bool(0, true),
+            branch_if_zero(0, 0),
+            constant(1, 1),
+            ret(1),
+        ])),
+        Ok(())
+    );
+}
+
+#[test]
+fn a_duplicate_label_is_a_violation() {
+    assert_eq!(
+        verify(function(vec![label(0), label(0), constant(0, 1), ret(0)])),
+        Err(Violation::DuplicateLabel {
+            index: 1,
+            label: LabelId(0),
+        })
+    );
+}
+
+#[test]
+fn a_branch_to_an_undefined_label_is_a_violation() {
+    assert_eq!(
+        verify(function(vec![
+            constant_bool(0, true),
+            branch_if_zero(0, 0),
+            constant(1, 1),
+            ret(1),
+        ])),
+        Err(Violation::UndefinedLabel {
+            index: 1,
+            label: LabelId(0),
+        })
+    );
+}
+
+#[test]
+fn a_jump_to_an_undefined_label_is_a_violation() {
+    assert_eq!(
+        verify(function(vec![jump(0), label(1), constant(0, 1), ret(0)])),
+        Err(Violation::UndefinedLabel {
+            index: 0,
+            label: LabelId(0),
+        })
+    );
+}
+
+#[test]
+fn a_branch_consumes_a_bool() {
+    let insts = vec![
+        constant(0, 1),
+        branch_if_zero(0, 0),
+        constant(1, 1),
+        ret(1),
+        label(0),
+        constant(2, 2),
+        ret(2),
+    ];
+    assert_eq!(
+        verify(function(insts)),
+        Err(Violation::OperandType {
+            index: 1,
+            position: 0,
+            value: ValueId(0),
+            found: typed_ast::Type::Uint64,
+            expected: typed_ast::Type::Bool,
+        })
+    );
+}
+
+#[test]
+fn a_branch_with_nothing_live_is_a_violation() {
+    assert_eq!(
+        verify(function(vec![
+            branch_if_zero(0, 0),
+            label(0),
+            constant(0, 1),
+            ret(0),
+        ])),
+        Err(Violation::StackUnderflow {
+            index: 0,
+            needed: 1,
+            available: 0,
+        })
+    );
+}
+
+#[test]
+fn a_value_live_at_a_label_is_a_violation() {
+    assert_eq!(
+        verify(function(vec![constant(0, 1), label(0), ret(0)])),
+        Err(Violation::ValuesLiveAcrossBranch { index: 1, count: 1 })
+    );
+}
+
+#[test]
+fn a_value_live_at_a_jump_is_a_violation() {
+    assert_eq!(
+        verify(function(vec![constant(0, 1), jump(0), label(0), ret(0)])),
+        Err(Violation::ValuesLiveAcrossBranch { index: 1, count: 1 })
+    );
+}
+
+#[test]
+fn a_value_live_after_a_branch_is_a_violation() {
+    // The constant sits under the condition, and outlives it.
+    assert_eq!(
+        verify(function(vec![
+            constant(0, 1),
+            constant_bool(1, true),
+            branch_if_zero(1, 0),
+            label(0),
+            ret(0),
+        ])),
+        Err(Violation::ValuesLiveAcrossBranch { index: 2, count: 1 })
     );
 }
 

@@ -1,6 +1,6 @@
 //! Tests for the messages violations render.
 
-use super::inst::ValueId;
+use super::inst::{LabelId, ValueId};
 use super::violation::Violation;
 use crate::typed_ast;
 
@@ -28,6 +28,30 @@ fn violations_describe_themselves() {
     assert_eq!(
         Violation::ValuesLeftOnStack { count: 1 }.to_string(),
         "consumed in stack order: 1 values are left unconsumed"
+    );
+    assert_eq!(
+        Violation::DeadCode { index: 2 }.to_string(),
+        "ends with `Return`: instruction 2 follows a `Return` or a `Jump` and is not a `Label`"
+    );
+    assert_eq!(
+        Violation::DuplicateLabel {
+            index: 4,
+            label: LabelId(0),
+        }
+        .to_string(),
+        "labels resolve: instruction 4 defines L0 again"
+    );
+    assert_eq!(
+        Violation::UndefinedLabel {
+            index: 1,
+            label: LabelId(2),
+        }
+        .to_string(),
+        "labels resolve: instruction 1 names L2, which nothing defines"
+    );
+    assert_eq!(
+        Violation::ValuesLiveAcrossBranch { index: 3, count: 2 }.to_string(),
+        "nothing live across a branch: instruction 3 has 2 values live"
     );
     assert_eq!(
         Violation::FrameTooLarge { count: 129 }.to_string(),
