@@ -24,11 +24,18 @@ pub struct FuncDecl {
     pub rparen: lexer::Token,
     /// The declared return type.
     pub ret: lexer::Token,
-    /// The `{` opening the body.
+    /// The body.
+    pub body: Block,
+}
+
+/// `{ stmts }`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Block {
+    /// The `{`.
     pub lbrace: lexer::Token,
-    /// The statements in the body, in source order.
-    pub body: Vec<Stmt>,
-    /// The `}` closing the body.
+    /// The statements, in source order.
+    pub stmts: Vec<Stmt>,
+    /// The `}`.
     pub rbrace: lexer::Token,
 }
 

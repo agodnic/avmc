@@ -92,11 +92,19 @@ impl Printer<'_> {
         }
         self.token(&func.rparen, Sep::Tight);
         self.token(&func.ret, Sep::Space);
-        self.token(&func.lbrace, Sep::Space);
+        self.block(&func.body, Sep::Space);
+        self.end_line();
+    }
+
+    /// Prints `block`, each statement on a line of its own. `sep` governs the
+    /// separation before `{`. Leaves the line of `}` open for the caller to
+    /// end.
+    fn block(&mut self, block: &cst::Block, sep: Sep) {
+        self.token(&block.lbrace, sep);
         self.end_line();
 
         self.indent += 1;
-        for (index, stmt) in func.body.iter().enumerate() {
+        for (index, stmt) in block.stmts.iter().enumerate() {
             let blanks = if index == 0 {
                 Blanks::NotLeading
             } else {
@@ -107,10 +115,9 @@ impl Printer<'_> {
         }
 
         // A comment before `}` is indented as the statements are.
-        self.trivia(func.rbrace.trivia, Blanks::NotTrailing);
+        self.trivia(block.rbrace.trivia, Blanks::NotTrailing);
         self.indent -= 1;
-        self.text(slice(self.source, func.rbrace.span), Sep::Tight);
-        self.end_line();
+        self.text(slice(self.source, block.rbrace.span), Sep::Tight);
     }
 
     /// Prints `stmt` on a line of its own. `blanks` governs the blank lines

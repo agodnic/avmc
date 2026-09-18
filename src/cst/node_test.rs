@@ -22,7 +22,7 @@ fn returned(source: &str) -> Expr {
     let mut funcs = program.funcs.into_iter();
     let func = funcs.next().expect("one function");
     assert!(funcs.next().is_none());
-    let mut body = func.body.into_iter();
+    let mut body = func.body.stmts.into_iter();
     let Some(Stmt::Return { expr, .. }) = body.next() else {
         panic!("one return statement")
     };

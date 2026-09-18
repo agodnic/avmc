@@ -43,13 +43,7 @@ impl Parser<'_> {
         let lparen = self.expect(lexer::TokenKind::LParen, "`(`")?;
         let (params, rparen) = self.params()?;
         let ret = self.name()?;
-        let lbrace = self.expect(lexer::TokenKind::LBrace, "`{`")?;
-
-        let mut body = Vec::new();
-        while self.peek_kind() != Some(lexer::TokenKind::RBrace) {
-            body.push(self.stmt()?);
-        }
-        let rbrace = self.expect(lexer::TokenKind::RBrace, "`}`")?;
+        let body = self.block()?;
 
         Some(cst::FuncDecl {
             func,
@@ -58,8 +52,23 @@ impl Parser<'_> {
             params,
             rparen,
             ret,
-            lbrace,
             body,
+        })
+    }
+
+    /// `{ stmts }`.
+    fn block(&mut self) -> Option<cst::Block> {
+        let lbrace = self.expect(lexer::TokenKind::LBrace, "`{`")?;
+
+        let mut stmts = Vec::new();
+        while self.peek_kind() != Some(lexer::TokenKind::RBrace) {
+            stmts.push(self.stmt()?);
+        }
+        let rbrace = self.expect(lexer::TokenKind::RBrace, "`}`")?;
+
+        Some(cst::Block {
+            lbrace,
+            stmts,
             rbrace,
         })
     }
