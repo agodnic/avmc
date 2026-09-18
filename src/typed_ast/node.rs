@@ -149,10 +149,3 @@ pub enum ExprKind {
         args: Vec<Expr>,
     },
 }
-
-impl Expr {
-    /// Where it was written.
-    pub fn span(&self) -> diag::Span {
-        self.span
-    }
-}
