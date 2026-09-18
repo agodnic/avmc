@@ -141,6 +141,39 @@ fn ret(value: u32) -> ir::Inst {
     }
 }
 
+/// The example program of the `if` milestone.
+const IF: &str = "func approval() uint64 {\n\tvar x uint64 = 3\n\tif x > 2 {\n\t\t\
+                  var y uint64 = x * 2\n\t\treturn y\n\t}\n\treturn x\n}\n";
+
+#[test]
+fn emits_the_if_program() {
+    assert_eq!(
+        emit_ok(IF),
+        "#pragma version 13\n\
+         callsub approval\n\
+         return\n\
+         approval:\n\
+         proto 0 1\n\
+         pushint 0\n\
+         pushint 0\n\
+         pushint 3\n\
+         frame_bury 0\n\
+         frame_dig 0\n\
+         pushint 2\n\
+         >\n\
+         bz approval@0\n\
+         frame_dig 0\n\
+         pushint 2\n\
+         *\n\
+         frame_bury 1\n\
+         frame_dig 1\n\
+         retsub\n\
+         approval@0:\n\
+         frame_dig 0\n\
+         retsub\n"
+    );
+}
+
 /// `var x uint64 = 1; return x`, as the next slice will lower it.
 fn one_slot() -> Vec<ir::Inst> {
     vec![constant(0, 1), store(0, 0), load(1, 0), ret(1)]

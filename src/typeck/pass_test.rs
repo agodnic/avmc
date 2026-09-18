@@ -1768,3 +1768,350 @@ fn a_signature_with_an_unknown_type_is_reported_once() {
         );
     }
 }
+
+/// The example program of the `if` milestone.
+const IF: &str = "func approval() uint64 {\n\tvar x uint64 = 3\n\tif x > 2 {\n\t\t\
+                  var y uint64 = x * 2\n\t\treturn y\n\t}\n\treturn x\n}\n";
+
+#[test]
+fn checks_the_if_program() {
+    let source = IF;
+    let mut span = testing::spans(source);
+
+    let start = span("func").start;
+    let func_name = testing::name("approval", span("approval"));
+    span("uint64");
+
+    let x_decl_start = span("var").start;
+    span("x");
+    span("uint64");
+    let three = span("3");
+
+    let if_start = span("if").start;
+    let x_cond = span("x");
+    let two = span("2");
+
+    let y_decl_start = span("var").start;
+    span("y");
+    span("uint64");
+    let x_mul = span("x");
+    let two_mul = span("2");
+
+    let return_y_start = span("return").start;
+    let y_read = span("y");
+    let if_end = span("}").end;
+
+    let return_x_start = span("return").start;
+    let x_read = span("x");
+    let end = span("}").end;
+
+    let uint64 = |kind, span| typed_ast::Expr {
+        kind,
+        ty: typed_ast::Type::Uint64,
+        span,
+    };
+
+    assert_eq!(
+        check_ok(source),
+        typed_ast::Program {
+            funcs: vec![typed_ast::FuncDecl {
+                name: func_name,
+                params: vec![],
+                ret: typed_ast::Type::Uint64,
+                body: vec![
+                    typed_ast::Stmt::Var {
+                        local: typed_ast::LocalId(0),
+                        ty: typed_ast::Type::Uint64,
+                        init: uint64(typed_ast::ExprKind::IntLit(3), three),
+                        span: diag::Span {
+                            start: x_decl_start,
+                            end: three.end,
+                        },
+                    },
+                    typed_ast::Stmt::If(typed_ast::IfStmt {
+                        cond: typed_ast::Expr {
+                            kind: typed_ast::ExprKind::Binary {
+                                op: ast::BinOp::Gt,
+                                lhs: Box::new(uint64(
+                                    typed_ast::ExprKind::Var(typed_ast::LocalId(0)),
+                                    x_cond
+                                )),
+                                rhs: Box::new(uint64(typed_ast::ExprKind::IntLit(2), two)),
+                            },
+                            ty: typed_ast::Type::Bool,
+                            span: diag::Span {
+                                start: x_cond.start,
+                                end: two.end,
+                            },
+                        },
+                        then: vec![
+                            typed_ast::Stmt::Var {
+                                // The block's declaration takes the next slot.
+                                local: typed_ast::LocalId(1),
+                                ty: typed_ast::Type::Uint64,
+                                init: uint64(
+                                    typed_ast::ExprKind::Binary {
+                                        op: ast::BinOp::Mul,
+                                        lhs: Box::new(uint64(
+                                            typed_ast::ExprKind::Var(typed_ast::LocalId(0)),
+                                            x_mul
+                                        )),
+                                        rhs: Box::new(uint64(
+                                            typed_ast::ExprKind::IntLit(2),
+                                            two_mul
+                                        )),
+                                    },
+                                    diag::Span {
+                                        start: x_mul.start,
+                                        end: two_mul.end,
+                                    },
+                                ),
+                                span: diag::Span {
+                                    start: y_decl_start,
+                                    end: two_mul.end,
+                                },
+                            },
+                            typed_ast::Stmt::Return {
+                                expr: uint64(
+                                    typed_ast::ExprKind::Var(typed_ast::LocalId(1)),
+                                    y_read
+                                ),
+                                span: diag::Span {
+                                    start: return_y_start,
+                                    end: y_read.end,
+                                },
+                            },
+                        ],
+                        span: diag::Span {
+                            start: if_start,
+                            end: if_end,
+                        },
+                    }),
+                    typed_ast::Stmt::Return {
+                        expr: uint64(typed_ast::ExprKind::Var(typed_ast::LocalId(0)), x_read),
+                        span: diag::Span {
+                            start: return_x_start,
+                            end: x_read.end,
+                        },
+                    },
+                ],
+                span: diag::Span { start, end },
+            }]
+        }
+    );
+}
+
+#[test]
+fn a_condition_must_be_a_bool() {
+    let source = wrap("if 1 { return 1 } return 2");
+    assert_eq!(
+        check_err(&source),
+        vec![diag::Entry {
+            kind: diag::Kind::TypeMismatch {
+                expected: typed_ast::Type::Bool,
+                found: typed_ast::Type::Uint64,
+            },
+            span: testing::span_of(&source, "1", 0),
+        }]
+    );
+}
+
+#[test]
+fn a_failed_condition_still_checks_the_block() {
+    let source = wrap("if 1 { return x } return 2");
+    assert_eq!(
+        check_err(&source),
+        vec![
+            diag::Entry {
+                kind: diag::Kind::TypeMismatch {
+                    expected: typed_ast::Type::Bool,
+                    found: typed_ast::Type::Uint64,
+                },
+                span: testing::span_of(&source, "1", 0),
+            },
+            diag::Entry {
+                kind: diag::Kind::UndefinedVariable {
+                    name: "x".to_string(),
+                },
+                span: testing::span_of(&source, "x", 0),
+            },
+        ]
+    );
+}
+
+#[test]
+fn a_variable_declared_in_a_block_is_not_visible_after_it() {
+    let source = wrap("if true { var y uint64 = 1 return y } return y");
+    assert_eq!(
+        check_err(&source),
+        vec![diag::Entry {
+            kind: diag::Kind::UndefinedVariable {
+                name: "y".to_string(),
+            },
+            span: testing::span_of(&source, "y", 2),
+        }]
+    );
+}
+
+#[test]
+fn a_block_may_not_redeclare_a_parameter() {
+    let source = "func f(q uint64) uint64 { if true { var q uint64 = 1 return q } return 2 }";
+    assert_eq!(
+        check_err(source),
+        vec![diag::Entry {
+            kind: diag::Kind::DuplicateVariable {
+                name: "q".to_string(),
+            },
+            span: testing::span_of(source, "q", 1),
+        }]
+    );
+}
+
+#[test]
+fn a_block_may_not_redeclare_an_outer_variable() {
+    let source = wrap("var q uint64 = 1 if true { var q uint64 = 2 return q } return q");
+    assert_eq!(
+        check_err(&source),
+        vec![diag::Entry {
+            kind: diag::Kind::DuplicateVariable {
+                name: "q".to_string(),
+            },
+            span: testing::span_of(&source, "q", 1),
+        }]
+    );
+}
+
+#[test]
+fn sibling_blocks_may_declare_the_same_name() {
+    let source = wrap(
+        "if true { var a uint64 = 1 return a } if true { var a uint64 = 2 return a } return 3",
+    );
+    let program = check_ok(&source);
+    assert_eq!(
+        slots(&program),
+        vec![typed_ast::LocalId(0), typed_ast::LocalId(1)]
+    );
+}
+
+/// Every slot the single function of `program` declares, in source order,
+/// recursing into blocks.
+fn slots(program: &typed_ast::Program) -> Vec<typed_ast::LocalId> {
+    fn walk(stmts: &[typed_ast::Stmt], found: &mut Vec<typed_ast::LocalId>) {
+        for stmt in stmts {
+            match stmt {
+                typed_ast::Stmt::Var { local, .. } => found.push(*local),
+                typed_ast::Stmt::Return { .. } => {}
+                typed_ast::Stmt::If(stmt) => walk(&stmt.then, found),
+            }
+        }
+    }
+
+    let mut found = Vec::new();
+    for func in &program.funcs {
+        walk(&func.body, &mut found);
+    }
+    found
+}
+
+#[test]
+fn a_block_declaration_takes_the_next_slot() {
+    let source =
+        wrap("var a uint64 = 1 if true { var b uint64 = 2 return b } var d uint64 = 3 return d");
+    let program = check_ok(&source);
+    assert_eq!(
+        slots(&program),
+        vec![
+            typed_ast::LocalId(0),
+            typed_ast::LocalId(1),
+            typed_ast::LocalId(2)
+        ]
+    );
+}
+
+#[test]
+fn declarations_inside_a_block_count_toward_the_capacity() {
+    let outer: String = (0..typed_ast::LocalId::CAPACITY)
+        .map(|index| format!("var v{index} uint64 = 1 "))
+        .collect();
+    let source = wrap(&format!(
+        "{outer}if true {{ var last uint64 = 1 return 2 }} return 1"
+    ));
+    assert_eq!(
+        check_err(&source),
+        vec![diag::Entry {
+            kind: diag::Kind::TooManyVariables {
+                max: typed_ast::LocalId::CAPACITY,
+            },
+            span: testing::span_of(&source, "last", 0),
+        }]
+    );
+}
+
+#[test]
+fn an_if_does_not_terminate() {
+    let source = wrap("if true { return 1 }");
+    assert_eq!(
+        check_err(&source),
+        vec![diag::Entry {
+            kind: diag::Kind::MissingReturn,
+            span: testing::span_of(&source, "approval", 0),
+        }]
+    );
+}
+
+#[test]
+fn a_statement_after_a_return_inside_a_block_is_unreachable() {
+    let source = wrap("if true { return 1 return 2 } return 3");
+    assert_eq!(
+        check_err(&source),
+        vec![diag::Entry {
+            kind: diag::Kind::UnreachableStatement,
+            span: testing::span_of(&source, "return 2", 0),
+        }]
+    );
+}
+
+#[test]
+fn a_block_reports_unreachable_before_the_function_reports_missing_return() {
+    let source = wrap("if true { return 1 return 2 }");
+    assert_eq!(
+        check_err(&source),
+        vec![
+            diag::Entry {
+                kind: diag::Kind::UnreachableStatement,
+                span: testing::span_of(&source, "return 2", 0),
+            },
+            diag::Entry {
+                kind: diag::Kind::MissingReturn,
+                span: testing::span_of(&source, "approval", 0),
+            },
+        ]
+    );
+}
+
+#[test]
+fn an_if_after_a_return_is_unreachable() {
+    let source = wrap("return 1 if true { return 2 }");
+    assert_eq!(
+        check_err(&source),
+        vec![diag::Entry {
+            kind: diag::Kind::UnreachableStatement,
+            span: testing::span_of(&source, "if true { return 2 }", 0),
+        }]
+    );
+}
+
+#[test]
+fn a_return_inside_a_block_must_have_the_return_type() {
+    let source = wrap("if true { return true } return 1");
+    assert_eq!(
+        check_err(&source),
+        vec![diag::Entry {
+            kind: diag::Kind::TypeMismatch {
+                expected: typed_ast::Type::Uint64,
+                found: typed_ast::Type::Bool,
+            },
+            span: testing::span_of(&source, "true", 1),
+        }]
+    );
+}

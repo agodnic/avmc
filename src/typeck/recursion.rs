@@ -40,14 +40,26 @@ fn call_graph(program: &typed_ast::Program) -> Vec<Vec<Edge>> {
         .iter()
         .map(|func| {
             let mut edges = Vec::new();
-            for stmt in &func.body {
-                let (typed_ast::Stmt::Var { init: expr, .. }
-                | typed_ast::Stmt::Return { expr, .. }) = stmt;
-                collect(expr, &mut edges);
-            }
+            collect_block(&func.body, &mut edges);
             edges
         })
         .collect()
+}
+
+/// Collects the calls a block's statements make, in source order, recursing
+/// into the block of an `if`: a call there closes a cycle like any other.
+fn collect_block(stmts: &[typed_ast::Stmt], edges: &mut Vec<Edge>) {
+    for stmt in stmts {
+        match stmt {
+            typed_ast::Stmt::Var { init: expr, .. } | typed_ast::Stmt::Return { expr, .. } => {
+                collect(expr, edges);
+            }
+            typed_ast::Stmt::If(stmt) => {
+                collect(&stmt.cond, edges);
+                collect_block(&stmt.then, edges);
+            }
+        }
+    }
 }
 
 /// Collects the calls `expr` makes, the outer call before the calls in its

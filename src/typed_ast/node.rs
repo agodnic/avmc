@@ -101,6 +101,19 @@ pub enum Stmt {
         /// From `return` through the expression.
         span: diag::Span,
     },
+    /// `if cond { then }`.
+    If(IfStmt),
+}
+
+/// `if cond { then }`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct IfStmt {
+    /// The condition. A `bool`.
+    pub cond: Expr,
+    /// The statements run when the condition holds, in source order.
+    pub then: Vec<Stmt>,
+    /// From `if` through the closing `}`.
+    pub span: diag::Span,
 }
 
 /// An expression and its type.

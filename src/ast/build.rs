@@ -1,6 +1,6 @@
 //! Building the AST from the concrete syntax tree.
 
-use super::node::{BinOp, Expr, FuncDecl, Name, Param, Program, Stmt, TypeRef, UnOp};
+use super::node::{BinOp, Expr, FuncDecl, IfStmt, Name, Param, Program, Stmt, TypeRef, UnOp};
 use crate::cst;
 use crate::diag;
 use crate::lexer;
@@ -33,6 +33,7 @@ pub(crate) fn binary_op(kind: lexer::TokenKind) -> Option<BinOp> {
         lexer::TokenKind::Func
         | lexer::TokenKind::Return
         | lexer::TokenKind::Var
+        | lexer::TokenKind::If
         | lexer::TokenKind::True
         | lexer::TokenKind::False
         | lexer::TokenKind::Ident
@@ -132,6 +133,18 @@ impl Builder<'_> {
                     end: expr.span().end,
                 };
                 Some(Stmt::Return { expr, span })
+            }
+            cst::Stmt::If(stmt) => {
+                let cond = self.expr(&stmt.cond)?;
+                let mut then = Vec::new();
+                for inner in &stmt.then.stmts {
+                    then.push(self.stmt(inner)?);
+                }
+                let span = diag::Span {
+                    start: stmt.keyword.span.start,
+                    end: stmt.then.rbrace.span.end,
+                };
+                Some(Stmt::If(IfStmt { cond, then, span }))
             }
         }
     }

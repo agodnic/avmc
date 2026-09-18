@@ -70,6 +70,29 @@ pub enum Stmt {
         /// From `return` through the expression.
         span: diag::Span,
     },
+    /// `if cond { then }`.
+    If(IfStmt),
+}
+
+impl Stmt {
+    /// Where it was written.
+    pub fn span(&self) -> diag::Span {
+        match self {
+            Stmt::Var { span, .. } | Stmt::Return { span, .. } => *span,
+            Stmt::If(stmt) => stmt.span,
+        }
+    }
+}
+
+/// `if cond { then }`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct IfStmt {
+    /// The condition.
+    pub cond: Expr,
+    /// The statements run when the condition holds, in source order.
+    pub then: Vec<Stmt>,
+    /// From `if` through the closing `}`.
+    pub span: diag::Span,
 }
 
 /// An expression. Parentheses are not a node: the AST of `(x)` is that of `x`.

@@ -141,6 +141,11 @@ impl Printer<'_> {
                 self.token_with_blanks(ret, Sep::Tight, blanks);
                 self.expr(expr, Sep::Space);
             }
+            cst::Stmt::If(stmt) => {
+                self.token_with_blanks(&stmt.keyword, Sep::Tight, blanks);
+                self.expr(&stmt.cond, Sep::Space);
+                self.block(&stmt.then, Sep::Space);
+            }
         }
     }
 

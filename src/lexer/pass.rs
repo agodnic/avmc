@@ -72,6 +72,7 @@ pub fn lex(source: &str, diags: &mut diag::Sink) -> Option<Vec<Token>> {
                     Some("func") => TokenKind::Func,
                     Some("return") => TokenKind::Return,
                     Some("var") => TokenKind::Var,
+                    Some("if") => TokenKind::If,
                     Some("true") => TokenKind::True,
                     Some("false") => TokenKind::False,
                     _ => TokenKind::Ident,

@@ -82,6 +82,19 @@ pub enum Stmt {
         /// The returned expression.
         expr: Expr,
     },
+    /// `if cond { then }`.
+    If(IfStmt),
+}
+
+/// `if cond { then }`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct IfStmt {
+    /// The `if` keyword.
+    pub keyword: lexer::Token,
+    /// The condition.
+    pub cond: Expr,
+    /// The block run when the condition holds.
+    pub then: Block,
 }
 
 /// An expression.

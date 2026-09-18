@@ -22,6 +22,11 @@ const CALLS: &str = "func approval() uint64 {\n\treturn add(1, double(2))\n}\n\n
 const VARIABLES: &str = "func approval() uint64 {\n  var x uint64 = 1 + 2\n  \
                          var y uint64 = x * 3\n  return y - x\n}\n";
 
+/// The example program of the `if` milestone, with a comment in the block.
+const IF: &str = "func approval() uint64 {\n\tvar x uint64 = 3\n\tif x > 2 {\n\t\t\
+                  // doubled\n\t\tvar y uint64 = x * 2\n\t\treturn y\n\t}\n\t\
+                  return x\n}\n";
+
 /// Lexes and parses `source`, asserting that both succeeded without
 /// diagnostics.
 fn parse_cst(source: &str) -> Program {
@@ -39,6 +44,7 @@ fn the_tree_is_lossless() {
         VARIABLES,
         PARAMETERS,
         CALLS,
+        IF,
         "func f() uint64 { return (1 + 2) * 3 // grouped\n}\n",
     ];
 

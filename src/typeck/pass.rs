@@ -117,22 +117,34 @@ fn check_func(
     })
 }
 
-/// A function's scope: its parameters, then the variables its body declares.
-/// They share one namespace, and a binding's index in its own list is its id.
-/// A type of `None` is one that did not resolve.
+/// A function's scope: its parameters, the frame its body declares, and which
+/// of those slots a name can currently reach. Parameters and variables share
+/// one namespace. A type of `None` is one that did not resolve.
 #[derive(Default)]
 struct Scope<'a> {
     params: Vec<(&'a str, Option<typed_ast::Type>)>,
+    /// The frame: every declaration in the function, in source order, indexed
+    /// by `LocalId`. A block never gives a slot back.
     locals: Vec<(&'a str, Option<typed_ast::Type>)>,
+    /// The slots a name can reach, innermost last. Leaving a block truncates
+    /// it back to the height the block found on entry.
+    visible: Vec<typed_ast::LocalId>,
 }
 
 impl Scope<'_> {
-    /// Whether the scope already declares `name`.
+    /// Whether a parameter or a visible variable already declares `name`.
     fn holds(&self, name: &str) -> bool {
-        self.params
-            .iter()
-            .chain(&self.locals)
-            .any(|(declared, _)| *declared == name)
+        self.params.iter().any(|(declared, _)| *declared == name)
+            || self.visible_var(name).is_some()
+    }
+
+    /// The slot and declared type `name` reaches, searching from the
+    /// innermost block outwards.
+    fn visible_var(&self, name: &str) -> Option<(typed_ast::LocalId, Option<typed_ast::Type>)> {
+        self.visible.iter().rev().find_map(|&local| {
+            let (declared, ty) = self.locals.get(usize::from(local.0))?;
+            (*declared == name).then_some((local, *ty))
+        })
     }
 }
 
@@ -178,9 +190,9 @@ fn resolve_type(ret: &ast::TypeRef, diags: &mut diag::Sink) -> Option<typed_ast:
     }
 }
 
-/// Checks a function body: every statement in it, in the scope its
-/// parameters opened. The body must end with a `return`, and nothing may
-/// follow one — of which only the first is reported.
+/// Checks a function body as a block, in the scope its parameters opened. A
+/// body that does not terminate is missing its `return`, which is reported
+/// after anything the block itself reported.
 fn check_body<'a>(
     func: &'a ast::FuncDecl,
     ret: Option<typed_ast::Type>,
@@ -188,38 +200,53 @@ fn check_body<'a>(
     scope: &mut Scope<'a>,
     diags: &mut diag::Sink,
 ) -> Option<Vec<typed_ast::Stmt>> {
-    let mut stmts = Vec::new();
-    let mut ok = true;
-    let mut returned = false;
-    let mut unreachable = None;
-
-    for stmt in &func.body {
-        let (ast::Stmt::Var { span, .. } | ast::Stmt::Return { span, .. }) = stmt;
-        if returned && unreachable.is_none() {
-            unreachable = Some(*span);
-        }
-        match check_stmt(stmt, ret, funcs, scope, diags) {
-            Some(stmt) => stmts.push(stmt),
-            None => ok = false,
-        }
-        returned |= matches!(stmt, ast::Stmt::Return { .. });
-    }
-
-    if !returned {
+    let (stmts, terminates) = check_block(&func.body, ret, funcs, scope, diags);
+    if !terminates {
         diags.push(diag::Entry {
             kind: diag::Kind::MissingReturn,
             span: func.name.span,
         });
         return None;
     }
+    stmts
+}
+
+/// Checks `stmts` in order, and says whether the block terminates: whether a
+/// `return` runs. Nothing may follow one — of which only the first is
+/// reported, once every statement has checked.
+fn check_block<'a>(
+    stmts: &'a [ast::Stmt],
+    ret: Option<typed_ast::Type>,
+    funcs: &Signatures,
+    scope: &mut Scope<'a>,
+    diags: &mut diag::Sink,
+) -> (Option<Vec<typed_ast::Stmt>>, bool) {
+    let mut checked = Vec::new();
+    let mut ok = true;
+    let mut returned = false;
+    let mut unreachable = None;
+
+    for stmt in stmts {
+        if returned && unreachable.is_none() {
+            unreachable = Some(stmt.span());
+        }
+        match check_stmt(stmt, ret, funcs, scope, diags) {
+            Some(stmt) => checked.push(stmt),
+            None => ok = false,
+        }
+        // An `if` never terminates: without an `else` its condition may be
+        // false.
+        returned |= matches!(stmt, ast::Stmt::Return { .. });
+    }
+
     if let Some(span) = unreachable {
         diags.push(diag::Entry {
             kind: diag::Kind::UnreachableStatement,
             span,
         });
-        return None;
+        ok = false;
     }
-    ok.then_some(stmts)
+    (ok.then_some(checked), returned)
 }
 
 /// Checks one statement, adding what it declares to `locals`. `ret` is the
@@ -262,7 +289,35 @@ fn check_stmt<'a>(
             check_type(Some(&expr), ret, diags).then_some(())?;
             Some(typed_ast::Stmt::Return { expr, span: *span })
         }
+        ast::Stmt::If(stmt) => {
+            let cond = check_expr(&stmt.cond, funcs, scope, diags);
+            let agrees = check_type(cond.as_ref(), Some(typed_ast::Type::Bool), diags);
+            // The block is checked, and reported, whether or not the
+            // condition was a `bool`.
+            let (then, _) = check_scoped_block(&stmt.then, ret, funcs, scope, diags);
+            agrees.then_some(())?;
+            Some(typed_ast::Stmt::If(typed_ast::IfStmt {
+                cond: cond?,
+                then: then?,
+                span: stmt.span,
+            }))
+        }
     }
+}
+
+/// Checks a nested block, whose declarations take frame slots of their own
+/// but stop being visible at its `}`.
+fn check_scoped_block<'a>(
+    stmts: &'a [ast::Stmt],
+    ret: Option<typed_ast::Type>,
+    funcs: &Signatures,
+    scope: &mut Scope<'a>,
+    diags: &mut diag::Sink,
+) -> (Option<Vec<typed_ast::Stmt>>, bool) {
+    let height = scope.visible.len();
+    let checked = check_block(stmts, ret, funcs, scope, diags);
+    scope.visible.truncate(height);
+    checked
 }
 
 /// Reports `expr` if it has a type other than `expected`, returning false if
@@ -303,6 +358,7 @@ fn declare<'a>(
         }
     } else if let Some(local) = typed_ast::LocalId::new(scope.locals.len()) {
         scope.locals.push((&name.text, ty));
+        scope.visible.push(local);
         return Some(local);
     } else {
         diag::Kind::TooManyVariables {
@@ -498,9 +554,8 @@ fn resolve_var(
         let id = typed_ast::ParamId::new(index)?;
         return Some((typed_ast::ExprKind::Param(id), ty?));
     }
-    if let Some((index, ty)) = lookup(&scope.locals, name) {
-        let id = typed_ast::LocalId::new(index)?;
-        return Some((typed_ast::ExprKind::Var(id), ty?));
+    if let Some((local, ty)) = scope.visible_var(&name.text) {
+        return Some((typed_ast::ExprKind::Var(local), ty?));
     }
 
     diags.push(diag::Entry {

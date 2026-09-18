@@ -85,6 +85,10 @@ const CALLS: &str = "func approval() uint64 {\n\treturn add(1, double(2))\n}\n\n
                      func add(a uint64, b uint64) uint64 {\n\treturn a + b\n}\n\n\
                      func double(x uint64) uint64 {\n\treturn x * 2\n}\n";
 
+/// The example program of the `if` milestone.
+const IF: &str = "func approval() uint64 {\n\tvar x uint64 = 3\n\tif x > 2 {\n\t\t\
+                  var y uint64 = x * 2\n\t\treturn y\n\t}\n\treturn x\n}\n";
+
 /// Every golden input, for the properties to run over.
 const GOLDEN: &[&str] = &[
     CANONICAL,
@@ -99,6 +103,7 @@ const GOLDEN: &[&str] = &[
     TRAILING_COMMENT,
     PARAMETERS,
     CALLS,
+    IF,
     "",
     "//x\n",
     "//   spaced   \n",
@@ -168,6 +173,28 @@ fn calls_are_formatted() {
         format_ok("func f() uint64 { return f( ) }"),
         "func f() uint64 {\n\treturn f()\n}\n"
     );
+}
+
+#[test]
+fn an_if_is_formatted() {
+    let messy = "func approval() uint64 {\n\tvar x uint64 = 3\nif x>2{\n\
+                 var y uint64 = x*2\nreturn y\n}\n\treturn x\n}\n";
+    assert_eq!(format_ok(messy), IF);
+    assert_eq!(format_ok(IF), IF);
+
+    // An empty block prints on two lines, as an empty body does.
+    let empty = "func f() uint64 { if x {} return 1 }";
+    assert_eq!(
+        format_ok(empty),
+        "func f() uint64 {\n\tif x {\n\t}\n\treturn 1\n}\n"
+    );
+}
+
+#[test]
+fn comments_inside_an_if_are_indented() {
+    let commented = "func f() uint64 {\n\tif x {\n\t\t// why\n\t\treturn 1\n\t\t\
+                     // done\n\t}\n\treturn 2\n}\n";
+    assert_eq!(format_ok(commented), commented);
 }
 
 #[test]

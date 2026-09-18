@@ -846,3 +846,200 @@ fn a_call_inside_an_expression() {
         ]
     );
 }
+
+#[test]
+fn an_if_branches_over_its_block() {
+    let source = "func approval() uint64 {\n\tvar x uint64 = 3\n\tif x > 2 {\n\t\t\
+                  var y uint64 = x * 2\n\t\treturn y\n\t}\n\treturn x\n}\n";
+    let mut span = testing::spans(source);
+
+    let func_start = span("func").start;
+    span("approval");
+    span("uint64");
+    let x_decl_start = span("var").start;
+    span("x");
+    span("uint64");
+    let three = span("3");
+    let if_start = span("if").start;
+    let x_cond = span("x");
+    let two = span("2");
+    let y_decl_start = span("var").start;
+    span("y");
+    span("uint64");
+    let x_mul = span("x");
+    let two_mul = span("2");
+    let return_y_start = span("return").start;
+    let y_read = span("y");
+    let if_end = span("}").end;
+    let return_x_start = span("return").start;
+    let x_read = span("x");
+    let end = span("}").end;
+
+    let x_decl = diag::Span {
+        start: x_decl_start,
+        end: three.end,
+    };
+    let cond = diag::Span {
+        start: x_cond.start,
+        end: two.end,
+    };
+    let if_span = diag::Span {
+        start: if_start,
+        end: if_end,
+    };
+    let mul = diag::Span {
+        start: x_mul.start,
+        end: two_mul.end,
+    };
+    let y_decl = diag::Span {
+        start: y_decl_start,
+        end: two_mul.end,
+    };
+    let return_y = diag::Span {
+        start: return_y_start,
+        end: y_read.end,
+    };
+    let return_x = diag::Span {
+        start: return_x_start,
+        end: x_read.end,
+    };
+
+    assert_eq!(
+        lower_ok(source),
+        ir::Program {
+            funcs: vec![ir::Function {
+                name: "approval".to_string(),
+                ret: typed_ast::Type::Uint64,
+                params: vec![],
+                // The block's declaration takes the slot after the outer one.
+                locals: vec![typed_ast::Type::Uint64, typed_ast::Type::Uint64],
+                insts: vec![
+                    ir::Inst::Const {
+                        dest: ir::ValueId(0),
+                        value: ir::ConstValue::Uint64(3),
+                        span: three,
+                    },
+                    ir::Inst::Store {
+                        local: typed_ast::LocalId(0),
+                        value: ir::ValueId(0),
+                        span: x_decl,
+                    },
+                    ir::Inst::Load {
+                        dest: ir::ValueId(1),
+                        local: typed_ast::LocalId(0),
+                        span: x_cond,
+                    },
+                    ir::Inst::Const {
+                        dest: ir::ValueId(2),
+                        value: ir::ConstValue::Uint64(2),
+                        span: two,
+                    },
+                    ir::Inst::Binary {
+                        dest: ir::ValueId(3),
+                        op: ast::BinOp::Gt,
+                        lhs: ir::ValueId(1),
+                        rhs: ir::ValueId(2),
+                        span: cond,
+                    },
+                    ir::Inst::BranchIfZero {
+                        cond: ir::ValueId(3),
+                        target: ir::LabelId(0),
+                        span: if_span,
+                    },
+                    ir::Inst::Load {
+                        dest: ir::ValueId(4),
+                        local: typed_ast::LocalId(0),
+                        span: x_mul,
+                    },
+                    ir::Inst::Const {
+                        dest: ir::ValueId(5),
+                        value: ir::ConstValue::Uint64(2),
+                        span: two_mul,
+                    },
+                    ir::Inst::Binary {
+                        dest: ir::ValueId(6),
+                        op: ast::BinOp::Mul,
+                        lhs: ir::ValueId(4),
+                        rhs: ir::ValueId(5),
+                        span: mul,
+                    },
+                    ir::Inst::Store {
+                        local: typed_ast::LocalId(1),
+                        value: ir::ValueId(6),
+                        span: y_decl,
+                    },
+                    ir::Inst::Load {
+                        dest: ir::ValueId(7),
+                        local: typed_ast::LocalId(1),
+                        span: y_read,
+                    },
+                    ir::Inst::Return {
+                        value: ir::ValueId(7),
+                        span: return_y,
+                    },
+                    ir::Inst::Label {
+                        label: ir::LabelId(0),
+                        span: if_span,
+                    },
+                    ir::Inst::Load {
+                        dest: ir::ValueId(8),
+                        local: typed_ast::LocalId(0),
+                        span: x_read,
+                    },
+                    ir::Inst::Return {
+                        value: ir::ValueId(8),
+                        span: return_x,
+                    },
+                ],
+                span: diag::Span {
+                    start: func_start,
+                    end,
+                },
+            }]
+        }
+    );
+}
+
+/// The labels each `if` of `source`'s single function branches to, in the
+/// order the branches are emitted.
+fn branch_targets(source: &str) -> Vec<ir::LabelId> {
+    lower_ok(source)
+        .funcs
+        .first()
+        .expect("one function")
+        .insts
+        .iter()
+        .filter_map(|inst| match inst {
+            ir::Inst::BranchIfZero { target, .. } => Some(*target),
+            _ => None,
+        })
+        .collect()
+}
+
+#[test]
+fn nested_ifs_number_their_labels_in_order() {
+    let source = "func approval() uint64 { if true { if false { return 1 } return 2 } return 3 }";
+    // The outer `if` is met first, so it takes `L0`.
+    assert_eq!(branch_targets(source), vec![ir::LabelId(0), ir::LabelId(1)]);
+}
+
+#[test]
+fn a_block_declaration_stores_to_its_slot() {
+    let source = "func approval() uint64 { var a uint64 = 1 if true { var b uint64 = 2 return b } return a }";
+    let func = lower_ok(source);
+    let func = func.funcs.first().expect("one function");
+
+    assert_eq!(
+        func.locals,
+        vec![typed_ast::Type::Uint64, typed_ast::Type::Uint64]
+    );
+    let stores: Vec<_> = func
+        .insts
+        .iter()
+        .filter_map(|inst| match inst {
+            ir::Inst::Store { local, .. } => Some(*local),
+            _ => None,
+        })
+        .collect();
+    assert_eq!(stores, vec![typed_ast::LocalId(0), typed_ast::LocalId(1)]);
+}
